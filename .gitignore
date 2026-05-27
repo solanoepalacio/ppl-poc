@@ -1,0 +1,30 @@
+# dependencies
+node_modules/
+
+# yarn (node-modules linker)
+.yarn/*
+!.yarn/patches
+!.yarn/releases
+!.yarn/plugins
+!.yarn/sdks
+!.yarn/versions
+.pnp.*
+
+# build output
+dist/
+build/
+.next/
+*.tsbuildinfo
+
+# prisma / sqlite
+packages/backend/prisma/*.db
+packages/backend/prisma/*.db-journal
+
+# env
+.env
+.env.local
+
+# misc
+.DS_Store
+coverage/
+*.log

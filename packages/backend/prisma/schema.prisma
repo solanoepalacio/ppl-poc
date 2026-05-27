@@ -1,0 +1,54 @@
+// Prisma schema for the Pannico order-intake PoC.
+// SQLite is used for PoC simplicity; status is a plain String column
+// constrained by the shared OrderStatus union and validated in the service layer
+// (SQLite + Prisma do not support native enums).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// Catalog product, populated by the seed. `active` lets us retire a product
+/// without hard-deleting it (historical OrderItems keep their reference).
+model Product {
+  id     String  @id @default(cuid())
+  name   String
+  active Boolean @default(true)
+
+  orderItems OrderItem[]
+}
+
+/// An order. The single-use token lives on the order (1:1) since a token is
+/// bound to exactly one order. `status` follows the shared OrderStatus union.
+model Order {
+  id          String    @id @default(cuid())
+  phone       String
+  token       String    @unique
+  status      String    @default("pending")
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+  confirmedAt DateTime?
+
+  items OrderItem[]
+
+  @@index([createdAt])
+  @@index([status])
+}
+
+/// A line item recorded on an order at confirmation. References Product so
+/// out-of-catalog items are structurally impossible.
+model OrderItem {
+  id        String @id @default(cuid())
+  orderId   String
+  productId String
+  quantity  Int
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+}

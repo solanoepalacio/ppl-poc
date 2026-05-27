@@ -1,0 +1,155 @@
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import type {
+  ConfirmOrderItem,
+  DayViewResponse,
+  Product,
+  TokenValidationResponse,
+} from '@pannico/shared';
+import { PrismaService } from '../prisma/prisma.service';
+import { TokenService } from './token.service';
+
+@Injectable()
+export class OrdersService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly tokenService: TokenService,
+  ) {}
+
+  /** Active catalog products, used by the form and the `/products` endpoint. */
+  async getCatalog(): Promise<Product[]> {
+    return this.prisma.product.findMany({
+      where: { active: true },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  /**
+   * Validates a token for the customer form. When valid, returns the bound
+   * phone and the catalog so the form can render; when invalid/expired/consumed,
+   * returns `{ valid: false }` and resolves no phone or catalog.
+   */
+  async validateToken(token: string): Promise<TokenValidationResponse> {
+    const order = await this.tokenService.findOrderByToken(token);
+    if (!this.tokenService.isValid(order)) {
+      return { valid: false };
+    }
+    return {
+      valid: true,
+      phone: order!.phone,
+      catalog: await this.getCatalog(),
+    };
+  }
+
+  /**
+   * Confirms an order: validates items against the catalog, records them, and
+   * transitions the order to `issued`. Rejects empty orders and out-of-catalog
+   * items, leaving the order `pending`. Rejects invalid/expired/consumed tokens.
+   */
+  async confirm(token: string, items: ConfirmOrderItem[]): Promise<void> {
+    const order = await this.tokenService.resolveValidOrder(token);
+    if (!order) {
+      throw new NotFoundException('Invalid, expired, or already-used link.');
+    }
+
+    if (!Array.isArray(items) || items.length === 0) {
+      throw new BadRequestException('An order must contain at least one item.');
+    }
+
+    // Every referenced product must exist and be active (in the catalog).
+    const productIds = [...new Set(items.map((i) => i.productId))];
+    const products = await this.prisma.product.findMany({
+      where: { id: { in: productIds }, active: true },
+      select: { id: true },
+    });
+    const validIds = new Set(products.map((p) => p.id));
+    for (const item of items) {
+      if (!validIds.has(item.productId)) {
+        throw new BadRequestException(
+          `Product ${item.productId} is not in the catalog.`,
+        );
+      }
+      if (!Number.isInteger(item.quantity) || item.quantity < 1) {
+        throw new BadRequestException('Item quantities must be positive integers.');
+      }
+    }
+
+    // Record items and flip to `issued` atomically.
+    await this.prisma.$transaction([
+      this.prisma.orderItem.createMany({
+        data: items.map((i) => ({
+          orderId: order.id,
+          productId: i.productId,
+          quantity: i.quantity,
+        })),
+      }),
+      this.prisma.order.update({
+        where: { id: order.id },
+        data: { status: 'issued', confirmedAt: new Date() },
+      }),
+    ]);
+  }
+
+  /**
+   * Records the customer's WhatsApp fallback: transitions the order to `denied`
+   * and records no items. Rejects invalid/expired/consumed tokens.
+   */
+  async denyForWhatsapp(token: string): Promise<void> {
+    const order = await this.tokenService.resolveValidOrder(token);
+    if (!order) {
+      throw new NotFoundException('Invalid, expired, or already-used link.');
+    }
+    await this.prisma.order.update({
+      where: { id: order.id },
+      data: { status: 'denied' },
+    });
+  }
+
+  /**
+   * Returns orders created on `day` (YYYY-MM-DD, server-local), defaulting to
+   * today, each with its status, items, and phone number for the back office.
+   */
+  async getOrdersByDay(day?: string): Promise<DayViewResponse> {
+    const { start, end, label } = dayBounds(day);
+    const orders = await this.prisma.order.findMany({
+      where: { createdAt: { gte: start, lt: end } },
+      orderBy: { createdAt: 'desc' },
+      include: { items: true },
+    });
+    return {
+      day: label,
+      orders: orders.map((o) => ({
+        id: o.id,
+        phone: o.phone,
+        status: o.status as DayViewResponse['orders'][number]['status'],
+        createdAt: o.createdAt.toISOString(),
+        items: o.items,
+      })),
+    };
+  }
+}
+
+/** Computes [start, end) bounds for a YYYY-MM-DD day in server-local time. */
+function dayBounds(day?: string): { start: Date; end: Date; label: string } {
+  let year: number;
+  let month: number;
+  let date: number;
+  if (day && /^\d{4}-\d{2}-\d{2}$/.test(day)) {
+    const [y, m, d] = day.split('-').map(Number);
+    year = y;
+    month = m;
+    date = d;
+  } else {
+    const now = new Date();
+    year = now.getFullYear();
+    month = now.getMonth() + 1;
+    date = now.getDate();
+  }
+  const start = new Date(year, month - 1, date, 0, 0, 0, 0);
+  const end = new Date(year, month - 1, date + 1, 0, 0, 0, 0);
+  const label = `${year}-${String(month).padStart(2, '0')}-${String(date).padStart(2, '0')}`;
+  return { start, end, label };
+}
