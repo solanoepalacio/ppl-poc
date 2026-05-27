@@ -25,30 +25,4 @@
     <goal_for_poc>
     Fully automate orders taking process for orders comming throuh Whatsapp.
     </goal_for_poc>
-    <output_requirements>
-    ## Output:
-    The main goal is to create two sets of documents:
-    - A set of documents with the technical specification of the application, located under `/spec/*`
-    - A development plan to get to get to such spec.
-
-    ## Details:
-    ### Spec:
-    The spec is the technical specification of the system.
-    It's rich in technical details.
-    It has a main file `spec/spec.md` that contains a brief description of all the components and interactions in the system. In general avoid excessive details in the main spec file such as code, database schemas, flow diagrams, etc. Technical details specific to any of the components of the system are created as a separate file `spec/components` `spec/subsystems` etc... (names based on demand as we go). The mail spec file can and should reference the technical when relevant.
-    
-    ### Development Plan:
-    The development plan can only be started when the spec is mostly ready.
-    Some minor changes might still be made to the spec during the creation and refinement of the development plan.
-    The development plan is broken down into phases, where each phase has a clear deliverable that can be verified by a human.
-    Each phase is further broken down into tasks with sufficient context so that an agent can perform autonomously without reading the entire plan.
-
-    Similary to the spec, the plan has a main file (`plans/master-plan.md`) that must mention all phases at a high level. It must avoid technical details such as code snippets, etc.
-    The goal of the master-plan is to get an understanding how we'll progress through the different phases and what we'll be finished in each of them.
-
-    </output_requirements>
-    <other_documents>
-    As we plan and refine the PoC, we'll also document the system architecture, stack and other technical details under `docs/design-decisions`, `docs/architecture`, etc...
-    These are usually documents explaning the rationale behind a decision, diagrams to help understand the architecture, and other **supporting** documents. The source of truth of the current system is `/spec`
-    </other_documents>
 </context>
