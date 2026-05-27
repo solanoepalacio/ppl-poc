@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import type { CreateLinkResponse } from '@pannico/shared';
 import { createLink } from '@/lib/api';
 
@@ -36,9 +35,6 @@ export default function LinksPage() {
 
   return (
     <section>
-      <p className="muted">
-        <Link href="/">← Back office</Link>
-      </p>
       <h1>Generate an order link</h1>
       <form onSubmit={generate} className="card">
         <label htmlFor="phone">Customer phone (E.164)</label>

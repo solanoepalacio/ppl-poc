@@ -1,5 +1,5 @@
-import Link from 'next/link';
 import { getOrdersByDay, getProducts } from '@/lib/api';
+import { OrderStatusControl } from './OrderStatusControl';
 
 /**
  * Back-office day view: orders created on the selected day (default today),
@@ -19,9 +19,6 @@ export default async function OrdersPage({
 
   return (
     <section>
-      <p className="muted">
-        <Link href="/">← Back office</Link>
-      </p>
       <h1>Orders</h1>
 
       <form className="card" method="get">
@@ -38,9 +35,7 @@ export default async function OrdersPage({
         <div className="card" key={order.id}>
           <div className="row" style={{ borderBottom: '1px solid #eee' }}>
             <strong>{order.phone}</strong>
-            <span className={`status status-${order.status}`}>
-              {order.status}
-            </span>
+            <OrderStatusControl orderId={order.id} status={order.status} />
           </div>
           <p className="muted">
             Created {new Date(order.createdAt).toLocaleString()}

@@ -3,11 +3,15 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import type {
-  ConfirmOrderItem,
-  DayViewResponse,
-  Product,
-  TokenValidationResponse,
+import {
+  isOrderStatus,
+  PRODUCTION_STATUSES,
+  type ConfirmOrderItem,
+  type DayViewResponse,
+  type OrderStatus,
+  type Product,
+  type ProductionTotalsResponse,
+  type TokenValidationResponse,
 } from '@pannico/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { TokenService } from './token.service';
@@ -109,6 +113,34 @@ export class OrdersService {
   }
 
   /**
+   * Back-office manual status update: sets an order's status to any valid
+   * status, regardless of its current value (transitions are free-form). Only
+   * `status` is touched — `confirmedAt` and items are left untouched. Rejects
+   * an unknown status (400) and a missing order (404), leaving it unchanged.
+   */
+  async updateStatus(
+    orderId: string,
+    status: string,
+  ): Promise<{ id: string; status: OrderStatus }> {
+    if (!isOrderStatus(status)) {
+      throw new BadRequestException(`Invalid order status: ${status}`);
+    }
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true },
+    });
+    if (!order) {
+      throw new NotFoundException(`Order ${orderId} not found.`);
+    }
+    const updated = await this.prisma.order.update({
+      where: { id: orderId },
+      data: { status },
+      select: { id: true, status: true },
+    });
+    return { id: updated.id, status: updated.status as OrderStatus };
+  }
+
+  /**
    * Returns orders created on `day` (YYYY-MM-DD, server-local), defaulting to
    * today, each with its status, items, and phone number for the back office.
    */
@@ -129,6 +161,45 @@ export class OrdersService {
         items: o.items,
       })),
     };
+  }
+
+  /**
+   * Per-item production totals for `day` (YYYY-MM-DD, server-local), defaulting
+   * to today: the summed quantity of each product across orders that represent
+   * real demand (`PRODUCTION_STATUSES`). Returns one entry per product with a
+   * positive total, sorted by product name; products with no demand are omitted.
+   */
+  async getProductionTotals(day?: string): Promise<ProductionTotalsResponse> {
+    const { start, end, label } = dayBounds(day);
+    const orders = await this.prisma.order.findMany({
+      where: {
+        createdAt: { gte: start, lt: end },
+        status: { in: PRODUCTION_STATUSES as string[] },
+      },
+      include: { items: { include: { product: true } } },
+    });
+
+    // Sum quantities per product, carrying the product name for display.
+    const totals = new Map<string, { name: string; quantity: number }>();
+    for (const order of orders) {
+      for (const item of order.items) {
+        const entry = totals.get(item.productId);
+        if (entry) {
+          entry.quantity += item.quantity;
+        } else {
+          totals.set(item.productId, {
+            name: item.product.name,
+            quantity: item.quantity,
+          });
+        }
+      }
+    }
+
+    const items = [...totals.entries()]
+      .map(([productId, { name, quantity }]) => ({ productId, name, quantity }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    return { day: label, items };
   }
 }
 

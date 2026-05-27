@@ -137,6 +137,44 @@ select {
   width: auto;
 }
 
+/* ── Back-office nav ──────────────────────────────────────── */
+.nav {
+  display: flex;
+  gap: 0.35rem;
+  background: var(--brand-slate);
+  border-radius: var(--radius);
+  padding: 0.35rem;
+  margin-bottom: 1.25rem;
+  box-shadow: var(--shadow-card);
+}
+.nav-link {
+  flex: 1;
+  text-align: center;
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.85);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.95rem;
+  min-height: var(--tap);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.nav-link:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+.nav-link.active {
+  background: var(--brand-amber);
+  color: var(--ink);
+}
+.nav-link:focus-visible {
+  outline: 3px solid var(--brand-amber);
+  outline-offset: 2px;
+}
+
 .subtitle {
   color: var(--ink-muted);
   margin: 0.25rem 0 1rem;
@@ -286,6 +324,22 @@ select {
 .status-issued { background: #d6f5dd; }
 .status-denied { background: #ffe0e0; }
 .status-ignored { background: #ececec; }
+.status-finished { background: #d9e8ff; }
+
+/* Status selector: a colored dot beside a plain select. */
+.status-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.status-dot {
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  flex: none;
+}
 
 .error {
   color: #b42318;

@@ -38,6 +38,17 @@ export interface ConfirmOrderRequest {
   items: ConfirmOrderItem[];
 }
 
+/** `PATCH /orders/:id/status` request: the manager sets a new order status. */
+export interface UpdateOrderStatusRequest {
+  status: OrderStatus;
+}
+
+/** `PATCH /orders/:id/status` response: the updated order id and status. */
+export interface UpdateOrderStatusResponse {
+  id: string;
+  status: OrderStatus;
+}
+
 /** An order as shown in the back-office day view. */
 export interface DayViewOrder {
   id: string;
@@ -51,4 +62,20 @@ export interface DayViewOrder {
 export interface DayViewResponse {
   day: string;
   orders: DayViewOrder[];
+}
+
+/** A single product's total quantity to produce for a day. */
+export interface ProductionTotalItem {
+  productId: string;
+  name: string;
+  quantity: number;
+}
+
+/**
+ * `GET /orders/production?day=YYYY-MM-DD` response: per-item production totals
+ * for the day, one entry per product with a positive total, sorted by name.
+ */
+export interface ProductionTotalsResponse {
+  day: string;
+  items: ProductionTotalItem[];
 }

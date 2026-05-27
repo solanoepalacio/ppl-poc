@@ -2,8 +2,11 @@ import type {
   ConfirmOrderItem,
   CreateLinkResponse,
   DayViewResponse,
+  OrderStatus,
   Product,
+  ProductionTotalsResponse,
   TokenValidationResponse,
+  UpdateOrderStatusResponse,
 } from '@pannico/shared';
 
 /**
@@ -72,6 +75,23 @@ export function getOrdersByDay(day?: string): Promise<DayViewResponse> {
   return request<DayViewResponse>(`/orders${qs}`);
 }
 
+export function getProductionTotals(
+  day?: string,
+): Promise<ProductionTotalsResponse> {
+  const qs = day ? `?day=${encodeURIComponent(day)}` : '';
+  return request<ProductionTotalsResponse>(`/orders/production${qs}`);
+}
+
 export function getProducts(): Promise<Product[]> {
   return request<Product[]>(`/products`);
+}
+
+export function updateOrderStatus(
+  orderId: string,
+  status: OrderStatus,
+): Promise<UpdateOrderStatusResponse> {
+  return request<UpdateOrderStatusResponse>(
+    `/orders/${encodeURIComponent(orderId)}/status`,
+    { method: 'PATCH', body: JSON.stringify({ status }) },
+  );
 }

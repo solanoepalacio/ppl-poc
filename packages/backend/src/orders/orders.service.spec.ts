@@ -150,6 +150,54 @@ describe('OrdersService', () => {
     });
   });
 
+  describe('updateStatus', () => {
+    it('marks an order finished and returns the updated id/status', async () => {
+      prisma.order.findUnique.mockResolvedValue({ id: 'order_1' });
+      prisma.order.update.mockResolvedValue({
+        id: 'order_1',
+        status: 'finished',
+      });
+
+      const res = await service.updateStatus('order_1', 'finished');
+
+      expect(res).toEqual({ id: 'order_1', status: 'finished' });
+      expect(prisma.order.update).toHaveBeenCalledWith({
+        where: { id: 'order_1' },
+        data: { status: 'finished' },
+        select: { id: true, status: true },
+      });
+    });
+
+    it('allows a free-form transition (issued → pending)', async () => {
+      prisma.order.findUnique.mockResolvedValue({ id: 'order_1' });
+      prisma.order.update.mockResolvedValue({
+        id: 'order_1',
+        status: 'pending',
+      });
+
+      const res = await service.updateStatus('order_1', 'pending');
+
+      expect(res.status).toBe('pending');
+    });
+
+    it('rejects an invalid status and leaves the order unchanged', async () => {
+      await expect(
+        service.updateStatus('order_1', 'shipped'),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.order.findUnique).not.toHaveBeenCalled();
+      expect(prisma.order.update).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFound for a missing order', async () => {
+      prisma.order.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.updateStatus('nope', 'finished'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.order.update).not.toHaveBeenCalled();
+    });
+  });
+
   describe('getOrdersByDay', () => {
     it('filters to the requested day [start, next-day)', async () => {
       prisma.order.findMany.mockResolvedValue([]);
@@ -174,6 +222,92 @@ describe('OrdersService', () => {
       expect(where.createdAt.gte).toEqual(
         new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0),
       );
+    });
+  });
+
+  describe('getProductionTotals', () => {
+    // Builds an order with items shaped as the include returns (product nested).
+    const orderWith = (
+      status: string,
+      items: { productId: string; name: string; quantity: number }[],
+    ) => ({
+      status,
+      items: items.map((i, idx) => ({
+        id: `oi_${status}_${idx}`,
+        productId: i.productId,
+        quantity: i.quantity,
+        product: { id: i.productId, name: i.name },
+      })),
+    });
+
+    it('sums the same product across orders and carries the product name', async () => {
+      prisma.order.findMany.mockResolvedValue([
+        orderWith('issued', [{ productId: 'p1', name: 'Croissant', quantity: 3 }]),
+        orderWith('finished', [{ productId: 'p1', name: 'Croissant', quantity: 2 }]),
+      ]);
+
+      const res = await service.getProductionTotals('2026-03-15');
+
+      expect(res.day).toBe('2026-03-15');
+      expect(res.items).toEqual([
+        { productId: 'p1', name: 'Croissant', quantity: 5 },
+      ]);
+    });
+
+    it('omits products with no demand (only ordered products appear)', async () => {
+      prisma.order.findMany.mockResolvedValue([
+        orderWith('issued', [{ productId: 'p1', name: 'Croissant', quantity: 1 }]),
+      ]);
+
+      const res = await service.getProductionTotals('2026-03-15');
+
+      expect(res.items.map((i) => i.productId)).toEqual(['p1']);
+    });
+
+    it('sorts entries by product name', async () => {
+      prisma.order.findMany.mockResolvedValue([
+        orderWith('issued', [
+          { productId: 'p2', name: 'Baguette', quantity: 1 },
+          { productId: 'p1', name: 'Croissant', quantity: 1 },
+        ]),
+      ]);
+
+      const res = await service.getProductionTotals('2026-03-15');
+
+      expect(res.items.map((i) => i.name)).toEqual(['Baguette', 'Croissant']);
+    });
+
+    it('queries only production-relevant statuses (excludes denied/ignored)', async () => {
+      prisma.order.findMany.mockResolvedValue([]);
+
+      await service.getProductionTotals('2026-03-15');
+
+      const where = prisma.order.findMany.mock.calls[0][0].where;
+      expect(where.status).toEqual({
+        in: ['pending', 'issued', 'finished'],
+      });
+      expect(where.status.in).not.toContain('denied');
+      expect(where.status.in).not.toContain('ignored');
+    });
+
+    it('filters to the requested day [start, next-day)', async () => {
+      prisma.order.findMany.mockResolvedValue([]);
+
+      await service.getProductionTotals('2026-03-15');
+
+      const where = prisma.order.findMany.mock.calls[0][0].where;
+      expect(where.createdAt.gte).toEqual(new Date(2026, 2, 15, 0, 0, 0, 0));
+      expect(where.createdAt.lt).toEqual(new Date(2026, 2, 16, 0, 0, 0, 0));
+    });
+
+    it('defaults to today when no day is given', async () => {
+      prisma.order.findMany.mockResolvedValue([]);
+      const now = new Date();
+
+      const res = await service.getProductionTotals();
+
+      const expected = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      expect(res.day).toBe(expected);
     });
   });
 });

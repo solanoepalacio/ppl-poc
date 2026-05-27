@@ -1,18 +1,6 @@
-import Link from 'next/link';
+import { redirect } from 'next/navigation';
 
+/** The back office lands on the orders-by-day view; there is no home page. */
 export default function Home() {
-  return (
-    <section>
-      <h1>Pannico — Back office</h1>
-      <p className="muted">Order intake PoC.</p>
-      <div className="card">
-        <p>
-          <Link href="/links">→ Generate an order link</Link>
-        </p>
-        <p>
-          <Link href="/orders">→ View orders by day</Link>
-        </p>
-      </div>
-    </section>
-  );
+  redirect('/orders');
 }
