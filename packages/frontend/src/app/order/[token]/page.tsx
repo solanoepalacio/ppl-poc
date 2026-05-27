@@ -1,4 +1,5 @@
 import { validateToken } from '@/lib/api';
+import { BrandHeader } from './BrandHeader';
 import { OrderForm } from './OrderForm';
 
 /**
@@ -23,13 +24,19 @@ export default async function OrderPage({
 
   if (!valid) {
     return (
-      <section className="card">
-        <h1>This link is no longer valid</h1>
-        <p className="muted">
-          The order link has expired or has already been used. Please ask the
-          bakery to send you a fresh link.
-        </p>
-      </section>
+      <>
+        <BrandHeader />
+        <section className="card outcome">
+          <span className="emoji" aria-hidden="true">
+            ⚠️
+          </span>
+          <h1>Este enlace ya no es válido</h1>
+          <p>
+            El enlace expiró o ya fue usado. Pedile a la panadería un nuevo
+            enlace.
+          </p>
+        </section>
+      </>
     );
   }
 

@@ -3,8 +3,20 @@
 import { useMemo, useState } from 'react';
 import type { Product } from '@pannico/shared';
 import { confirmOrder, continueOnWhatsapp } from '@/lib/api';
+import { BrandHeader } from './BrandHeader';
+import { QuantityStepper } from './QuantityStepper';
 
 type Outcome = 'open' | 'issued' | 'denied';
+
+const COPY = {
+  title: 'Tu pedido',
+  subtitle: 'Elegí lo que querés y la cantidad.',
+  emptyHint: 'Agregá al menos un producto.',
+  confirm: 'Confirmar pedido',
+  busy: 'Enviando…',
+  whatsapp: 'Seguir por WhatsApp',
+  genericError: 'Algo salió mal. Intentá de nuevo.',
+};
 
 /**
  * Frictionless picklist form: no login, no prices, no payment. The customer
@@ -42,7 +54,7 @@ export function OrderForm({
       await confirmOrder(token, items);
       setOutcome('issued');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong.');
+      setError(e instanceof Error ? e.message : COPY.genericError);
     } finally {
       setBusy(false);
     }
@@ -55,7 +67,7 @@ export function OrderForm({
       await continueOnWhatsapp(token);
       setOutcome('denied');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong.');
+      setError(e instanceof Error ? e.message : COPY.genericError);
     } finally {
       setBusy(false);
     }
@@ -63,66 +75,84 @@ export function OrderForm({
 
   if (outcome === 'issued') {
     return (
-      <section className="card">
-        <h1>Order received ✅</h1>
-        <p className="muted">
-          Thanks! Your order has been sent to the bakery. No further steps
-          needed.
-        </p>
-      </section>
+      <>
+        <BrandHeader />
+        <section className="card outcome">
+          <span className="emoji" aria-hidden="true">
+            ✅
+          </span>
+          <h1>¡Pedido recibido!</h1>
+          <p>Gracias. Tu pedido fue enviado a la panadería.</p>
+        </section>
+      </>
     );
   }
 
   if (outcome === 'denied') {
     return (
-      <section className="card">
-        <h1>Continue on WhatsApp 💬</h1>
-        <p className="muted">
-          No problem — please continue your order over WhatsApp with the bakery.
-        </p>
-      </section>
+      <>
+        <BrandHeader />
+        <section className="card outcome">
+          <span className="emoji" aria-hidden="true">
+            💬
+          </span>
+          <h1>Seguí por WhatsApp</h1>
+          <p>
+            Sin problema — continuá tu pedido por WhatsApp con la panadería.
+          </p>
+        </section>
+      </>
     );
   }
 
+  const summary =
+    items.length === 1 ? '1 producto' : `${items.length} productos`;
+
   return (
-    <section>
-      <h1>Place your order</h1>
-      <p className="muted">Choose what you’d like and the quantity.</p>
+    <>
+      <BrandHeader />
+      <section>
+        <h1>{COPY.title}</h1>
+        <p className="subtitle">{COPY.subtitle}</p>
 
-      <div className="card">
-        {catalog.map((product) => (
-          <div className="row" key={product.id}>
-            <span>{product.name}</span>
-            <input
-              className="qty"
-              type="number"
-              min={0}
-              inputMode="numeric"
-              aria-label={`Quantity for ${product.name}`}
-              value={quantities[product.id] ?? 0}
-              onChange={(e) => setQty(product.id, Number(e.target.value) || 0)}
-            />
-          </div>
-        ))}
-      </div>
+        <div className="product-list">
+          {catalog.map((product) => {
+            const qty = quantities[product.id] ?? 0;
+            return (
+              <div
+                className={`product-row${qty > 0 ? ' selected' : ''}`}
+                key={product.id}
+              >
+                <span className="product-name">{product.name}</span>
+                <QuantityStepper
+                  productName={product.name}
+                  value={qty}
+                  onChange={(next) => setQty(product.id, next)}
+                />
+              </div>
+            );
+          })}
+        </div>
 
-      {error && <p className="error">{error}</p>}
+        {error && <p className="error">{error}</p>}
 
-      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-        <button
-          className="btn-primary"
-          disabled={busy || items.length === 0}
-          onClick={submit}
-        >
-          {busy ? 'Submitting…' : 'Confirm order'}
-        </button>
-        <button className="btn-secondary" disabled={busy} onClick={whatsapp}>
-          Continue on WhatsApp
-        </button>
-      </div>
-      {items.length === 0 && (
-        <p className="muted">Add at least one item to confirm.</p>
-      )}
-    </section>
+        <div className="action-bar">
+          <p className="summary" aria-live="polite">
+            {summary}
+          </p>
+          <button
+            className="btn-primary"
+            disabled={busy || items.length === 0}
+            onClick={submit}
+          >
+            {busy ? COPY.busy : COPY.confirm}
+          </button>
+          <button className="btn-secondary" disabled={busy} onClick={whatsapp}>
+            {COPY.whatsapp}
+          </button>
+          {items.length === 0 && <p className="muted">{COPY.emptyHint}</p>}
+        </div>
+      </section>
+    </>
   );
 }
