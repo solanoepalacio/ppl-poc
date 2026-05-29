@@ -49,6 +49,41 @@ export interface UpdateOrderStatusResponse {
   status: OrderStatus;
 }
 
+/**
+ * `POST /orders` request: the manager records an order received off-channel.
+ * `items` defaults to empty and `status` defaults to `issued` when omitted.
+ */
+export interface CreateOrderRequest {
+  phone: string;
+  items?: ConfirmOrderItem[];
+  status?: OrderStatus;
+}
+
+/** `POST /orders` response: the created order id and status. */
+export interface CreateOrderResponse {
+  id: string;
+  status: OrderStatus;
+}
+
+/**
+ * `PATCH /orders/:id/items` request: the complete desired item list for the
+ * order. An empty list clears the order's items.
+ */
+export interface ReplaceOrderItemsRequest {
+  items: ConfirmOrderItem[];
+}
+
+/** `PATCH /orders/:id/items` response: the order id and its new item list. */
+export interface ReplaceOrderItemsResponse {
+  id: string;
+  items: OrderItem[];
+}
+
+/** `DELETE /orders/:id` response: the id of the removed order. */
+export interface DeleteOrderResponse {
+  id: string;
+}
+
 /** An order as shown in the back-office day view. */
 export interface DayViewOrder {
   id: string;

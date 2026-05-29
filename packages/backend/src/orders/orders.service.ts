@@ -7,13 +7,21 @@ import {
   isOrderStatus,
   PRODUCTION_STATUSES,
   type ConfirmOrderItem,
+  type CreateOrderRequest,
+  type CreateOrderResponse,
   type DayViewResponse,
+  type DeleteOrderResponse,
   type OrderStatus,
   type Product,
   type ProductionTotalsResponse,
+  type ReplaceOrderItemsResponse,
   type TokenValidationResponse,
 } from '@pannico/shared';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { normalizePhoneE164 } from '../common/phone.util';
+import { generateToken } from '../common/token.util';
+import { computeExpiry } from '../config/token.config';
 import { TokenService } from './token.service';
 
 @Injectable()
@@ -62,24 +70,7 @@ export class OrdersService {
     if (!Array.isArray(items) || items.length === 0) {
       throw new BadRequestException('An order must contain at least one item.');
     }
-
-    // Every referenced product must exist and be active (in the catalog).
-    const productIds = [...new Set(items.map((i) => i.productId))];
-    const products = await this.prisma.product.findMany({
-      where: { id: { in: productIds }, active: true },
-      select: { id: true },
-    });
-    const validIds = new Set(products.map((p) => p.id));
-    for (const item of items) {
-      if (!validIds.has(item.productId)) {
-        throw new BadRequestException(
-          `Product ${item.productId} is not in the catalog.`,
-        );
-      }
-      if (!Number.isInteger(item.quantity) || item.quantity < 1) {
-        throw new BadRequestException('Item quantities must be positive integers.');
-      }
-    }
+    await this.validateItemsAgainstCatalog(items);
 
     // Record items and flip to `issued` atomically.
     await this.prisma.$transaction([
@@ -138,6 +129,145 @@ export class OrdersService {
       select: { id: true, status: true },
     });
     return { id: updated.id, status: updated.status as OrderStatus };
+  }
+
+  /**
+   * Back-office manual order creation: records an order received off-channel
+   * (phone/WhatsApp/in-person) directly, without generating a customer link.
+   * Validates the phone and items against the catalog, generates an unused
+   * token + expiry to satisfy the schema, and defaults the status to `issued`
+   * since the order is already real. Rejects a bad phone, an unknown status,
+   * or an out-of-catalog item, persisting nothing on rejection.
+   */
+  async createOrder(input: CreateOrderRequest): Promise<CreateOrderResponse> {
+    const phone = normalizePhoneE164(input.phone);
+    if (!phone) {
+      throw new BadRequestException(
+        'A valid phone number (E.164, e.g. +5491122334455) is required.',
+      );
+    }
+
+    const status = input.status ?? 'issued';
+    if (!isOrderStatus(status)) {
+      throw new BadRequestException(`Invalid order status: ${status}`);
+    }
+
+    const items = input.items ?? [];
+    await this.validateItemsAgainstCatalog(items);
+
+    const order = await this.prisma.order.create({
+      data: {
+        phone,
+        token: generateToken(),
+        status,
+        expiresAt: computeExpiry(),
+        items:
+          items.length > 0
+            ? {
+                create: items.map((i) => ({
+                  productId: i.productId,
+                  quantity: i.quantity,
+                })),
+              }
+            : undefined,
+      },
+      select: { id: true, status: true },
+    });
+    return { id: order.id, status: order.status as OrderStatus };
+  }
+
+  /**
+   * Back-office item edit: replaces an order's entire item list with the
+   * submitted one, regardless of the order's status. An empty list clears the
+   * items. Validates every item against the catalog (rejecting and leaving the
+   * existing items untouched on failure) and never changes `status`. Rejects a
+   * missing order (404).
+   */
+  async replaceItems(
+    orderId: string,
+    items: ConfirmOrderItem[],
+  ): Promise<ReplaceOrderItemsResponse> {
+    const exists = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true },
+    });
+    if (!exists) {
+      throw new NotFoundException(`Order ${orderId} not found.`);
+    }
+    await this.validateItemsAgainstCatalog(items);
+
+    // Replace the whole list atomically: drop the old rows, write the new ones.
+    const ops: Prisma.PrismaPromise<unknown>[] = [
+      this.prisma.orderItem.deleteMany({ where: { orderId } }),
+    ];
+    if (items.length > 0) {
+      ops.push(
+        this.prisma.orderItem.createMany({
+          data: items.map((i) => ({
+            orderId,
+            productId: i.productId,
+            quantity: i.quantity,
+          })),
+        }),
+      );
+    }
+    await this.prisma.$transaction(ops);
+
+    const updated = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: true },
+    });
+    return { id: orderId, items: updated!.items };
+  }
+
+  /**
+   * Back-office order deletion: removes the order and (via cascade) its items.
+   * Intended for corrections such as duplicates; cancellations that should
+   * still count use a status change instead. Rejects a missing order (404).
+   */
+  async deleteOrder(orderId: string): Promise<DeleteOrderResponse> {
+    const exists = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true },
+    });
+    if (!exists) {
+      throw new NotFoundException(`Order ${orderId} not found.`);
+    }
+    await this.prisma.order.delete({ where: { id: orderId } });
+    return { id: orderId };
+  }
+
+  /**
+   * Validates that every item references an active catalog product with a
+   * positive integer quantity, throwing `BadRequestException` otherwise. Does
+   * not enforce a non-empty list — callers that require items check that
+   * themselves. Shared by `confirm`, `createOrder`, and `replaceItems` so the
+   * catalog check can never drift between them.
+   */
+  private async validateItemsAgainstCatalog(
+    items: ConfirmOrderItem[],
+  ): Promise<void> {
+    if (items.length === 0) {
+      return;
+    }
+    const productIds = [...new Set(items.map((i) => i.productId))];
+    const products = await this.prisma.product.findMany({
+      where: { id: { in: productIds }, active: true },
+      select: { id: true },
+    });
+    const validIds = new Set(products.map((p) => p.id));
+    for (const item of items) {
+      if (!validIds.has(item.productId)) {
+        throw new BadRequestException(
+          `Product ${item.productId} is not in the catalog.`,
+        );
+      }
+      if (!Number.isInteger(item.quantity) || item.quantity < 1) {
+        throw new BadRequestException(
+          'Item quantities must be positive integers.',
+        );
+      }
+    }
   }
 
   /**

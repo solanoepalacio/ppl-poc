@@ -346,6 +346,72 @@ select {
   font-weight: 500;
 }
 
+/* ── Modal dialog ─────────────────────────────────────────── */
+.modal {
+  border: none;
+  padding: 0;
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  width: calc(100vw - 2rem);
+  max-width: 460px;
+  max-height: calc(100vh - 4rem);
+  box-shadow: 0 12px 40px rgba(31, 42, 48, 0.25);
+  overflow: hidden;
+}
+.modal::backdrop {
+  background: rgba(31, 42, 48, 0.45);
+}
+.modal-card {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 4rem);
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--line);
+}
+.modal-header strong {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+}
+.modal-header button {
+  min-height: auto;
+  padding: 0.3rem 0.6rem;
+}
+/* The body is the only scrolling region; header and footer stay pinned. */
+.modal-body {
+  padding: 1rem 1.25rem 1.25rem;
+  overflow-y: auto;
+}
+.modal-footer {
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.85rem 1.25rem calc(0.85rem + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+.modal-footer button {
+  flex: 1;
+}
+
+/* Stacked label + full-width control (used inside modals). */
+.field {
+  margin-bottom: 0.75rem;
+}
+.field label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+.field input {
+  width: 100%;
+}
+
 code {
   background: #f0f0f0;
   padding: 0.15rem 0.35rem;

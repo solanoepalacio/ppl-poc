@@ -1,10 +1,14 @@
 import type {
   ConfirmOrderItem,
   CreateLinkResponse,
+  CreateOrderRequest,
+  CreateOrderResponse,
   DayViewResponse,
+  DeleteOrderResponse,
   OrderStatus,
   Product,
   ProductionTotalsResponse,
+  ReplaceOrderItemsResponse,
   TokenValidationResponse,
   UpdateOrderStatusResponse,
 } from '@pannico/shared';
@@ -93,5 +97,31 @@ export function updateOrderStatus(
   return request<UpdateOrderStatusResponse>(
     `/orders/${encodeURIComponent(orderId)}/status`,
     { method: 'PATCH', body: JSON.stringify({ status }) },
+  );
+}
+
+export function createOrder(
+  input: CreateOrderRequest,
+): Promise<CreateOrderResponse> {
+  return request<CreateOrderResponse>(`/orders`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function replaceOrderItems(
+  orderId: string,
+  items: ConfirmOrderItem[],
+): Promise<ReplaceOrderItemsResponse> {
+  return request<ReplaceOrderItemsResponse>(
+    `/orders/${encodeURIComponent(orderId)}/items`,
+    { method: 'PATCH', body: JSON.stringify({ items }) },
+  );
+}
+
+export function deleteOrder(orderId: string): Promise<DeleteOrderResponse> {
+  return request<DeleteOrderResponse>(
+    `/orders/${encodeURIComponent(orderId)}`,
+    { method: 'DELETE' },
   );
 }

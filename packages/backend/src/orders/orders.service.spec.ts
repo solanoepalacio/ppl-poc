@@ -8,9 +8,11 @@ type PrismaMock = {
     findUnique: jest.Mock;
     findMany: jest.Mock;
     update: jest.Mock;
+    create: jest.Mock;
+    delete: jest.Mock;
   };
   product: { findMany: jest.Mock };
-  orderItem: { createMany: jest.Mock };
+  orderItem: { createMany: jest.Mock; deleteMany: jest.Mock };
   $transaction: jest.Mock;
 };
 
@@ -20,9 +22,14 @@ function makePrisma(): PrismaMock {
       findUnique: jest.fn(),
       findMany: jest.fn(),
       update: jest.fn().mockResolvedValue(undefined),
+      create: jest.fn(),
+      delete: jest.fn().mockResolvedValue(undefined),
     },
     product: { findMany: jest.fn() },
-    orderItem: { createMany: jest.fn().mockResolvedValue(undefined) },
+    orderItem: {
+      createMany: jest.fn().mockResolvedValue(undefined),
+      deleteMany: jest.fn().mockResolvedValue(undefined),
+    },
     $transaction: jest.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
   };
 }
@@ -195,6 +202,153 @@ describe('OrdersService', () => {
         service.updateStatus('nope', 'finished'),
       ).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma.order.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('createOrder', () => {
+    it('persists an order with items, defaulting status to issued', async () => {
+      prisma.product.findMany.mockResolvedValue([{ id: 'p1' }, { id: 'p2' }]);
+      prisma.order.create.mockResolvedValue({ id: 'order_new', status: 'issued' });
+
+      const res = await service.createOrder({
+        phone: '+5491122334455',
+        items: [
+          { productId: 'p1', quantity: 2 },
+          { productId: 'p2', quantity: 1 },
+        ],
+      });
+
+      expect(res).toEqual({ id: 'order_new', status: 'issued' });
+      const data = prisma.order.create.mock.calls[0][0].data;
+      expect(data.phone).toBe('+5491122334455');
+      expect(data.status).toBe('issued');
+      expect(typeof data.token).toBe('string');
+      expect(data.token.length).toBeGreaterThan(0);
+      expect(data.expiresAt).toBeInstanceOf(Date);
+      expect(data.items.create).toEqual([
+        { productId: 'p1', quantity: 2 },
+        { productId: 'p2', quantity: 1 },
+      ]);
+    });
+
+    it('persists an order with no items', async () => {
+      prisma.order.create.mockResolvedValue({ id: 'order_new', status: 'issued' });
+
+      await service.createOrder({ phone: '+5491122334455' });
+
+      expect(prisma.product.findMany).not.toHaveBeenCalled();
+      const data = prisma.order.create.mock.calls[0][0].data;
+      expect(data.items).toBeUndefined();
+    });
+
+    it('rejects an out-of-catalog item and persists nothing', async () => {
+      prisma.product.findMany.mockResolvedValue([]); // p9 missing
+
+      await expect(
+        service.createOrder({
+          phone: '+5491122334455',
+          items: [{ productId: 'p9', quantity: 1 }],
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.order.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects a malformed phone and persists nothing', async () => {
+      await expect(
+        service.createOrder({ phone: 'not-a-phone' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.order.create).not.toHaveBeenCalled();
+    });
+
+    it('generates a fresh token per order', async () => {
+      prisma.order.create.mockResolvedValue({ id: 'order_new', status: 'issued' });
+
+      await service.createOrder({ phone: '+5491122334455' });
+      await service.createOrder({ phone: '+5491122334455' });
+
+      const first = prisma.order.create.mock.calls[0][0].data.token;
+      const second = prisma.order.create.mock.calls[1][0].data.token;
+      expect(first).not.toBe(second);
+    });
+  });
+
+  describe('replaceItems', () => {
+    it('replaces the item list and leaves status untouched', async () => {
+      prisma.order.findUnique
+        .mockResolvedValueOnce({ id: 'order_1' })
+        .mockResolvedValueOnce({
+          id: 'order_1',
+          items: [{ id: 'oi_1', orderId: 'order_1', productId: 'p1', quantity: 4 }],
+        });
+      prisma.product.findMany.mockResolvedValue([{ id: 'p1' }]);
+
+      const res = await service.replaceItems('order_1', [
+        { productId: 'p1', quantity: 4 },
+      ]);
+
+      expect(prisma.orderItem.deleteMany).toHaveBeenCalledWith({
+        where: { orderId: 'order_1' },
+      });
+      expect(prisma.orderItem.createMany).toHaveBeenCalledTimes(1);
+      expect(prisma.order.update).not.toHaveBeenCalled();
+      expect(res.id).toBe('order_1');
+      expect(res.items).toHaveLength(1);
+    });
+
+    it('clears items when given an empty list', async () => {
+      prisma.order.findUnique
+        .mockResolvedValueOnce({ id: 'order_1' })
+        .mockResolvedValueOnce({ id: 'order_1', items: [] });
+
+      const res = await service.replaceItems('order_1', []);
+
+      expect(prisma.orderItem.deleteMany).toHaveBeenCalledWith({
+        where: { orderId: 'order_1' },
+      });
+      expect(prisma.orderItem.createMany).not.toHaveBeenCalled();
+      expect(res.items).toEqual([]);
+    });
+
+    it('rejects an out-of-catalog item and leaves existing items unchanged', async () => {
+      prisma.order.findUnique.mockResolvedValue({ id: 'order_1' });
+      prisma.product.findMany.mockResolvedValue([]); // p9 missing
+
+      await expect(
+        service.replaceItems('order_1', [{ productId: 'p9', quantity: 1 }]),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.orderItem.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.orderItem.createMany).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFound for a missing order', async () => {
+      prisma.order.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.replaceItems('nope', [{ productId: 'p1', quantity: 1 }]),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.orderItem.deleteMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('deleteOrder', () => {
+    it('removes the order (items cascade) and returns its id', async () => {
+      prisma.order.findUnique.mockResolvedValue({ id: 'order_1' });
+
+      const res = await service.deleteOrder('order_1');
+
+      expect(res).toEqual({ id: 'order_1' });
+      expect(prisma.order.delete).toHaveBeenCalledWith({
+        where: { id: 'order_1' },
+      });
+    });
+
+    it('throws NotFound for a missing order', async () => {
+      prisma.order.findUnique.mockResolvedValue(null);
+
+      await expect(service.deleteOrder('nope')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(prisma.order.delete).not.toHaveBeenCalled();
     });
   });
 

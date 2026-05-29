@@ -1,4 +1,6 @@
 import { getOrdersByDay, getProducts } from '@/lib/api';
+import { CreateOrderForm } from './CreateOrderForm';
+import { OrderActions } from './OrderActions';
 import { OrderStatusControl } from './OrderStatusControl';
 
 /**
@@ -27,6 +29,8 @@ export default async function OrdersPage({
         <button className="btn-secondary">View</button>
       </form>
 
+      <CreateOrderForm products={products} />
+
       {view.orders.length === 0 && (
         <p className="muted">No orders created on {view.day}.</p>
       )}
@@ -52,6 +56,11 @@ export default async function OrdersPage({
           ) : (
             <p className="muted">No items.</p>
           )}
+          <OrderActions
+            orderId={order.id}
+            items={order.items}
+            products={products}
+          />
         </div>
       ))}
     </section>

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
@@ -10,13 +11,18 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type {
+  CreateOrderResponse,
   DayViewResponse,
+  DeleteOrderResponse,
   ProductionTotalsResponse,
+  ReplaceOrderItemsResponse,
   TokenValidationResponse,
   UpdateOrderStatusResponse,
 } from '@pannico/shared';
 import { OrdersService } from './orders.service';
 import { ConfirmOrderDto } from './dto/confirm-order.dto';
+import { CreateOrderDto } from './dto/create-order.dto';
+import { ReplaceOrderItemsDto } from './dto/replace-order-items.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { TokenGuard } from './token.guard';
 
@@ -38,6 +44,12 @@ export class OrdersController {
     return this.ordersService.getProductionTotals(day);
   }
 
+  /** Back-office manual order creation (order received off-channel). */
+  @Post()
+  create(@Body() dto: CreateOrderDto): Promise<CreateOrderResponse> {
+    return this.ordersService.createOrder(dto);
+  }
+
   /** Back-office manual status update for an order (free-form transitions). */
   @Patch(':id/status')
   updateStatus(
@@ -45,6 +57,22 @@ export class OrdersController {
     @Body() dto: UpdateOrderStatusDto,
   ): Promise<UpdateOrderStatusResponse> {
     return this.ordersService.updateStatus(id, dto.status);
+  }
+
+  /** Back-office item edit: replaces the order's whole item list. */
+  @Patch(':id/items')
+  replaceItems(
+    @Param('id') id: string,
+    @Body() dto: ReplaceOrderItemsDto,
+  ): Promise<ReplaceOrderItemsResponse> {
+    return this.ordersService.replaceItems(id, dto.items);
+  }
+
+  /** Back-office order deletion (removes the order and its items). */
+  @Delete(':id')
+  @HttpCode(200)
+  remove(@Param('id') id: string): Promise<DeleteOrderResponse> {
+    return this.ordersService.deleteOrder(id);
   }
 
   /** Customer form bootstrap: token validity + catalog when valid. */
