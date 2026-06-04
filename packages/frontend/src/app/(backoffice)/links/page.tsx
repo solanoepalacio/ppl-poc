@@ -1,74 +1,31 @@
-'use client';
+import { getProducts } from '@/lib/api';
+import { LinkGenerator } from './LinkGenerator';
+import { DirectOrderForm } from './DirectOrderForm';
 
-import { useState } from 'react';
-import type { CreateLinkResponse } from '@pannico/shared';
-import { createLink } from '@/lib/api';
-
-/** Back-office link generator: enter a phone, get a shareable order URL. */
-export default function LinksPage() {
-  const [phone, setPhone] = useState('');
-  const [result, setResult] = useState<CreateLinkResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [copied, setCopied] = useState(false);
-
-  async function generate(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setResult(null);
-    setCopied(false);
-    setBusy(true);
-    try {
-      setResult(await createLink(phone));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function copy() {
-    if (!result) return;
-    await navigator.clipboard.writeText(result.url);
-    setCopied(true);
-  }
+/**
+ * Back-office "Crear orden" view: the single destination for creating an order,
+ * either by generating a shareable customer link or by recording the order
+ * directly from its items.
+ */
+export default async function CreateOrderPage() {
+  const products = await getProducts();
 
   return (
     <section>
-      <h1>Generate an order link</h1>
-      <form onSubmit={generate} className="card">
-        <label htmlFor="phone">Customer phone (E.164)</label>
-        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-          <input
-            id="phone"
-            placeholder="+5491122334455"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            style={{ flex: 1 }}
-          />
-          <button className="btn-primary" disabled={busy || !phone}>
-            {busy ? 'Generating…' : 'Generate'}
-          </button>
-        </div>
-      </form>
+      <h1>Crear orden</h1>
 
-      {error && <p className="error">{error}</p>}
+      <h2>Por link</h2>
+      <p className="muted">
+        Generate a link to share with the customer so they place the order
+        themselves.
+      </p>
+      <LinkGenerator />
 
-      {result && (
-        <div className="card">
-          <p className="muted">Share this link with the customer over WhatsApp:</p>
-          <p>
-            <code>{result.url}</code>
-          </p>
-          <p className="muted">
-            For {result.phone} · expires{' '}
-            {new Date(result.expiresAt).toLocaleString()}
-          </p>
-          <button className="btn-secondary" onClick={copy}>
-            {copied ? 'Copied!' : 'Copy link'}
-          </button>
-        </div>
-      )}
+      <h2>Cargar orden</h2>
+      <p className="muted">
+        Enter the order directly when you take it yourself.
+      </p>
+      <DirectOrderForm products={products} />
     </section>
   );
 }

@@ -1,21 +1,4 @@
-# back-office-navigation Specification
-
-## Purpose
-
-Defines how the back office is structured around its three views and the persistent navigation the manager uses to move between them, and how this navigation is kept off the customer-facing order form.
-
-## Requirements
-
-### Requirement: Back office lands on the orders-by-day view
-The back office SHALL present the orders-by-day view as its landing destination. There SHALL NOT be a separate back-office home page; navigating to the back-office root SHALL result in the orders-by-day view.
-
-#### Scenario: Opening the back office shows orders by day
-- **WHEN** the manager navigates to the back-office root
-- **THEN** the orders-by-day view is shown
-
-#### Scenario: No standalone home page
-- **WHEN** the manager is anywhere in the back office
-- **THEN** no standalone landing page distinct from the three views is presented
+## MODIFIED Requirements
 
 ### Requirement: Persistent navigation across back-office views
 The back office SHALL present a persistent navigation, visible on every back-office view, with one link to each of the three views labelled **Órdenes** (orders by day), **Crear orden** (order creation), and **Producción** (production totals). The **Crear orden** view SHALL host both order-creation paths — generating a shareable customer link and recording an order directly by adding items — as a single destination. Selecting a link SHALL navigate to that view. The navigation SHALL indicate which view is currently active.
@@ -35,10 +18,3 @@ The back office SHALL present a persistent navigation, visible on every back-off
 #### Scenario: Crear orden hosts both creation paths
 - **WHEN** the manager opens the Crear orden view
 - **THEN** the view offers both creating an order by generating a customer link and recording an order directly by adding items
-
-### Requirement: Customer order form excludes back-office navigation
-The persistent back-office navigation SHALL NOT appear on the customer-facing order form.
-
-#### Scenario: Order form has no back-office navigation
-- **WHEN** a customer opens their order form via a link
-- **THEN** the back-office navigation is not shown

@@ -241,6 +241,28 @@ describe('OrdersService', () => {
       expect(data.items).toBeUndefined();
     });
 
+    it('persists a captured message', async () => {
+      prisma.order.create.mockResolvedValue({ id: 'order_new', status: 'issued' });
+
+      await service.createOrder({
+        phone: '+5491122334455',
+        message: 'Hola, quiero 2 medialunas',
+      });
+
+      const data = prisma.order.create.mock.calls[0][0].data;
+      expect(data.message).toBe('Hola, quiero 2 medialunas');
+    });
+
+    it('stores null when the message is absent or blank', async () => {
+      prisma.order.create.mockResolvedValue({ id: 'order_new', status: 'issued' });
+
+      await service.createOrder({ phone: '+5491122334455' });
+      await service.createOrder({ phone: '+5491122334455', message: '   ' });
+
+      expect(prisma.order.create.mock.calls[0][0].data.message).toBeNull();
+      expect(prisma.order.create.mock.calls[1][0].data.message).toBeNull();
+    });
+
     it('rejects an out-of-catalog item and persists nothing', async () => {
       prisma.product.findMany.mockResolvedValue([]); // p9 missing
 

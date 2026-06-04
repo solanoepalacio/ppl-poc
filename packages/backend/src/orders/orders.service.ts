@@ -155,12 +155,15 @@ export class OrdersService {
     const items = input.items ?? [];
     await this.validateItemsAgainstCatalog(items);
 
+    const message = input.message?.trim() || null;
+
     const order = await this.prisma.order.create({
       data: {
         phone,
         token: generateToken(),
         status,
         expiresAt: computeExpiry(),
+        message,
         items:
           items.length > 0
             ? {

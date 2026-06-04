@@ -32,6 +32,9 @@ model Order {
   expiresAt   DateTime
   createdAt   DateTime  @default(now())
   confirmedAt DateTime?
+  /// Optional raw customer message (e.g. pasted WhatsApp text) captured when a
+  /// manager transcribes an order by hand. Null when no message was captured.
+  message     String?
 
   items OrderItem[]
 

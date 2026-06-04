@@ -57,6 +57,9 @@ export interface CreateOrderRequest {
   phone: string;
   items?: ConfirmOrderItem[];
   status?: OrderStatus;
+  /** Optional raw customer message (e.g. pasted WhatsApp text) for manually
+   * transcribed orders. Blank/absent stores no message. */
+  message?: string;
 }
 
 /** `POST /orders` response: the created order id and status. */

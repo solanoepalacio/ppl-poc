@@ -31,4 +31,8 @@ export class CreateOrderDto implements CreateOrderRequest {
   @IsString()
   @IsIn(ORDER_STATUSES as readonly string[])
   status?: OrderStatus;
+
+  @IsOptional()
+  @IsString()
+  message?: string;
 }
