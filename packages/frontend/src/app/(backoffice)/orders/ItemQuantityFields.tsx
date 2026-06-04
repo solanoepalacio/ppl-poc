@@ -2,6 +2,8 @@
 
 import type { Product } from '@pannico/shared';
 
+import { useSelectAllOnFocus } from '../../../lib/selectAllOnFocus';
+
 /**
  * Catalog rows with a quantity input each, shared by the create-order and
  * edit-items forms. Quantity 0 means "not in the order"; callers drop zeros
@@ -18,6 +20,7 @@ export function ItemQuantityFields({
   onChange: (productId: string, quantity: number) => void;
   disabled?: boolean;
 }) {
+  const selectAllOnFocus = useSelectAllOnFocus();
   return (
     <ul className="item-fields">
       {products.map((p) => (
@@ -30,6 +33,7 @@ export function ItemQuantityFields({
             min={0}
             value={quantities[p.id] ?? 0}
             disabled={disabled}
+            {...selectAllOnFocus}
             onChange={(e) =>
               onChange(
                 p.id,
