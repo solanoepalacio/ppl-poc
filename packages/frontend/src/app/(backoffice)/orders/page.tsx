@@ -1,11 +1,12 @@
 import { getOrdersByDay, getProducts } from '@/lib/api';
+import { DayPicker } from './DayPicker';
 import { OrderActions } from './OrderActions';
 import { OrderStatusControl } from './OrderStatusControl';
 
 /**
  * Back-office day view: orders created on the selected day (default today),
- * each with status, items, and phone. The date picker submits via GET so the
- * selected day lives in the URL (?day=YYYY-MM-DD).
+ * each with status, items, and phone. Selecting a day in the picker navigates
+ * immediately, so the selected day lives in the URL (?day=YYYY-MM-DD).
  */
 export default async function OrdersPage({
   searchParams,
@@ -22,11 +23,7 @@ export default async function OrdersPage({
     <section>
       <h1>Órdenes</h1>
 
-      <form className="card" method="get">
-        <label htmlFor="day">Día </label>
-        <input id="day" name="day" type="date" defaultValue={view.day} />{' '}
-        <button className="btn-secondary">Ver</button>
-      </form>
+      <DayPicker day={view.day} />
 
       {view.orders.length === 0 && (
         <p className="muted">No hay órdenes creadas el {view.day}.</p>
