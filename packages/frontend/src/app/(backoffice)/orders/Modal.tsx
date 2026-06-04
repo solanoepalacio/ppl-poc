@@ -14,12 +14,15 @@ export function Modal({
   title,
   children,
   footer,
+  bodyClassName,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
   footer?: ReactNode;
+  /** Extra class on the scrolling body, e.g. to opt into a custom region layout. */
+  bodyClassName?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
 
@@ -57,7 +60,9 @@ export function Modal({
             ✕
           </button>
         </div>
-        <div className="modal-body">{children}</div>
+        <div className={`modal-body${bodyClassName ? ` ${bodyClassName}` : ''}`}>
+          {children}
+        </div>
         {footer && <div className="modal-footer">{footer}</div>}
       </div>
     </dialog>

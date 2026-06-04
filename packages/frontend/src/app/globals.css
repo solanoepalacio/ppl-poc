@@ -389,6 +389,27 @@ select {
   padding: 1rem 1.25rem 1.25rem;
   overflow-y: auto;
 }
+/*
+ * Content-step layout: three regions inside the body — phone fixed at top, the
+ * items list as the only scroller in the middle, message fixed at the bottom.
+ * The body becomes a flex column and the items region flex-grows; min-height:0
+ * lets both the body and the items region shrink below content height so the
+ * items list (not the whole body) is what scrolls.
+ */
+.modal-body--content {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+.order-content__items {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+.order-content__message {
+  flex: 0 0 auto;
+}
 .modal-footer {
   display: flex;
   gap: 0.6rem;

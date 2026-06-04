@@ -143,7 +143,13 @@ export function CreateOrderModal({ products }: { products: Product[] }) {
         Crear orden
       </button>
 
-      <Modal open={open} onClose={close} title="Crear orden" footer={footer}>
+      <Modal
+        open={open}
+        onClose={close}
+        title="Crear orden"
+        footer={footer}
+        bodyClassName={step === 'content' ? 'modal-body--content' : undefined}
+      >
         <PhoneField
           id="create-order-phone"
           areaCode={areaCode}
@@ -193,27 +199,36 @@ export function CreateOrderModal({ products }: { products: Product[] }) {
           </div>
         )}
 
+        {/*
+          Content step: phone (above) stays fixed, the items list is the only
+          scrollable region, and the message field below stays fixed. The
+          modal-body--content class turns the body into a flex column so the
+          items region can flex-grow and scroll on its own.
+        */}
         {step === 'content' && (
-          <>
+          <div className="order-content__items">
             <ItemQuantityFields
               products={products}
               quantities={quantities}
               onChange={setQuantity}
               disabled={pending}
             />
-            <div className="field">
-              <label htmlFor="create-order-message">Mensaje (opcional)</label>
-              <textarea
-                id="create-order-message"
-                rows={6}
-                placeholder="Pegá el mensaje de WhatsApp que generó esta orden…"
-                value={message}
-                disabled={pending}
-                onChange={(e) => setMessage(e.target.value)}
-                style={{ width: '100%', resize: 'vertical' }}
-              />
-            </div>
-          </>
+          </div>
+        )}
+
+        {step === 'content' && (
+          <div className="field order-content__message">
+            <label htmlFor="create-order-message">Mensaje (opcional)</label>
+            <textarea
+              id="create-order-message"
+              rows={6}
+              placeholder="Pegá el mensaje de WhatsApp que generó esta orden…"
+              value={message}
+              disabled={pending}
+              onChange={(e) => setMessage(e.target.value)}
+              style={{ width: '100%', resize: 'vertical' }}
+            />
+          </div>
         )}
 
         {error && <p className="error">{error}</p>}
