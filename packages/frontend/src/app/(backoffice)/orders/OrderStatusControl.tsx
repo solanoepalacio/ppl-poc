@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { ORDER_STATUSES, type OrderStatus } from '@pannico/shared';
 import { updateOrderStatus } from '@/lib/api';
+import { trackEvent } from '@/lib/analytics';
 
 /** Spanish display labels for each stored status value (display-only; the
  *  underlying enum value sent to the API is unchanged). */
@@ -36,6 +37,7 @@ export function OrderStatusControl({
     setError(false);
     try {
       await updateOrderStatus(orderId, next);
+      trackEvent('order_status_changed', { fromStatus: status, toStatus: next });
       startTransition(() => router.refresh());
     } catch {
       setError(true);

@@ -10,6 +10,7 @@ import {
   type Product,
 } from '@pannico/shared';
 import { createLink, createOrder } from '@/lib/api';
+import { trackEvent } from '@/lib/analytics';
 import { Modal } from './Modal';
 import { PhoneField } from './PhoneField';
 import { ItemQuantityFields, itemsFromQuantities } from './ItemQuantityFields';
@@ -70,6 +71,7 @@ export function CreateOrderModal({ products }: { products: Product[] }) {
     setBusy(true);
     try {
       const res = await createLink(composePhoneE164(areaCode, localNumber));
+      trackEvent('order_link_generated');
       setResult(res);
       setStep('link');
     } catch (e) {
@@ -82,16 +84,22 @@ export function CreateOrderModal({ products }: { products: Product[] }) {
   async function copy() {
     if (!result) return;
     await navigator.clipboard.writeText(result.url);
+    trackEvent('order_link_copied');
     setCopied(true);
   }
 
   async function submitContent() {
     setError(null);
     try {
+      const orderItems = itemsFromQuantities(quantities);
       await createOrder({
         phone: composePhoneE164(areaCode, localNumber),
-        items: itemsFromQuantities(quantities),
+        items: orderItems,
         message,
+      });
+      trackEvent('order_created_direct', {
+        itemCount: orderItems.length,
+        totalQuantity: orderItems.reduce((sum, i) => sum + i.quantity, 0),
       });
       close();
       startTransition(() => router.refresh());

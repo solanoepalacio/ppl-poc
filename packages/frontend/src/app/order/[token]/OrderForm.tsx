@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import type { Product } from '@pannico/shared';
 import { confirmOrder, continueOnWhatsapp } from '@/lib/api';
+import { trackEvent } from '@/lib/analytics';
 import { BrandHeader } from './BrandHeader';
 import { QuantityStepper } from './QuantityStepper';
 
@@ -52,6 +53,10 @@ export function OrderForm({
     setBusy(true);
     try {
       await confirmOrder(token, items);
+      trackEvent('order_confirmed', {
+        itemCount: items.length,
+        totalQuantity: items.reduce((sum, i) => sum + i.quantity, 0),
+      });
       setOutcome('issued');
     } catch (e) {
       setError(e instanceof Error ? e.message : COPY.genericError);
@@ -65,6 +70,7 @@ export function OrderForm({
     setBusy(true);
     try {
       await continueOnWhatsapp(token);
+      trackEvent('whatsapp_fallback_selected');
       setOutcome('denied');
     } catch (e) {
       setError(e instanceof Error ? e.message : COPY.genericError);

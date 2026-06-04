@@ -1,6 +1,7 @@
 import { validateToken } from '@/lib/api';
 import { BrandHeader } from './BrandHeader';
 import { OrderForm } from './OrderForm';
+import { TrackInvalidLink } from './TrackInvalidLink';
 
 /**
  * Customer order form route. Server-fetches token validity + catalog. Renders
@@ -26,6 +27,7 @@ export default async function OrderPage({
     return (
       <>
         <BrandHeader />
+        <TrackInvalidLink />
         <section className="card outcome">
           <span className="emoji" aria-hidden="true">
             ⚠️

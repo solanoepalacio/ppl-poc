@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { Oswald, Inter } from 'next/font/google';
+import { UmamiScript } from './UmamiScript';
 import './globals.css';
 
 const oswald = Oswald({
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="es" className={`${oswald.variable} ${inter.variable}`}>
       <body>
         <main>{children}</main>
+        <UmamiScript />
       </body>
     </html>
   );

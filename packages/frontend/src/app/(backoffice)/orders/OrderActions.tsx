@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import type { OrderItem, Product } from '@pannico/shared';
 import { deleteOrder, replaceOrderItems } from '@/lib/api';
+import { trackEvent } from '@/lib/analytics';
 import { ItemQuantityFields, itemsFromQuantities } from './ItemQuantityFields';
 import { Modal } from './Modal';
 
@@ -51,6 +52,10 @@ export function OrderActions({
     setError(null);
     try {
       await replaceOrderItems(orderId, next);
+      trackEvent('order_items_edited', {
+        itemCount: next.length,
+        totalQuantity: next.reduce((sum, i) => sum + i.quantity, 0),
+      });
       setEditing(false);
       startTransition(() => router.refresh());
     } catch (e) {
@@ -65,6 +70,7 @@ export function OrderActions({
     setError(null);
     try {
       await deleteOrder(orderId);
+      trackEvent('order_deleted');
       startTransition(() => router.refresh());
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo eliminar la orden.');
