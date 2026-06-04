@@ -3,10 +3,9 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-/** The three back-office views, with Spanish labels and their routes. */
+/** The back-office views, with Spanish labels and their routes. */
 const LINKS = [
   { href: '/orders', label: 'Órdenes' },
-  { href: '/links', label: 'Crear orden' },
   { href: '/production', label: 'Producción' },
 ] as const;
 

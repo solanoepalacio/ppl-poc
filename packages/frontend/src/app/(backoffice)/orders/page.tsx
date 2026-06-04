@@ -1,5 +1,6 @@
 import { getOrdersByDay, getProducts } from '@/lib/api';
 import { DayPicker } from './DayPicker';
+import { CreateOrderModal } from './CreateOrderModal';
 import { OrderActions } from './OrderActions';
 import { OrderStatusControl } from './OrderStatusControl';
 
@@ -23,7 +24,10 @@ export default async function OrdersPage({
     <section>
       <h1>Órdenes</h1>
 
-      <DayPicker day={view.day} />
+      <DayPicker
+        day={view.day}
+        action={<CreateOrderModal products={products} />}
+      />
 
       {view.orders.length === 0 && (
         <p className="muted">No hay órdenes creadas el {view.day}.</p>

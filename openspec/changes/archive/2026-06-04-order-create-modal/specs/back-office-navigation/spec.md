@@ -1,21 +1,4 @@
-# back-office-navigation Specification
-
-## Purpose
-
-Defines how the back office is structured around its three views and the persistent navigation the manager uses to move between them, and how this navigation is kept off the customer-facing order form.
-
-## Requirements
-
-### Requirement: Back office lands on the orders-by-day view
-The back office SHALL present the orders-by-day view as its landing destination. There SHALL NOT be a separate back-office home page; navigating to the back-office root SHALL result in the orders-by-day view.
-
-#### Scenario: Opening the back office shows orders by day
-- **WHEN** the manager navigates to the back-office root
-- **THEN** the orders-by-day view is shown
-
-#### Scenario: No standalone home page
-- **WHEN** the manager is anywhere in the back office
-- **THEN** no standalone landing page distinct from the three views is presented
+## MODIFIED Requirements
 
 ### Requirement: Persistent navigation across back-office views
 The back office SHALL present a persistent navigation, visible on every back-office view, with one link to each of its views labelled **Órdenes** (orders by day) and **Producción** (production totals). Order creation SHALL NOT be a standalone navigation destination; it is launched as a modal action from the orders view. Selecting a link SHALL navigate to that view. The navigation SHALL indicate which view is currently active.
@@ -36,10 +19,3 @@ The back office SHALL present a persistent navigation, visible on every back-off
 - **WHEN** the manager looks at the back-office navigation
 - **THEN** there is no separate Crear orden navigation link
 - **AND** order creation is reached from the orders view instead
-
-### Requirement: Customer order form excludes back-office navigation
-The persistent back-office navigation SHALL NOT appear on the customer-facing order form.
-
-#### Scenario: Order form has no back-office navigation
-- **WHEN** a customer opens their order form via a link
-- **THEN** the back-office navigation is not shown
