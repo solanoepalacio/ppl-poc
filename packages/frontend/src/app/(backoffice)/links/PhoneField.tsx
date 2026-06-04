@@ -28,7 +28,7 @@ export function PhoneField({
 
   return (
     <div className="field">
-      <label htmlFor={id}>Phone</label>
+      <label htmlFor={id}>Teléfono</label>
       <div className="phone-entry">
         <span className="phone-fixed" aria-hidden="true">
           0
@@ -36,7 +36,7 @@ export function PhoneField({
         <input
           className="phone-area"
           inputMode="numeric"
-          aria-label="Area code"
+          aria-label="Código de área"
           value={areaCode}
           disabled={disabled}
           onChange={(e) => onAreaCodeChange(digits(e.target.value))}
@@ -48,7 +48,7 @@ export function PhoneField({
           id={id}
           className="phone-local"
           inputMode="numeric"
-          aria-label="Local number"
+          aria-label="Número local"
           placeholder="1234567"
           value={localNumber}
           disabled={disabled}

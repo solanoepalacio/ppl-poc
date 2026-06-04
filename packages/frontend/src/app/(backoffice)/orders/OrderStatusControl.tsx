@@ -5,6 +5,16 @@ import { useRouter } from 'next/navigation';
 import { ORDER_STATUSES, type OrderStatus } from '@pannico/shared';
 import { updateOrderStatus } from '@/lib/api';
 
+/** Spanish display labels for each stored status value (display-only; the
+ *  underlying enum value sent to the API is unchanged). */
+const STATUS_LABELS: Record<OrderStatus, string> = {
+  pending: 'pendiente',
+  issued: 'emitida',
+  denied: 'rechazada',
+  ignored: 'ignorada',
+  finished: 'finalizada',
+};
+
 /**
  * Back-office status control: a `<select>` of every valid status that lets the
  * manager set an order to any status (free-form transitions). On change it
@@ -36,18 +46,18 @@ export function OrderStatusControl({
     <span className="status-select">
       <span className={`status-dot status-${status}`} aria-hidden />
       <select
-        aria-label="Order status"
+        aria-label="Estado de la orden"
         value={status}
         disabled={pending}
         onChange={(e) => void onChange(e.target.value as OrderStatus)}
       >
         {ORDER_STATUSES.map((s) => (
           <option key={s} value={s}>
-            {s}
+            {STATUS_LABELS[s]}
           </option>
         ))}
       </select>
-      {error && <span className="muted"> · failed</span>}
+      {error && <span className="muted"> · falló</span>}
     </span>
   );
 }

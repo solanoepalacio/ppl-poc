@@ -18,7 +18,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: 'Pannico',
-  description: 'Order intake PoC',
+  description: 'Recepción de órdenes',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

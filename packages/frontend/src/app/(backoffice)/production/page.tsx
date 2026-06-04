@@ -15,17 +15,17 @@ export default async function ProductionPage({
 
   return (
     <section>
-      <h1>Daily production</h1>
+      <h1>Producción diaria</h1>
 
       <form className="card" method="get">
-        <label htmlFor="day">Day </label>
+        <label htmlFor="day">Día </label>
         <input id="day" name="day" type="date" defaultValue={production.day} />{' '}
-        <button className="btn-secondary">View</button>
+        <button className="btn-secondary">Ver</button>
       </form>
 
       <p className="muted">
-        Items to produce on {production.day} (pending, issued, and finished
-        orders).
+        Artículos a producir el {production.day} (órdenes pendientes, emitidas y
+        finalizadas).
       </p>
 
       {production.items.length > 0 ? (
@@ -39,7 +39,7 @@ export default async function ProductionPage({
           </ul>
         </div>
       ) : (
-        <p className="muted">Nothing to produce on {production.day}.</p>
+        <p className="muted">Nada que producir el {production.day}.</p>
       )}
     </section>
   );

@@ -16,14 +16,14 @@ export default async function CreateOrderPage() {
 
       <h2>Por link</h2>
       <p className="muted">
-        Generate a link to share with the customer so they place the order
-        themselves.
+        Generá un enlace para compartir con el cliente y que haga el pedido él
+        mismo.
       </p>
       <LinkGenerator />
 
       <h2>Cargar orden</h2>
       <p className="muted">
-        Enter the order directly when you take it yourself.
+        Ingresá la orden directamente cuando la tomás vos.
       </p>
       <DirectOrderForm products={products} />
     </section>

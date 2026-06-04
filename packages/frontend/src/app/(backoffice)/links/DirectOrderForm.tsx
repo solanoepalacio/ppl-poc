@@ -54,14 +54,14 @@ export function DirectOrderForm({ products }: { products: Product[] }) {
       setDone(true);
       startTransition(() => router.refresh());
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to create order.');
+      setError(e instanceof Error ? e.message : 'No se pudo crear la orden.');
     }
   }
 
   return (
     <form onSubmit={submit} className="card">
       <p className="muted">
-        Record an order received by phone, WhatsApp, or in person.
+        Registrá una orden recibida por teléfono, WhatsApp o en persona.
       </p>
       <PhoneField
         id="direct-order-phone"
@@ -72,7 +72,7 @@ export function DirectOrderForm({ products }: { products: Product[] }) {
         disabled={pending}
       />
       {localNumber.length > 0 && !valid && (
-        <p className="error">That phone number looks incomplete.</p>
+        <p className="error">Ese número de teléfono parece incompleto.</p>
       )}
       <ItemQuantityFields
         products={products}
@@ -81,11 +81,11 @@ export function DirectOrderForm({ products }: { products: Product[] }) {
         disabled={pending}
       />
       <div className="field">
-        <label htmlFor="direct-order-message">Message (optional)</label>
+        <label htmlFor="direct-order-message">Mensaje (opcional)</label>
         <textarea
           id="direct-order-message"
           rows={6}
-          placeholder="Paste the WhatsApp message that generated this order…"
+          placeholder="Pegá el mensaje de WhatsApp que generó esta orden…"
           value={message}
           disabled={pending}
           onChange={(e) => setMessage(e.target.value)}
@@ -93,9 +93,9 @@ export function DirectOrderForm({ products }: { products: Product[] }) {
         />
       </div>
       {error && <p className="error">{error}</p>}
-      {done && <p className="muted">Order created.</p>}
+      {done && <p className="muted">Orden creada.</p>}
       <button className="btn-primary" disabled={pending || !valid}>
-        {pending ? 'Creating…' : 'Create order'}
+        {pending ? 'Creando…' : 'Crear orden'}
       </button>
     </form>
   );

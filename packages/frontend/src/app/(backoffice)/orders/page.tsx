@@ -20,16 +20,16 @@ export default async function OrdersPage({
 
   return (
     <section>
-      <h1>Orders</h1>
+      <h1>Órdenes</h1>
 
       <form className="card" method="get">
-        <label htmlFor="day">Day </label>
+        <label htmlFor="day">Día </label>
         <input id="day" name="day" type="date" defaultValue={view.day} />{' '}
-        <button className="btn-secondary">View</button>
+        <button className="btn-secondary">Ver</button>
       </form>
 
       {view.orders.length === 0 && (
-        <p className="muted">No orders created on {view.day}.</p>
+        <p className="muted">No hay órdenes creadas el {view.day}.</p>
       )}
 
       {view.orders.map((order) => (
@@ -39,7 +39,7 @@ export default async function OrdersPage({
             <OrderStatusControl orderId={order.id} status={order.status} />
           </div>
           <p className="muted">
-            Created {new Date(order.createdAt).toLocaleString()}
+            Creada {new Date(order.createdAt).toLocaleString()}
           </p>
           {order.items.length > 0 ? (
             <ul>
@@ -51,7 +51,7 @@ export default async function OrdersPage({
               ))}
             </ul>
           ) : (
-            <p className="muted">No items.</p>
+            <p className="muted">Sin artículos.</p>
           )}
           <OrderActions
             orderId={order.id}

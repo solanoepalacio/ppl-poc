@@ -30,7 +30,7 @@ export function LinkGenerator() {
     try {
       setResult(await createLink(composePhoneE164(areaCode, localNumber)));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.');
+      setError(err instanceof Error ? err.message : 'Algo salió mal.');
     } finally {
       setBusy(false);
     }
@@ -54,10 +54,10 @@ export function LinkGenerator() {
           disabled={busy}
         />
         {localNumber.length > 0 && !valid && (
-          <p className="error">That phone number looks incomplete.</p>
+          <p className="error">Ese número de teléfono parece incompleto.</p>
         )}
         <button className="btn-primary" disabled={busy || !valid}>
-          {busy ? 'Generating…' : 'Generate'}
+          {busy ? 'Generando…' : 'Generar'}
         </button>
       </form>
 
@@ -65,16 +65,16 @@ export function LinkGenerator() {
 
       {result && (
         <div className="card">
-          <p className="muted">Share this link with the customer over WhatsApp:</p>
+          <p className="muted">Compartí este enlace con el cliente por WhatsApp:</p>
           <p>
             <code>{result.url}</code>
           </p>
           <p className="muted">
-            For {result.phone} · expires{' '}
+            Para {result.phone} · expira{' '}
             {new Date(result.expiresAt).toLocaleString()}
           </p>
           <button className="btn-secondary" onClick={copy}>
-            {copied ? 'Copied!' : 'Copy link'}
+            {copied ? '¡Copiado!' : 'Copiar enlace'}
           </button>
         </div>
       )}

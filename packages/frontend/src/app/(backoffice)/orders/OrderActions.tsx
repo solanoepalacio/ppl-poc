@@ -44,7 +44,7 @@ export function OrderActions({
     const next = itemsFromQuantities(quantities);
     if (
       next.length === 0 &&
-      !window.confirm("Save with no items? This clears the order's items.")
+      !window.confirm('¿Guardar sin artículos? Esto borra los artículos de la orden.')
     ) {
       return;
     }
@@ -54,12 +54,12 @@ export function OrderActions({
       setEditing(false);
       startTransition(() => router.refresh());
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to save items.');
+      setError(e instanceof Error ? e.message : 'No se pudieron guardar los artículos.');
     }
   }
 
   async function remove() {
-    if (!window.confirm('Delete this order? This cannot be undone.')) {
+    if (!window.confirm('¿Eliminar esta orden? No se puede deshacer.')) {
       return;
     }
     setError(null);
@@ -67,7 +67,7 @@ export function OrderActions({
       await deleteOrder(orderId);
       startTransition(() => router.refresh());
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to delete order.');
+      setError(e instanceof Error ? e.message : 'No se pudo eliminar la orden.');
     }
   }
 
@@ -79,21 +79,21 @@ export function OrderActions({
           onClick={startEditing}
           disabled={pending}
         >
-          Edit items
+          Editar artículos
         </button>
         <button
           className="btn-secondary"
           onClick={() => void remove()}
           disabled={pending}
         >
-          Delete
+          Eliminar
         </button>
         {error && !editing && <span className="error"> · {error}</span>}
       </div>
       <Modal
         open={editing}
         onClose={() => setEditing(false)}
-        title="Edit items"
+        title="Editar artículos"
         footer={
           <>
             <button
@@ -101,14 +101,14 @@ export function OrderActions({
               onClick={() => void save()}
               disabled={pending}
             >
-              Save items
+              Guardar artículos
             </button>
             <button
               className="btn-secondary"
               onClick={() => setEditing(false)}
               disabled={pending}
             >
-              Cancel
+              Cancelar
             </button>
           </>
         }

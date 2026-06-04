@@ -51,7 +51,7 @@ export function Modal({
           <button
             type="button"
             className="btn-secondary"
-            aria-label="Close"
+            aria-label="Cerrar"
             onClick={onClose}
           >
             ✕

@@ -20,7 +20,7 @@ export function BackofficeNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="nav" aria-label="Back office">
+    <nav className="nav" aria-label="Oficina de gestión">
       {LINKS.map(({ href, label }) => {
         const active = pathname === href;
         return (
