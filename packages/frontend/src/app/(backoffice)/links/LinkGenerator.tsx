@@ -1,16 +1,25 @@
 'use client';
 
 import { useState } from 'react';
-import type { CreateLinkResponse } from '@pannico/shared';
+import {
+  DEFAULT_AREA_CODE,
+  composePhoneE164,
+  isValidPhoneEntry,
+  type CreateLinkResponse,
+} from '@pannico/shared';
 import { createLink } from '@/lib/api';
+import { PhoneField } from './PhoneField';
 
 /** Generate a shareable, tokenized order link from a customer phone number. */
 export function LinkGenerator() {
-  const [phone, setPhone] = useState('');
+  const [areaCode, setAreaCode] = useState(DEFAULT_AREA_CODE);
+  const [localNumber, setLocalNumber] = useState('');
   const [result, setResult] = useState<CreateLinkResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  const valid = isValidPhoneEntry(areaCode, localNumber);
 
   async function generate(e: React.FormEvent) {
     e.preventDefault();
@@ -19,7 +28,7 @@ export function LinkGenerator() {
     setCopied(false);
     setBusy(true);
     try {
-      setResult(await createLink(phone));
+      setResult(await createLink(composePhoneE164(areaCode, localNumber)));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.');
     } finally {
@@ -36,19 +45,20 @@ export function LinkGenerator() {
   return (
     <>
       <form onSubmit={generate} className="card">
-        <label htmlFor="phone">Customer phone (E.164)</label>
-        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-          <input
-            id="phone"
-            placeholder="+5491122334455"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            style={{ flex: 1 }}
-          />
-          <button className="btn-primary" disabled={busy || !phone}>
-            {busy ? 'Generating…' : 'Generate'}
-          </button>
-        </div>
+        <PhoneField
+          id="link-phone-local"
+          areaCode={areaCode}
+          localNumber={localNumber}
+          onAreaCodeChange={setAreaCode}
+          onLocalNumberChange={setLocalNumber}
+          disabled={busy}
+        />
+        {localNumber.length > 0 && !valid && (
+          <p className="error">That phone number looks incomplete.</p>
+        )}
+        <button className="btn-primary" disabled={busy || !valid}>
+          {busy ? 'Generating…' : 'Generate'}
+        </button>
       </form>
 
       {error && <p className="error">{error}</p>}

@@ -1101,6 +1101,9 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@pannico/shared@workspace:packages/shared"
   dependencies:
+    "@types/jest": "npm:^29.5.12"
+    jest: "npm:^29.7.0"
+    ts-jest: "npm:^29.2.0"
     typescript: "npm:^5.4.0"
   languageName: unknown
   linkType: soft

@@ -412,6 +412,25 @@ select {
   width: 100%;
 }
 
+/* Argentine `0[area] 15[number]` two-field phone entry. */
+.phone-entry {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.phone-entry .phone-fixed {
+  font-weight: 600;
+  color: var(--muted, #666);
+}
+.phone-entry .phone-area {
+  width: 4.5rem;
+  flex: 0 0 auto;
+  text-align: center;
+}
+.phone-entry .phone-local {
+  flex: 1;
+}
+
 code {
   background: #f0f0f0;
   padding: 0.15rem 0.35rem;

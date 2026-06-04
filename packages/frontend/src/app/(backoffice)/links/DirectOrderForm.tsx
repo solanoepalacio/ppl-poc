@@ -2,8 +2,14 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Product } from '@pannico/shared';
+import {
+  DEFAULT_AREA_CODE,
+  composePhoneE164,
+  isValidPhoneEntry,
+  type Product,
+} from '@pannico/shared';
 import { createOrder } from '@/lib/api';
+import { PhoneField } from './PhoneField';
 import {
   ItemQuantityFields,
   itemsFromQuantities,
@@ -17,12 +23,15 @@ import {
  */
 export function DirectOrderForm({ products }: { products: Product[] }) {
   const router = useRouter();
-  const [phone, setPhone] = useState('');
+  const [areaCode, setAreaCode] = useState(DEFAULT_AREA_CODE);
+  const [localNumber, setLocalNumber] = useState('');
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [message, setMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [pending, startTransition] = useTransition();
+
+  const valid = isValidPhoneEntry(areaCode, localNumber);
 
   function setQuantity(productId: string, quantity: number) {
     setQuantities((q) => ({ ...q, [productId]: quantity }));
@@ -34,11 +43,12 @@ export function DirectOrderForm({ products }: { products: Product[] }) {
     setDone(false);
     try {
       await createOrder({
-        phone,
+        phone: composePhoneE164(areaCode, localNumber),
         items: itemsFromQuantities(quantities),
         message,
       });
-      setPhone('');
+      setAreaCode(DEFAULT_AREA_CODE);
+      setLocalNumber('');
       setQuantities({});
       setMessage('');
       setDone(true);
@@ -53,17 +63,17 @@ export function DirectOrderForm({ products }: { products: Product[] }) {
       <p className="muted">
         Record an order received by phone, WhatsApp, or in person.
       </p>
-      <div className="field">
-        <label htmlFor="direct-order-phone">Phone</label>
-        <input
-          id="direct-order-phone"
-          type="tel"
-          placeholder="+5491122334455"
-          value={phone}
-          disabled={pending}
-          onChange={(e) => setPhone(e.target.value)}
-        />
-      </div>
+      <PhoneField
+        id="direct-order-phone"
+        areaCode={areaCode}
+        localNumber={localNumber}
+        onAreaCodeChange={setAreaCode}
+        onLocalNumberChange={setLocalNumber}
+        disabled={pending}
+      />
+      {localNumber.length > 0 && !valid && (
+        <p className="error">That phone number looks incomplete.</p>
+      )}
       <ItemQuantityFields
         products={products}
         quantities={quantities}
@@ -84,7 +94,7 @@ export function DirectOrderForm({ products }: { products: Product[] }) {
       </div>
       {error && <p className="error">{error}</p>}
       {done && <p className="muted">Order created.</p>}
-      <button className="btn-primary" disabled={pending || !phone}>
+      <button className="btn-primary" disabled={pending || !valid}>
         {pending ? 'Creating…' : 'Create order'}
       </button>
     </form>
