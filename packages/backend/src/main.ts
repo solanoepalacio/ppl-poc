@@ -5,8 +5,14 @@ import { AppModule } from './app.module';
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
 
-  // The frontend is served from a different origin in dev; allow it.
-  app.enableCors({ origin: true });
+  // Browser traffic reaches the backend through the Next.js proxy
+  // (same-origin), so cross-origin CORS is normally unnecessary. Only enable it
+  // when the backend is exposed directly, restricting to an explicit allowlist
+  // via CORS_ORIGIN (comma-separated origins).
+  if (process.env.CORS_ORIGIN) {
+    const origin = process.env.CORS_ORIGIN.split(',').map((o) => o.trim());
+    app.enableCors({ origin });
+  }
 
   app.useGlobalPipes(
     new ValidationPipe({

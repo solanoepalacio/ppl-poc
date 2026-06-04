@@ -14,11 +14,21 @@ import type {
 } from '@pannico/shared';
 
 /**
- * Backend API base URL. Configured via env so the frontend can point at any
- * backend instance (see .env.local / .env.example).
+ * Backend API base URL, resolved per execution context:
+ *
+ * - In the browser, calls go to a relative path (`/api`) that Next.js rewrites
+ *   to the backend (see next.config.js). The backend is never exposed directly,
+ *   so the browser only ever talks to the frontend's own origin.
+ * - On the server (server components, route handlers), `fetch` needs an
+ *   absolute URL, so we hit the backend directly over the internal network via
+ *   BACKEND_INTERNAL_URL.
+ *
+ * Both are overridable via env; the defaults match the local dev setup.
  */
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
+  typeof window === 'undefined'
+    ? process.env.BACKEND_INTERNAL_URL ?? 'http://localhost:3000'
+    : process.env.NEXT_PUBLIC_API_BASE_URL ?? '/api';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
