@@ -44,7 +44,7 @@ export function OrderStatusControl({
 
   return (
     <span className="status-select">
-      <span className={`status-dot status-${status}`} aria-hidden />
+      <span className="status-label">Estado</span>
       <select
         aria-label="Estado de la orden"
         value={status}

@@ -150,7 +150,7 @@ export function CreateOrderModal({ products }: { products: Product[] }) {
         )}
 
         {step === 'choose' && (
-          <div className="row">
+          <div className="row row--no-divider">
             <button
               type="button"
               className="btn-primary"

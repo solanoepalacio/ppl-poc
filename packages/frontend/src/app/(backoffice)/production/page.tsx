@@ -16,14 +16,7 @@ export default async function ProductionPage({
 
   return (
     <section>
-      <h1>Producción diaria</h1>
-
       <DayPicker day={production.day} />
-
-      <p className="muted">
-        Artículos a producir el {production.day} (órdenes pendientes, emitidas y
-        finalizadas).
-      </p>
 
       {production.items.length > 0 ? (
         <div className="card">

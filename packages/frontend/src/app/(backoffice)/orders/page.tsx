@@ -22,8 +22,6 @@ export default async function OrdersPage({
 
   return (
     <section>
-      <h1>Órdenes</h1>
-
       <DayPicker
         day={view.day}
         action={<CreateOrderModal products={products} />}
@@ -35,7 +33,7 @@ export default async function OrdersPage({
 
       {view.orders.map((order) => (
         <div className="card" key={order.id}>
-          <div className="row" style={{ borderBottom: '1px solid #eee' }}>
+          <div className="row">
             <strong>{order.phone}</strong>
             <OrderStatusControl orderId={order.id} status={order.status} />
           </div>

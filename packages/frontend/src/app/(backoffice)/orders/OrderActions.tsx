@@ -73,7 +73,7 @@ export function OrderActions({
 
   return (
     <>
-      <div className="row">
+      <div className="row row--no-divider">
         <button
           className="btn-secondary"
           onClick={startEditing}
