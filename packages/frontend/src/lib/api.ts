@@ -8,6 +8,7 @@ import type {
   DeleteOrderResponse,
   OrderStatus,
   Product,
+  ProductCategory,
   ProductionTotalsResponse,
   ReplaceOrderItemsResponse,
   Slot,
@@ -99,8 +100,12 @@ export function getOrdersBySlot(slotId?: string): Promise<SlotOrdersResponse> {
 
 export function getProductionTotals(
   slotId?: string,
+  category?: ProductCategory,
 ): Promise<ProductionTotalsResponse> {
-  const qs = slotId ? `?slotId=${encodeURIComponent(slotId)}` : '';
+  const params = new URLSearchParams();
+  if (slotId) params.set('slotId', slotId);
+  if (category) params.set('category', category);
+  const qs = params.toString() ? `?${params.toString()}` : '';
   return request<ProductionTotalsResponse>(`/orders/production${qs}`);
 }
 

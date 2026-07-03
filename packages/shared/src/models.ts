@@ -1,10 +1,13 @@
 import type { OrderStatus } from './order-status';
+import type { ProductCategory } from './product-category';
 
 /** A product in the predefined catalog. */
 export interface Product {
   id: string;
   name: string;
   active: boolean;
+  /** The production line this product is baked on (*salados* / *dulces*). */
+  category: ProductCategory;
 }
 
 /**

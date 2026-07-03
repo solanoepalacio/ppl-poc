@@ -451,14 +451,19 @@ describe('OrdersService', () => {
     // Builds an order with items shaped as the include returns (product nested).
     const orderWith = (
       status: string,
-      items: { productId: string; name: string; quantity: number }[],
+      items: {
+        productId: string;
+        name: string;
+        quantity: number;
+        category?: 'sweet' | 'salty';
+      }[],
     ) => ({
       status,
       items: items.map((i, idx) => ({
         id: `oi_${status}_${idx}`,
         productId: i.productId,
         quantity: i.quantity,
-        product: { id: i.productId, name: i.name },
+        product: { id: i.productId, name: i.name, category: i.category ?? 'salty' },
       })),
     });
 
@@ -534,6 +539,34 @@ describe('OrdersService', () => {
       expect(res.slot.id).toBe('slot_open');
       const where = prisma.order.findMany.mock.calls[0][0].where;
       expect(where.slotId).toBe('slot_open');
+    });
+
+    it('scopes totals to the requested category, excluding the other line', async () => {
+      prisma.order.findMany.mockResolvedValue([
+        orderWith('issued', [
+          { productId: 'p1', name: 'Ciabatta', quantity: 2, category: 'salty' },
+          { productId: 'p2', name: 'Pavlova', quantity: 5, category: 'sweet' },
+        ]),
+      ]);
+
+      const res = await service.getProductionTotals('slot_7', 'salty');
+
+      expect(res.items).toEqual([
+        { productId: 'p1', name: 'Ciabatta', quantity: 2 },
+      ]);
+    });
+
+    it('includes both categories when none is specified', async () => {
+      prisma.order.findMany.mockResolvedValue([
+        orderWith('issued', [
+          { productId: 'p1', name: 'Ciabatta', quantity: 2, category: 'salty' },
+          { productId: 'p2', name: 'Pavlova', quantity: 5, category: 'sweet' },
+        ]),
+      ]);
+
+      const res = await service.getProductionTotals('slot_7');
+
+      expect(res.items.map((i) => i.productId).sort()).toEqual(['p1', 'p2']);
     });
   });
 });

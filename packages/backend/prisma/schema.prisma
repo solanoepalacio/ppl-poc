@@ -14,10 +14,15 @@ datasource db {
 
 /// Catalog product, populated by the seed. `active` lets us retire a product
 /// without hard-deleting it (historical OrderItems keep their reference).
+/// `category` is the production line (`sweet` | `salty`), stored as a plain
+/// String constrained by the shared ProductCategory union and validated in the
+/// service layer (SQLite + Prisma have no native enums). The default keeps the
+/// migration's ADD COLUMN valid on existing rows; the seed writes the real value.
 model Product {
-  id     String  @id @default(cuid())
-  name   String
-  active Boolean @default(true)
+  id       String  @id @default(cuid())
+  name     String
+  active   Boolean @default(true)
+  category String  @default("salty")
 
   orderItems OrderItem[]
 }

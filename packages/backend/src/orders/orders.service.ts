@@ -12,6 +12,7 @@ import {
   type DeleteOrderResponse,
   type OrderStatus,
   type Product,
+  type ProductCategory,
   type ProductionTotalsResponse,
   type ReplaceOrderItemsResponse,
   type SlotOrdersResponse,
@@ -36,10 +37,16 @@ export class OrdersService {
 
   /** Active catalog products, used by the form and the `/products` endpoint. */
   async getCatalog(): Promise<Product[]> {
-    return this.prisma.product.findMany({
+    const products = await this.prisma.product.findMany({
       where: { active: true },
       orderBy: { name: 'asc' },
     });
+    // `category` is a plain string column; narrow it to the union at the boundary
+    // (mirroring how Slot.status is cast in toSlotDto).
+    return products.map((p) => ({
+      ...p,
+      category: p.category as Product['category'],
+    }));
   }
 
   /**
@@ -308,9 +315,13 @@ export class OrdersService {
    * bloque: the summed quantity of each product across orders that represent
    * real demand (`PRODUCTION_STATUSES`). Returns one entry per product with a
    * positive total, sorted by product name; products with no demand are omitted.
+   *
+   * When a `category` is given, only products on that production line contribute,
+   * so the salados and dulces views each show just their line's totals.
    */
   async getProductionTotals(
     slotId?: string,
+    category?: ProductCategory,
   ): Promise<ProductionTotalsResponse> {
     const slot = await this.slotsService.resolveSlot(slotId);
     const orders = await this.prisma.order.findMany({
@@ -325,6 +336,9 @@ export class OrdersService {
     const totals = new Map<string, { name: string; quantity: number }>();
     for (const order of orders) {
       for (const item of order.items) {
+        if (category && item.product.category !== category) {
+          continue;
+        }
         const entry = totals.get(item.productId);
         if (entry) {
           entry.quantity += item.quantity;

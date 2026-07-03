@@ -10,14 +10,15 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import type {
-  CreateOrderResponse,
-  DeleteOrderResponse,
-  ProductionTotalsResponse,
-  ReplaceOrderItemsResponse,
-  SlotOrdersResponse,
-  TokenValidationResponse,
-  UpdateOrderStatusResponse,
+import {
+  isProductCategory,
+  type CreateOrderResponse,
+  type DeleteOrderResponse,
+  type ProductionTotalsResponse,
+  type ReplaceOrderItemsResponse,
+  type SlotOrdersResponse,
+  type TokenValidationResponse,
+  type UpdateOrderStatusResponse,
 } from '@pannico/shared';
 import { OrdersService } from './orders.service';
 import { ConfirmOrderDto } from './dto/confirm-order.dto';
@@ -36,12 +37,18 @@ export class OrdersController {
     return this.ordersService.getOrdersBySlot(slotId);
   }
 
-  /** Back-office per-item production totals for a bloque (defaults to the open one). */
+  /**
+   * Back-office per-item production totals for a bloque (defaults to the open one).
+   * An optional `category` scopes the totals to one production line (salados /
+   * dulces); unknown values are ignored and yield the unscoped totals.
+   */
   @Get('production')
   getProductionTotals(
     @Query('slotId') slotId?: string,
+    @Query('category') category?: string,
   ): Promise<ProductionTotalsResponse> {
-    return this.ordersService.getProductionTotals(slotId);
+    const scoped = isProductCategory(category) ? category : undefined;
+    return this.ordersService.getProductionTotals(slotId, scoped);
   }
 
   /** Back-office manual order creation (order received off-channel). */
