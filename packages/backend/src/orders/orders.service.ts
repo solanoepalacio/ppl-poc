@@ -20,7 +20,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SlotsService, toSlotDto } from '../slots/slots.service';
-import { normalizePhoneE164 } from '../common/phone.util';
+import { ClientsService } from '../clients/clients.service';
 import { generateToken } from '../common/token.util';
 import { computeExpiry } from '../config/token.config';
 import { TokenService } from './token.service';
@@ -31,6 +31,7 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly tokenService: TokenService,
     private readonly slotsService: SlotsService,
+    private readonly clientsService: ClientsService,
   ) {}
 
   /** Active catalog products, used by the form and the `/products` endpoint. */
@@ -43,17 +44,22 @@ export class OrdersService {
 
   /**
    * Validates a token for the customer form. When valid, returns the bound
-   * phone and the catalog so the form can render; when invalid/expired/consumed,
-   * returns `{ valid: false }` and resolves no phone or catalog.
+   * client name and the catalog so the form can render; when
+   * invalid/expired/consumed, returns `{ valid: false }` and resolves no client
+   * or catalog.
    */
   async validateToken(token: string): Promise<TokenValidationResponse> {
     const order = await this.tokenService.findOrderByToken(token);
     if (!this.tokenService.isValid(order)) {
       return { valid: false };
     }
+    const client = await this.prisma.client.findUnique({
+      where: { id: order!.clientId },
+      select: { name: true },
+    });
     return {
       valid: true,
-      phone: order!.phone,
+      clientName: client?.name,
       catalog: await this.getCatalog(),
     };
   }
@@ -135,19 +141,14 @@ export class OrdersService {
 
   /**
    * Back-office manual order creation: records an order received off-channel
-   * (phone/WhatsApp/in-person) directly, without generating a customer link.
-   * Validates the phone and items against the catalog, generates an unused
+   * (WhatsApp/in-person) directly, without generating a customer link.
+   * Validates the client and items against the catalog, generates an unused
    * token + expiry to satisfy the schema, and defaults the status to `issued`
-   * since the order is already real. Rejects a bad phone, an unknown status,
-   * or an out-of-catalog item, persisting nothing on rejection.
+   * since the order is already real. Rejects a missing/inactive client, an
+   * unknown status, or an out-of-catalog item, persisting nothing on rejection.
    */
   async createOrder(input: CreateOrderRequest): Promise<CreateOrderResponse> {
-    const phone = normalizePhoneE164(input.phone);
-    if (!phone) {
-      throw new BadRequestException(
-        'A valid phone number (E.164, e.g. +5491122334455) is required.',
-      );
-    }
+    await this.clientsService.assertActive(input.clientId);
 
     const status = input.status ?? 'issued';
     if (!isOrderStatus(status)) {
@@ -162,7 +163,7 @@ export class OrdersService {
 
     const order = await this.prisma.order.create({
       data: {
-        phone,
+        clientId: input.clientId,
         token: generateToken(),
         status,
         slotId,
@@ -279,21 +280,22 @@ export class OrdersService {
 
   /**
    * Returns the orders in a bloque, defaulting to the currently open bloque when
-   * no `slotId` is given, each with its status, items, and phone number for the
-   * back office. Also returns the resolved bloque for the header/picker.
+   * no `slotId` is given, each with its status, items, and client for the back
+   * office. Also returns the resolved bloque for the header/picker.
    */
   async getOrdersBySlot(slotId?: string): Promise<SlotOrdersResponse> {
     const slot = await this.slotsService.resolveSlot(slotId);
     const orders = await this.prisma.order.findMany({
       where: { slotId: slot.id },
       orderBy: { createdAt: 'desc' },
-      include: { items: true },
+      include: { items: true, client: true },
     });
     return {
       slot: toSlotDto(slot),
       orders: orders.map((o) => ({
         id: o.id,
-        phone: o.phone,
+        clientId: o.clientId,
+        clientName: o.client.name,
         status: o.status as SlotOrdersResponse['orders'][number]['status'],
         createdAt: o.createdAt.toISOString(),
         items: o.items,

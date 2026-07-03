@@ -3,15 +3,17 @@ import type { OrderStatus } from './order-status';
 import type { Product } from './models';
 import type { Slot } from './slot';
 
-/** `POST /links` request: the manager supplies a customer phone number. */
+/** `POST /links` request: the manager selects a client from the directory. */
 export interface CreateLinkRequest {
-  phone: string;
+  clientId: string;
 }
 
 /** `POST /links` response: the shareable custom URL plus order context. */
 export interface CreateLinkResponse {
   orderId: string;
-  phone: string;
+  clientId: string;
+  /** Display name of the client the order is for. */
+  clientName: string;
   token: string;
   /** Fully-qualified custom URL the manager shares over WhatsApp. */
   url: string;
@@ -24,7 +26,8 @@ export interface CreateLinkResponse {
  */
 export interface TokenValidationResponse {
   valid: boolean;
-  phone?: string;
+  /** Display name of the client the order is for, when the token is valid. */
+  clientName?: string;
   catalog?: Product[];
 }
 
@@ -55,7 +58,7 @@ export interface UpdateOrderStatusResponse {
  * `items` defaults to empty and `status` defaults to `issued` when omitted.
  */
 export interface CreateOrderRequest {
-  phone: string;
+  clientId: string;
   items?: ConfirmOrderItem[];
   status?: OrderStatus;
   /** Optional raw customer message (e.g. pasted WhatsApp text) for manually
@@ -91,7 +94,9 @@ export interface DeleteOrderResponse {
 /** An order as shown in the back-office bloque view. */
 export interface SlotViewOrder {
   id: string;
-  phone: string;
+  clientId: string;
+  /** Display name of the client the order is for. */
+  clientName: string;
   status: OrderStatus;
   createdAt: string;
   items: OrderItem[];

@@ -3,6 +3,7 @@ import { OrdersService } from './orders.service';
 import { TokenService } from './token.service';
 import type { PrismaService } from '../prisma/prisma.service';
 import type { SlotsService } from '../slots/slots.service';
+import type { ClientsService } from '../clients/clients.service';
 
 /** The open bloque resolveSlot returns by default in these unit tests. */
 const openSlot = {
@@ -22,6 +23,7 @@ type PrismaMock = {
     delete: jest.Mock;
   };
   product: { findMany: jest.Mock };
+  client: { findUnique: jest.Mock };
   orderItem: { createMany: jest.Mock; deleteMany: jest.Mock };
   $transaction: jest.Mock;
 };
@@ -36,6 +38,7 @@ function makePrisma(): PrismaMock {
       delete: jest.fn().mockResolvedValue(undefined),
     },
     product: { findMany: jest.fn() },
+    client: { findUnique: jest.fn() },
     orderItem: {
       createMany: jest.fn().mockResolvedValue(undefined),
       deleteMany: jest.fn().mockResolvedValue(undefined),
@@ -46,7 +49,7 @@ function makePrisma(): PrismaMock {
 
 const pendingOrder = {
   id: 'order_1',
-  phone: '+5491122334455',
+  clientId: 'client_1',
   token: 'tok_valid',
   status: 'pending',
   expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1h ahead
@@ -57,6 +60,7 @@ const pendingOrder = {
 describe('OrdersService', () => {
   let prisma: PrismaMock;
   let slots: { getOpenSlotId: jest.Mock; resolveSlot: jest.Mock };
+  let clients: { assertActive: jest.Mock };
   let service: OrdersService;
 
   beforeEach(() => {
@@ -65,11 +69,13 @@ describe('OrdersService', () => {
       getOpenSlotId: jest.fn().mockResolvedValue('slot_open'),
       resolveSlot: jest.fn().mockResolvedValue(openSlot),
     };
+    clients = { assertActive: jest.fn().mockResolvedValue(undefined) };
     const tokenService = new TokenService(prisma as unknown as PrismaService);
     service = new OrdersService(
       prisma as unknown as PrismaService,
       tokenService,
       slots as unknown as SlotsService,
+      clients as unknown as ClientsService,
     );
   });
 
@@ -151,19 +157,20 @@ describe('OrdersService', () => {
   });
 
   describe('validateToken', () => {
-    it('returns valid + catalog for a pending unexpired token', async () => {
+    it('returns valid + client name + catalog for a pending unexpired token', async () => {
       prisma.order.findUnique.mockResolvedValue({ ...pendingOrder });
+      prisma.client.findUnique.mockResolvedValue({ name: 'Il Postino' });
       prisma.product.findMany.mockResolvedValue([
         { id: 'p1', name: 'A', active: true },
       ]);
 
       const res = await service.validateToken('tok_valid');
       expect(res.valid).toBe(true);
-      expect(res.phone).toBe('+5491122334455');
+      expect(res.clientName).toBe('Il Postino');
       expect(res.catalog).toHaveLength(1);
     });
 
-    it('returns invalid (no phone/catalog) for an expired token', async () => {
+    it('returns invalid (no client/catalog) for an expired token', async () => {
       prisma.order.findUnique.mockResolvedValue({
         ...pendingOrder,
         expiresAt: new Date(Date.now() - 1000),
@@ -227,7 +234,7 @@ describe('OrdersService', () => {
       prisma.order.create.mockResolvedValue({ id: 'order_new', status: 'issued' });
 
       const res = await service.createOrder({
-        phone: '+5491122334455',
+        clientId: 'client_1',
         items: [
           { productId: 'p1', quantity: 2 },
           { productId: 'p2', quantity: 1 },
@@ -236,7 +243,7 @@ describe('OrdersService', () => {
 
       expect(res).toEqual({ id: 'order_new', status: 'issued' });
       const data = prisma.order.create.mock.calls[0][0].data;
-      expect(data.phone).toBe('+5491122334455');
+      expect(data.clientId).toBe('client_1');
       expect(data.status).toBe('issued');
       expect(typeof data.token).toBe('string');
       expect(data.token.length).toBeGreaterThan(0);
@@ -250,7 +257,7 @@ describe('OrdersService', () => {
     it('persists an order with no items', async () => {
       prisma.order.create.mockResolvedValue({ id: 'order_new', status: 'issued' });
 
-      await service.createOrder({ phone: '+5491122334455' });
+      await service.createOrder({ clientId: 'client_1' });
 
       expect(prisma.product.findMany).not.toHaveBeenCalled();
       const data = prisma.order.create.mock.calls[0][0].data;
@@ -261,7 +268,7 @@ describe('OrdersService', () => {
       prisma.order.create.mockResolvedValue({ id: 'order_new', status: 'issued' });
 
       await service.createOrder({
-        phone: '+5491122334455',
+        clientId: 'client_1',
         message: 'Hola, quiero 2 medialunas',
       });
 
@@ -272,8 +279,8 @@ describe('OrdersService', () => {
     it('stores null when the message is absent or blank', async () => {
       prisma.order.create.mockResolvedValue({ id: 'order_new', status: 'issued' });
 
-      await service.createOrder({ phone: '+5491122334455' });
-      await service.createOrder({ phone: '+5491122334455', message: '   ' });
+      await service.createOrder({ clientId: 'client_1' });
+      await service.createOrder({ clientId: 'client_1', message: '   ' });
 
       expect(prisma.order.create.mock.calls[0][0].data.message).toBeNull();
       expect(prisma.order.create.mock.calls[1][0].data.message).toBeNull();
@@ -284,16 +291,18 @@ describe('OrdersService', () => {
 
       await expect(
         service.createOrder({
-          phone: '+5491122334455',
+          clientId: 'client_1',
           items: [{ productId: 'p9', quantity: 1 }],
         }),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(prisma.order.create).not.toHaveBeenCalled();
     });
 
-    it('rejects a malformed phone and persists nothing', async () => {
+    it('rejects a missing/inactive client and persists nothing', async () => {
+      clients.assertActive.mockRejectedValue(new BadRequestException());
+
       await expect(
-        service.createOrder({ phone: 'not-a-phone' }),
+        service.createOrder({ clientId: 'nope' }),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(prisma.order.create).not.toHaveBeenCalled();
     });
@@ -301,8 +310,8 @@ describe('OrdersService', () => {
     it('generates a fresh token per order', async () => {
       prisma.order.create.mockResolvedValue({ id: 'order_new', status: 'issued' });
 
-      await service.createOrder({ phone: '+5491122334455' });
-      await service.createOrder({ phone: '+5491122334455' });
+      await service.createOrder({ clientId: 'client_1' });
+      await service.createOrder({ clientId: 'client_1' });
 
       const first = prisma.order.create.mock.calls[0][0].data.token;
       const second = prisma.order.create.mock.calls[1][0].data.token;
@@ -414,6 +423,27 @@ describe('OrdersService', () => {
       expect(res.slot.id).toBe('slot_open');
       const where = prisma.order.findMany.mock.calls[0][0].where;
       expect(where).toEqual({ slotId: 'slot_open' });
+    });
+
+    it('surfaces each order with its client id and name', async () => {
+      prisma.order.findMany.mockResolvedValue([
+        {
+          id: 'order_1',
+          clientId: 'client_1',
+          client: { name: 'Il Postino' },
+          status: 'issued',
+          createdAt: new Date('2026-03-15T10:00:00.000Z'),
+          items: [],
+        },
+      ]);
+
+      const res = await service.getOrdersBySlot();
+
+      expect(res.orders[0]).toMatchObject({
+        id: 'order_1',
+        clientId: 'client_1',
+        clientName: 'Il Postino',
+      });
     });
   });
 

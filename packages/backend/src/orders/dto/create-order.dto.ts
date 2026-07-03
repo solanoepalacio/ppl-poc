@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import {
   IsArray,
   IsIn,
+  IsNotEmpty,
   IsOptional,
   IsString,
   ValidateNested,
@@ -19,7 +20,8 @@ import { OrderItemDto } from './order-item.dto';
  */
 export class CreateOrderDto implements CreateOrderRequest {
   @IsString()
-  phone!: string;
+  @IsNotEmpty()
+  clientId!: string;
 
   @IsOptional()
   @IsArray()

@@ -1,4 +1,5 @@
 import type {
+  Client,
   CloseSlotResponse,
   ConfirmOrderItem,
   CreateLinkResponse,
@@ -80,11 +81,15 @@ export function continueOnWhatsapp(
   });
 }
 
-export function createLink(phone: string): Promise<CreateLinkResponse> {
+export function createLink(clientId: string): Promise<CreateLinkResponse> {
   return request<CreateLinkResponse>(`/links`, {
     method: 'POST',
-    body: JSON.stringify({ phone }),
+    body: JSON.stringify({ clientId }),
   });
+}
+
+export function getClients(): Promise<Client[]> {
+  return request<Client[]>(`/clients`);
 }
 
 export function getOrdersBySlot(slotId?: string): Promise<SlotOrdersResponse> {

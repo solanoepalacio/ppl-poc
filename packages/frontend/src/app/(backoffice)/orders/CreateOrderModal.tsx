@@ -3,32 +3,35 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  DEFAULT_AREA_CODE,
-  composePhoneE164,
-  isValidPhoneEntry,
+  type Client,
   type CreateLinkResponse,
   type Product,
 } from '@pannico/shared';
 import { createLink, createOrder } from '@/lib/api';
 import { trackEvent } from '@/lib/analytics';
 import { Modal } from './Modal';
-import { PhoneField } from './PhoneField';
+import { ClientCombobox } from './ClientCombobox';
 import { ItemQuantityFields, itemsFromQuantities } from './ItemQuantityFields';
 
 /**
- * Phone-first order creation, launched as a modal from the orders view. The
- * manager enters one phone number, then chooses a path: "Generar link" issues a
- * shareable tokenized link, while "Cargar contenido" reveals the catalog so the
- * order can be recorded directly. Both paths reuse the single phone entry; the
- * items list stays hidden until content is loaded.
+ * Client-first order creation, launched as a modal from the orders view. The
+ * manager selects a client (filtering by name), then chooses a path: "Generar
+ * link" issues a shareable tokenized link, while "Cargar contenido" reveals the
+ * catalog so the order can be recorded directly. Both paths reuse the single
+ * client selection; the items list stays hidden until content is loaded.
  */
-export function CreateOrderModal({ products }: { products: Product[] }) {
+export function CreateOrderModal({
+  products,
+  clients,
+}: {
+  products: Product[];
+  clients: Client[];
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<'choose' | 'link' | 'content'>('choose');
 
-  const [areaCode, setAreaCode] = useState(DEFAULT_AREA_CODE);
-  const [localNumber, setLocalNumber] = useState('');
+  const [clientId, setClientId] = useState<string | null>(null);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [message, setMessage] = useState('');
 
@@ -38,12 +41,11 @@ export function CreateOrderModal({ products }: { products: Product[] }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const valid = isValidPhoneEntry(areaCode, localNumber);
+  const valid = clientId !== null;
 
   function reset() {
     setStep('choose');
-    setAreaCode(DEFAULT_AREA_CODE);
-    setLocalNumber('');
+    setClientId(null);
     setQuantities({});
     setMessage('');
     setResult(null);
@@ -70,7 +72,7 @@ export function CreateOrderModal({ products }: { products: Product[] }) {
     setError(null);
     setBusy(true);
     try {
-      const res = await createLink(composePhoneE164(areaCode, localNumber));
+      const res = await createLink(clientId!);
       trackEvent('order_link_generated');
       setResult(res);
       setStep('link');
@@ -93,7 +95,7 @@ export function CreateOrderModal({ products }: { products: Product[] }) {
     try {
       const orderItems = itemsFromQuantities(quantities);
       await createOrder({
-        phone: composePhoneE164(areaCode, localNumber),
+        clientId: clientId!,
         items: orderItems,
         message,
       });
@@ -150,18 +152,14 @@ export function CreateOrderModal({ products }: { products: Product[] }) {
         footer={footer}
         bodyClassName={step === 'content' ? 'modal-body--content' : undefined}
       >
-        <PhoneField
-          id="create-order-phone"
-          areaCode={areaCode}
-          localNumber={localNumber}
-          onAreaCodeChange={setAreaCode}
-          onLocalNumberChange={setLocalNumber}
+        <ClientCombobox
+          key={open ? 'open' : 'closed'}
+          id="create-order-client"
+          clients={clients}
+          onSelect={setClientId}
           disabled={busy || pending || step === 'link'}
           autoFocus
         />
-        {localNumber.length > 0 && !valid && (
-          <p className="error">Ese número de teléfono parece incompleto.</p>
-        )}
 
         {step === 'choose' && (
           <div className="row row--no-divider">
@@ -193,17 +191,17 @@ export function CreateOrderModal({ products }: { products: Product[] }) {
               <code>{result.url}</code>
             </p>
             <p className="muted">
-              Para {result.phone} · expira{' '}
+              Para {result.clientName} · expira{' '}
               {new Date(result.expiresAt).toLocaleString()}
             </p>
           </div>
         )}
 
         {/*
-          Content step: phone (above) stays fixed, the items list is the only
-          scrollable region, and the message field below stays fixed. The
-          modal-body--content class turns the body into a flex column so the
-          items region can flex-grow and scroll on its own.
+          Content step: the client selector (above) stays fixed, the items list
+          is the only scrollable region, and the message field below stays
+          fixed. The modal-body--content class turns the body into a flex column
+          so the items region can flex-grow and scroll on its own.
         */}
         {step === 'content' && (
           <div className="order-content__items">

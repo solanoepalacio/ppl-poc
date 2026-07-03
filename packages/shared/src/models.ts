@@ -7,6 +7,18 @@ export interface Product {
   active: boolean;
 }
 
+/**
+ * A client an order can be attached to. The directory is a fixed preset list
+ * loaded via data migrations (no management UI). `name` is the UI-friendly
+ * display name; `slug` is a normalized, unique natural key.
+ */
+export interface Client {
+  id: string;
+  name: string;
+  slug: string;
+  active: boolean;
+}
+
 /** An item recorded on an order once the customer confirms. */
 export interface OrderItem {
   id: string;
@@ -18,8 +30,8 @@ export interface OrderItem {
 /** An order, created in `pending` status when the manager generates a link. */
 export interface Order {
   id: string;
-  /** Customer phone number, normalized to E.164, bound to the order's token. */
-  phone: string;
+  /** The client this order is for (references `Client.id`). */
+  clientId: string;
   /** URL-safe, single-use token embedded in the customer link. */
   token: string;
   status: OrderStatus;

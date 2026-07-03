@@ -9,6 +9,6 @@ export class LinksController {
 
   @Post()
   create(@Body() dto: CreateLinkDto): Promise<CreateLinkResponse> {
-    return this.linksService.createLink(dto.phone);
+    return this.linksService.createLink(dto.clientId);
   }
 }

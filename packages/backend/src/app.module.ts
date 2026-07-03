@@ -5,6 +5,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { LinksModule } from './links/links.module';
 import { OrdersModule } from './orders/orders.module';
 import { SlotsModule } from './slots/slots.module';
+import { ClientsModule } from './clients/clients.module';
 import { ExpiryModule } from './expiry/expiry.module';
 
 @Module({
@@ -13,6 +14,7 @@ import { ExpiryModule } from './expiry/expiry.module';
     ScheduleModule.forRoot(),
     PrismaModule,
     SlotsModule,
+    ClientsModule,
     LinksModule,
     OrdersModule,
     ExpiryModule,

@@ -1,8 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import type { CreateLinkResponse } from '@pannico/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { SlotsService } from '../slots/slots.service';
-import { normalizePhoneE164 } from '../common/phone.util';
+import { ClientsService } from '../clients/clients.service';
 import { generateToken } from '../common/token.util';
 import { computeExpiry } from '../config/token.config';
 
@@ -11,36 +11,34 @@ export class LinksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly slotsService: SlotsService,
+    private readonly clientsService: ClientsService,
   ) {}
 
   /**
-   * Normalizes the phone (rejecting missing/malformed), then creates a unique
-   * token + a `pending` order bound to that phone, and returns the shareable URL.
+   * Validates the client (rejecting missing/inactive), then creates a unique
+   * token + a `pending` order for that client, and returns the shareable URL.
    */
-  async createLink(rawPhone: string): Promise<CreateLinkResponse> {
-    const phone = normalizePhoneE164(rawPhone);
-    if (!phone) {
-      throw new BadRequestException(
-        'A valid phone number (E.164, e.g. +5491122334455) is required.',
-      );
-    }
+  async createLink(clientId: string): Promise<CreateLinkResponse> {
+    await this.clientsService.assertActive(clientId);
 
     const expiresAt = computeExpiry();
     const slotId = await this.slotsService.getOpenSlotId();
     const order = await this.prisma.order.create({
       data: {
-        phone,
+        clientId,
         token: generateToken(),
         status: 'pending',
         slotId,
         expiresAt,
       },
+      include: { client: true },
     });
 
     const base = process.env.FRONTEND_BASE_URL ?? 'http://localhost:3001';
     return {
       orderId: order.id,
-      phone: order.phone,
+      clientId: order.clientId,
+      clientName: order.client.name,
       token: order.token,
       url: `${base.replace(/\/$/, '')}/order/${order.token}`,
       expiresAt: order.expiresAt.toISOString(),

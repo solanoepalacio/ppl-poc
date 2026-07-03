@@ -358,7 +358,10 @@ select {
   max-width: 460px;
   max-height: calc(100vh - 4rem);
   box-shadow: 0 12px 40px rgba(31, 42, 48, 0.25);
-  overflow: hidden;
+  /* `visible` (not `hidden`) so the client-picker dropdown can float past the
+     card edge instead of being clipped. Corner rounding is handled per-region
+     (header/footer) below since the card no longer clips its children. */
+  overflow: visible;
 }
 .modal::backdrop {
   background: rgba(31, 42, 48, 0.45);
@@ -375,6 +378,7 @@ select {
   gap: 1rem;
   padding: 1rem 1.25rem;
   border-bottom: 1px solid var(--line);
+  border-radius: var(--radius) var(--radius) 0 0;
 }
 .modal-header strong {
   font-family: var(--font-display);
@@ -384,14 +388,17 @@ select {
   min-height: auto;
   padding: 0.3rem 0.6rem;
 }
-/* The body is the only scrolling region; header and footer stay pinned. */
+/* Header and footer stay pinned. The base body does not clip so the client
+   picker's dropdown can overflow the card; the content step opts into its own
+   scrolling region via .modal-body--content below. */
 .modal-body {
   padding: 1rem 1.25rem 1.25rem;
-  overflow-y: auto;
+  border-radius: 0 0 var(--radius) var(--radius);
 }
 /*
- * Content-step layout: three regions inside the body — phone fixed at top, the
- * items list as the only scroller in the middle, message fixed at the bottom.
+ * Content-step layout: three regions inside the body — client selector fixed at
+ * top, the items list as the only scroller in the middle, message fixed at the
+ * bottom.
  * The body becomes a flex column and the items region flex-grows; min-height:0
  * lets both the body and the items region shrink below content height so the
  * items list (not the whole body) is what scrolls.
@@ -416,6 +423,7 @@ select {
   padding: 0.85rem 1.25rem calc(0.85rem + env(safe-area-inset-bottom));
   border-top: 1px solid var(--line);
   background: var(--surface);
+  border-radius: 0 0 var(--radius) var(--radius);
 }
 .modal-footer button {
   flex: 1;
@@ -434,23 +442,38 @@ select {
   width: 100%;
 }
 
-/* Argentine `0[area] 15[number]` two-field phone entry. */
-.phone-entry {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
+/* Type-ahead client picker: a text input with a filtered dropdown of clients. */
+.combobox-control {
+  position: relative;
 }
-.phone-entry .phone-fixed {
-  font-weight: 600;
-  color: var(--muted, #666);
+.combobox-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 10;
+  margin: 0;
+  padding: 0.25rem;
+  list-style: none;
+  max-height: 14rem;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow-card);
 }
-.phone-entry .phone-area {
-  width: 4.5rem;
-  flex: 0 0 auto;
-  text-align: center;
+.combobox-list li {
+  padding: 0.5rem 0.6rem;
+  border-radius: 8px;
+  cursor: pointer;
 }
-.phone-entry .phone-local {
-  flex: 1;
+.combobox-list li.is-active {
+  background: var(--brand-slate);
+  color: #fff;
+}
+.combobox-list .combobox-empty {
+  color: var(--ink-muted);
+  cursor: default;
 }
 
 code {

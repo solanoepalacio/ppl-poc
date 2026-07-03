@@ -22,6 +22,21 @@ model Product {
   orderItems OrderItem[]
 }
 
+/// A client an order can be attached to. The directory is a fixed preset list
+/// loaded via Prisma data migrations (no management UI); new clients are added
+/// with further data migrations. `name` is the UI-friendly display name and
+/// `slug` is a normalized, unique natural key used for dedup and idempotent
+/// data-migration upserts. `active` retires a client without hard-deleting it
+/// so historical orders keep their reference.
+model Client {
+  id     String  @id @default(cuid())
+  name   String
+  slug   String  @unique
+  active Boolean @default(true)
+
+  orders Order[]
+}
+
 /// A production bloque: the container orders are slotted into. Exactly one
 /// bloque is `open` at any time (enforced by app logic plus a partial unique
 /// index defined in the migration — Prisma's DSL can't express a partial index).
@@ -45,7 +60,7 @@ model Slot {
 /// Every order belongs to the bloque that was open when it was created.
 model Order {
   id          String    @id @default(cuid())
-  phone       String
+  clientId    String
   token       String    @unique
   status      String    @default("pending")
   slotId      String
@@ -56,12 +71,14 @@ model Order {
   /// manager transcribes an order by hand. Null when no message was captured.
   message     String?
 
-  items OrderItem[]
-  slot  Slot        @relation(fields: [slotId], references: [id], onDelete: Restrict)
+  items  OrderItem[]
+  slot   Slot        @relation(fields: [slotId], references: [id], onDelete: Restrict)
+  client Client      @relation(fields: [clientId], references: [id], onDelete: Restrict)
 
   @@index([createdAt])
   @@index([status])
   @@index([slotId])
+  @@index([clientId])
 }
 
 /// A line item recorded on an order at confirmation. References Product so
