@@ -2,12 +2,13 @@
 
 import { useMemo, useState } from 'react';
 import type { Product } from '@pannico/shared';
-import { confirmOrder, continueOnWhatsapp } from '@/lib/api';
+import { ApiError, confirmOrder, continueOnWhatsapp } from '@/lib/api';
 import { trackEvent } from '@/lib/analytics';
 import { BrandHeader } from './BrandHeader';
+import { InvalidLinkNotice } from './InvalidLinkNotice';
 import { QuantityStepper } from './QuantityStepper';
 
-type Outcome = 'open' | 'issued' | 'denied';
+type Outcome = 'open' | 'issued' | 'denied' | 'invalid';
 
 const COPY = {
   title: 'Tu pedido',
@@ -48,6 +49,20 @@ export function OrderForm({
     setQuantities((prev) => ({ ...prev, [productId]: Math.max(0, value) }));
   }
 
+  /**
+   * A 404 on a token endpoint means the link is no longer valid — e.g. the
+   * bakery closed the bloque while the customer was filling out the form. Switch
+   * to the invalid-link view instead of an inline error the customer can't act
+   * on. Any other failure stays an inline, retryable error.
+   */
+  function handleActionError(e: unknown) {
+    if (e instanceof ApiError && e.status === 404) {
+      setOutcome('invalid');
+      return;
+    }
+    setError(e instanceof Error ? e.message : COPY.genericError);
+  }
+
   async function submit() {
     setError(null);
     setBusy(true);
@@ -59,7 +74,7 @@ export function OrderForm({
       });
       setOutcome('issued');
     } catch (e) {
-      setError(e instanceof Error ? e.message : COPY.genericError);
+      handleActionError(e);
     } finally {
       setBusy(false);
     }
@@ -73,10 +88,14 @@ export function OrderForm({
       trackEvent('whatsapp_fallback_selected');
       setOutcome('denied');
     } catch (e) {
-      setError(e instanceof Error ? e.message : COPY.genericError);
+      handleActionError(e);
     } finally {
       setBusy(false);
     }
+  }
+
+  if (outcome === 'invalid') {
+    return <InvalidLinkNotice />;
   }
 
   if (outcome === 'issued') {

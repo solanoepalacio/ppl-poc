@@ -10,14 +10,14 @@ describe('ExpiryService', () => {
     service = new ExpiryService(prisma as unknown as PrismaService);
   });
 
-  it('flips only expired pending orders to ignored', async () => {
+  it('flips only pending orders in closed bloques to ignored', async () => {
     const count = await service.sweepExpired();
 
     expect(count).toBe(1);
     const arg = prisma.order.updateMany.mock.calls[0][0];
-    // Targets only pending + expired orders...
+    // Targets only pending orders whose bloque is already closed...
     expect(arg.where.status).toBe('pending');
-    expect(arg.where.expiresAt.lt).toBeInstanceOf(Date);
+    expect(arg.where.slot).toEqual({ status: 'closed' });
     // ...and the only mutation is the transition to ignored.
     expect(arg.data).toEqual({ status: 'ignored' });
   });

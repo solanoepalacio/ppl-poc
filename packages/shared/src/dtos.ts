@@ -17,7 +17,11 @@ export interface CreateLinkResponse {
   token: string;
   /** Fully-qualified custom URL the manager shares over WhatsApp. */
   url: string;
-  expiresAt: string;
+  /**
+   * Human-facing sequence number of the production bloque the link is valid for.
+   * The link stays valid until that bloque is closed (no fixed expiry time).
+   */
+  slotSeq: number;
 }
 
 /**

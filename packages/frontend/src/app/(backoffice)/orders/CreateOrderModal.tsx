@@ -191,8 +191,8 @@ export function CreateOrderModal({
               <code>{result.url}</code>
             </p>
             <p className="muted">
-              Para {result.clientName} · expira{' '}
-              {new Date(result.expiresAt).toLocaleString()}
+              Para {result.clientName} · válido durante el bloque #
+              {result.slotSeq}
             </p>
           </div>
         )}

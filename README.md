@@ -1,10 +1,11 @@
 # Pannico — Order Intake PoC
 
-Zero-friction bakery order intake. The manager generates a short-lived,
-single-use order link from the back office and shares it (e.g. WhatsApp); the
-customer opens it and submits a structured order — no login, no prices, no
-payment — or falls back to WhatsApp. Orders carry a status
-(`pending → issued | denied | ignored`) viewable by day.
+Zero-friction bakery order intake. The manager generates a single-use order
+link from the back office and shares it (e.g. WhatsApp); the customer opens it
+and submits a structured order — no login, no prices, no payment — or falls back
+to WhatsApp. A link stays valid while the production bloque it was created in is
+open; closing the bloque expires its unused links. Orders carry a status
+(`pending → issued | denied | ignored`) grouped by bloque.
 
 ## Layout (Yarn v4 monorepo)
 
@@ -42,7 +43,6 @@ yarn workspace @pannico/backend prisma:seed
 `packages/backend/.env`:
 
 - `DATABASE_URL` — SQLite file (default `file:./dev.db`, relative to `prisma/`)
-- `ORDER_TOKEN_TTL_HOURS` — link validity window (default `4`)
 - `FRONTEND_BASE_URL` — used to build shareable links (default `http://localhost:3001`)
 - `PORT` — backend port (default `3000`)
 
@@ -86,5 +86,6 @@ yarn lint     # typecheck every workspace
 - `pending` — link generated, not yet acted on.
 - `issued` — customer confirmed via the form.
 - `denied` — customer chose "continue on WhatsApp".
-- `ignored` — token expired while still `pending` (flipped by an in-process
-  worker that sweeps every ~minute, keeping `GROUP BY status` metrics honest).
+- `ignored` — link went unused: its bloque was closed while the order was still
+  `pending` (flipped atomically on close, with an in-process worker sweeping
+  every ~minute as a backstop, keeping `GROUP BY status` metrics honest).

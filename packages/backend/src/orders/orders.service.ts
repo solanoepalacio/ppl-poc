@@ -23,7 +23,6 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SlotsService, toSlotDto } from '../slots/slots.service';
 import { ClientsService } from '../clients/clients.service';
 import { generateToken } from '../common/token.util';
-import { computeExpiry } from '../config/token.config';
 import { TokenService } from './token.service';
 
 @Injectable()
@@ -174,7 +173,6 @@ export class OrdersService {
         token: generateToken(),
         status,
         slotId,
-        expiresAt: computeExpiry(),
         message,
         items:
           items.length > 0

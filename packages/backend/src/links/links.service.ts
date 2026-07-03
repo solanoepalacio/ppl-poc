@@ -4,7 +4,6 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SlotsService } from '../slots/slots.service';
 import { ClientsService } from '../clients/clients.service';
 import { generateToken } from '../common/token.util';
-import { computeExpiry } from '../config/token.config';
 
 @Injectable()
 export class LinksService {
@@ -21,15 +20,13 @@ export class LinksService {
   async createLink(clientId: string): Promise<CreateLinkResponse> {
     await this.clientsService.assertActive(clientId);
 
-    const expiresAt = computeExpiry();
-    const slotId = await this.slotsService.getOpenSlotId();
+    const slot = await this.slotsService.getOpenSlot();
     const order = await this.prisma.order.create({
       data: {
         clientId,
         token: generateToken(),
         status: 'pending',
-        slotId,
-        expiresAt,
+        slotId: slot.id,
       },
       include: { client: true },
     });
@@ -41,7 +38,7 @@ export class LinksService {
       clientName: order.client.name,
       token: order.token,
       url: `${base.replace(/\/$/, '')}/order/${order.token}`,
-      expiresAt: order.expiresAt.toISOString(),
+      slotSeq: slot.seq,
     };
   }
 }

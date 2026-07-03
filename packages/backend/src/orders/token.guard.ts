@@ -14,11 +14,11 @@ export interface RequestWithOrder extends Request {
 }
 
 /**
- * Resolves the `:token` route param to its order and rejects invalid, expired,
- * or already-consumed tokens (404). On success it attaches the order to the
- * request so the handler can act on it without re-querying. Apply to endpoints
- * that mutate an order (confirm, whatsapp); the read-only validation endpoint
- * reports validity in its body instead and does not use this guard.
+ * Resolves the `:token` route param to its order and rejects invalid,
+ * closed-bloque, or already-consumed tokens (404). On success it attaches the
+ * order to the request so the handler can act on it without re-querying. Apply to
+ * endpoints that mutate an order (confirm, whatsapp); the read-only validation
+ * endpoint reports validity in its body instead and does not use this guard.
  */
 @Injectable()
 export class TokenGuard implements CanActivate {
@@ -31,7 +31,9 @@ export class TokenGuard implements CanActivate {
       ? await this.tokenService.resolveValidOrder(token)
       : null;
     if (!order) {
-      throw new NotFoundException('Invalid, expired, or already-used link.');
+      throw new NotFoundException(
+        'Invalid, closed, or already-used link.',
+      );
     }
     req.order = order;
     return true;

@@ -113,6 +113,11 @@ export class SlotsService implements OnModuleInit {
    * always exactly one open bloque. Rejects a missing (404) or already-closed
    * (400) bloque. The transaction plus the partial unique index make a
    * double-close race roll back cleanly.
+   *
+   * Closing a bloque is also the moment its unused order links die: every order
+   * in it still `pending` is flipped to `ignored` in the same transaction, so
+   * those tokens can no longer be used and the `placed`/`ignored` metrics stay
+   * honest (an active transition, not a lazy relabel on read).
    */
   async closeSlot(id: string): Promise<CloseSlotResponse> {
     const { closed, open } = await this.prisma.$transaction(async (tx) => {
@@ -126,6 +131,10 @@ export class SlotsService implements OnModuleInit {
       const closed = await tx.slot.update({
         where: { id },
         data: { status: 'closed', closedAt: new Date() },
+      });
+      await tx.order.updateMany({
+        where: { slotId: id, status: 'pending' },
+        data: { status: 'ignored' },
       });
       const max = await tx.slot.aggregate({ _max: { seq: true } });
       const open = await tx.slot.create({

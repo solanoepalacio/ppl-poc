@@ -69,7 +69,6 @@ model Order {
   token       String    @unique
   status      String    @default("pending")
   slotId      String
-  expiresAt   DateTime
   createdAt   DateTime  @default(now())
   confirmedAt DateTime?
   /// Optional raw customer message (e.g. pasted WhatsApp text) captured when a

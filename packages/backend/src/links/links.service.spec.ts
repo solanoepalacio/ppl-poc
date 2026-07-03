@@ -6,13 +6,21 @@ import type { ClientsService } from '../clients/clients.service';
 
 describe('LinksService', () => {
   let prisma: { order: { create: jest.Mock } };
-  let slots: { getOpenSlotId: jest.Mock };
+  let slots: { getOpenSlot: jest.Mock };
   let clients: { assertActive: jest.Mock };
   let service: LinksService;
 
   beforeEach(() => {
     prisma = { order: { create: jest.fn() } };
-    slots = { getOpenSlotId: jest.fn().mockResolvedValue('slot_open') };
+    slots = {
+      getOpenSlot: jest.fn().mockResolvedValue({
+        id: 'slot_open',
+        seq: 5,
+        status: 'open',
+        openedAt: new Date('2026-03-15T00:00:00.000Z'),
+        closedAt: null,
+      }),
+    };
     clients = { assertActive: jest.fn().mockResolvedValue(undefined) };
     service = new LinksService(
       prisma as unknown as PrismaService,
@@ -29,7 +37,7 @@ describe('LinksService', () => {
       client: { name: 'Il Postino' },
       token: data.token,
       status: data.status,
-      expiresAt: data.expiresAt,
+      slotId: data.slotId,
       createdAt: new Date(),
       confirmedAt: null,
     }));
@@ -43,10 +51,11 @@ describe('LinksService', () => {
     expect(createArg.clientId).toBe('client_1');
     expect(createArg.token).toBeTruthy();
     expect(createArg.slotId).toBe('slot_open'); // stamped with the open bloque
-    expect(slots.getOpenSlotId).toHaveBeenCalledTimes(1);
+    expect(slots.getOpenSlot).toHaveBeenCalledTimes(1);
     expect(res.url).toBe(`http://localhost:3001/order/${res.token}`);
     expect(res.clientId).toBe('client_1');
     expect(res.clientName).toBe('Il Postino');
+    expect(res.slotSeq).toBe(5); // the open bloque the link is valid for
   });
 
   it('rejects a missing/inactive client without creating an order', async () => {

@@ -52,7 +52,8 @@ const pendingOrder = {
   clientId: 'client_1',
   token: 'tok_valid',
   status: 'pending',
-  expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1h ahead
+  slotId: 'slot_open',
+  slot: { status: 'open' }, // joined bloque — token is valid while it is open
   createdAt: new Date(),
   confirmedAt: null,
 };
@@ -124,10 +125,10 @@ describe('OrdersService', () => {
       ).rejects.toBeInstanceOf(NotFoundException);
     });
 
-    it('rejects an expired token', async () => {
+    it('rejects a token whose bloque is closed', async () => {
       prisma.order.findUnique.mockResolvedValue({
         ...pendingOrder,
-        expiresAt: new Date(Date.now() - 1000),
+        slot: { status: 'closed' },
       });
       await expect(
         service.confirm('tok_valid', [{ productId: 'p1', quantity: 1 }]),
@@ -170,10 +171,10 @@ describe('OrdersService', () => {
       expect(res.catalog).toHaveLength(1);
     });
 
-    it('returns invalid (no client/catalog) for an expired token', async () => {
+    it('returns invalid (no client/catalog) for a token in a closed bloque', async () => {
       prisma.order.findUnique.mockResolvedValue({
         ...pendingOrder,
-        expiresAt: new Date(Date.now() - 1000),
+        slot: { status: 'closed' },
       });
       const res = await service.validateToken('tok_valid');
       expect(res).toEqual({ valid: false });
@@ -247,7 +248,6 @@ describe('OrdersService', () => {
       expect(data.status).toBe('issued');
       expect(typeof data.token).toBe('string');
       expect(data.token.length).toBeGreaterThan(0);
-      expect(data.expiresAt).toBeInstanceOf(Date);
       expect(data.items.create).toEqual([
         { productId: 'p1', quantity: 2 },
         { productId: 'p2', quantity: 1 },

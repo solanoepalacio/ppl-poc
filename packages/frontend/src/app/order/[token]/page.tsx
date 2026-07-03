@@ -1,7 +1,6 @@
 import { validateToken } from '@/lib/api';
-import { BrandHeader } from './BrandHeader';
+import { InvalidLinkNotice } from './InvalidLinkNotice';
 import { OrderForm } from './OrderForm';
-import { TrackInvalidLink } from './TrackInvalidLink';
 
 /**
  * Customer order form route. Server-fetches token validity + catalog. Renders
@@ -24,22 +23,7 @@ export default async function OrderPage({
   }
 
   if (!valid) {
-    return (
-      <>
-        <BrandHeader />
-        <TrackInvalidLink />
-        <section className="card outcome">
-          <span className="emoji" aria-hidden="true">
-            ⚠️
-          </span>
-          <h1>Este enlace ya no es válido</h1>
-          <p>
-            El enlace expiró o ya fue usado. Pedile a la panadería un nuevo
-            enlace.
-          </p>
-        </section>
-      </>
-    );
+    return <InvalidLinkNotice />;
   }
 
   return <OrderForm token={params.token} catalog={catalog} />;

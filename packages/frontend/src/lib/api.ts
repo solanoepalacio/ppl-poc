@@ -35,6 +35,22 @@ export const API_BASE_URL =
     ? process.env.BACKEND_INTERNAL_URL ?? 'http://localhost:3000'
     : process.env.NEXT_PUBLIC_API_BASE_URL ?? '/api';
 
+/**
+ * Error thrown by {@link request} for any non-2xx response, carrying the HTTP
+ * `status` so callers can branch on it (e.g. a 404 on a token endpoint means the
+ * link is no longer valid). Still an `Error` with the server's message, so
+ * existing `e instanceof Error` / `e.message` handling keeps working.
+ */
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
@@ -53,7 +69,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       /* non-JSON error body; keep the default message */
     }
-    throw new Error(message);
+    throw new ApiError(res.status, message);
   }
   return (await res.json()) as T;
 }
