@@ -5,6 +5,17 @@
 
 ## MODIFIED Requirements
 
+### Requirement: Creation modal omits per-path explanatory copy
+The order-creation modal SHALL NOT display the explanatory paragraphs that previously framed the two paths (e.g. "Ingresá la orden directamente cuando la tomás vos.", "Generá un enlace para compartir con el cliente…", "Registrá una orden recibida por teléfono, WhatsApp o en persona."). The two labelled buttons SHALL communicate the available paths on their own. Inline result text (e.g. the generated link) is not explanatory copy and SHALL remain.
+
+#### Scenario: No explanatory paragraphs in the modal
+- **WHEN** the order-creation modal is shown
+- **THEN** it does not present the previous per-path explanatory paragraphs
+
+#### Scenario: Functional inline text is retained
+- **WHEN** a link has been generated
+- **THEN** the generated-link result is still shown
+
 ### Requirement: Creation modal is client-first with a two-path choice
 The order-creation modal SHALL present a client selector first — a control that lists the directory's selectable clients and lets the manager narrow them by typing part of a name — followed by exactly two action buttons labelled **Generar link** and **Cargar contenido**. The modal SHALL NOT show the catalog items list until the manager chooses to load content. Both buttons SHALL require a client to be selected before they can act.
 
