@@ -2,6 +2,16 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { TokenService } from './token.service';
 import type { PrismaService } from '../prisma/prisma.service';
+import type { SlotsService } from '../slots/slots.service';
+
+/** The open bloque resolveSlot returns by default in these unit tests. */
+const openSlot = {
+  id: 'slot_open',
+  seq: 2,
+  status: 'open' as const,
+  openedAt: new Date('2026-03-15T00:00:00.000Z'),
+  closedAt: null,
+};
 
 type PrismaMock = {
   order: {
@@ -46,14 +56,20 @@ const pendingOrder = {
 
 describe('OrdersService', () => {
   let prisma: PrismaMock;
+  let slots: { getOpenSlotId: jest.Mock; resolveSlot: jest.Mock };
   let service: OrdersService;
 
   beforeEach(() => {
     prisma = makePrisma();
+    slots = {
+      getOpenSlotId: jest.fn().mockResolvedValue('slot_open'),
+      resolveSlot: jest.fn().mockResolvedValue(openSlot),
+    };
     const tokenService = new TokenService(prisma as unknown as PrismaService);
     service = new OrdersService(
       prisma as unknown as PrismaService,
       tokenService,
+      slots as unknown as SlotsService,
     );
   });
 
@@ -374,30 +390,30 @@ describe('OrdersService', () => {
     });
   });
 
-  describe('getOrdersByDay', () => {
-    it('filters to the requested day [start, next-day)', async () => {
+  describe('getOrdersBySlot', () => {
+    it('filters to the requested bloque and returns it in the response', async () => {
+      const requested = { ...openSlot, id: 'slot_7', seq: 7, status: 'closed' as const };
+      slots.resolveSlot.mockResolvedValue(requested);
       prisma.order.findMany.mockResolvedValue([]);
 
-      const res = await service.getOrdersByDay('2026-03-15');
+      const res = await service.getOrdersBySlot('slot_7');
 
-      expect(res.day).toBe('2026-03-15');
+      expect(slots.resolveSlot).toHaveBeenCalledWith('slot_7');
+      expect(res.slot.id).toBe('slot_7');
+      expect(res.slot.seq).toBe(7);
       const where = prisma.order.findMany.mock.calls[0][0].where;
-      expect(where.createdAt.gte).toEqual(new Date(2026, 2, 15, 0, 0, 0, 0));
-      expect(where.createdAt.lt).toEqual(new Date(2026, 2, 16, 0, 0, 0, 0));
+      expect(where).toEqual({ slotId: 'slot_7' });
     });
 
-    it('defaults to today when no day is given', async () => {
+    it('defaults to the open bloque when no slotId is given', async () => {
       prisma.order.findMany.mockResolvedValue([]);
-      const now = new Date();
 
-      const res = await service.getOrdersByDay();
+      const res = await service.getOrdersBySlot();
 
-      const expected = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      expect(res.day).toBe(expected);
+      expect(slots.resolveSlot).toHaveBeenCalledWith(undefined);
+      expect(res.slot.id).toBe('slot_open');
       const where = prisma.order.findMany.mock.calls[0][0].where;
-      expect(where.createdAt.gte).toEqual(
-        new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0),
-      );
+      expect(where).toEqual({ slotId: 'slot_open' });
     });
   });
 
@@ -422,9 +438,9 @@ describe('OrdersService', () => {
         orderWith('finished', [{ productId: 'p1', name: 'Croissant', quantity: 2 }]),
       ]);
 
-      const res = await service.getProductionTotals('2026-03-15');
+      const res = await service.getProductionTotals('slot_7');
 
-      expect(res.day).toBe('2026-03-15');
+      expect(res.slot.id).toBe('slot_open');
       expect(res.items).toEqual([
         { productId: 'p1', name: 'Croissant', quantity: 5 },
       ]);
@@ -466,24 +482,28 @@ describe('OrdersService', () => {
       expect(where.status.in).not.toContain('ignored');
     });
 
-    it('filters to the requested day [start, next-day)', async () => {
+    it('filters to the requested bloque', async () => {
+      const requested = { ...openSlot, id: 'slot_7', seq: 7, status: 'closed' as const };
+      slots.resolveSlot.mockResolvedValue(requested);
       prisma.order.findMany.mockResolvedValue([]);
 
-      await service.getProductionTotals('2026-03-15');
+      const res = await service.getProductionTotals('slot_7');
 
+      expect(slots.resolveSlot).toHaveBeenCalledWith('slot_7');
+      expect(res.slot.id).toBe('slot_7');
       const where = prisma.order.findMany.mock.calls[0][0].where;
-      expect(where.createdAt.gte).toEqual(new Date(2026, 2, 15, 0, 0, 0, 0));
-      expect(where.createdAt.lt).toEqual(new Date(2026, 2, 16, 0, 0, 0, 0));
+      expect(where.slotId).toBe('slot_7');
     });
 
-    it('defaults to today when no day is given', async () => {
+    it('defaults to the open bloque when no slotId is given', async () => {
       prisma.order.findMany.mockResolvedValue([]);
-      const now = new Date();
 
       const res = await service.getProductionTotals();
 
-      const expected = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      expect(res.day).toBe(expected);
+      expect(slots.resolveSlot).toHaveBeenCalledWith(undefined);
+      expect(res.slot.id).toBe('slot_open');
+      const where = prisma.order.findMany.mock.calls[0][0].where;
+      expect(where.slotId).toBe('slot_open');
     });
   });
 });

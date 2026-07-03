@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the order lifecycle status model, persistence of orders with their context, and the back-office view that groups orders by day for the manager to forward to the production line.
+Defines the order lifecycle status model, persistence of orders with their context, and the back-office view that groups orders by production bloque for the manager to forward to the production line.
 
 ## Requirements
 
@@ -14,26 +14,26 @@ Every order SHALL have a status that is exactly one of `pending`, `issued`, `den
 - **THEN** it is exactly one of `pending`, `issued`, `denied`, `ignored`, or `finished`
 
 ### Requirement: Orders are persisted with their context
-The system SHALL persist each order with the phone number bound to its token, its status, the time it was created, and its order items once the customer submits them. Stored orders MUST be retrievable for back-office viewing.
+The system SHALL persist each order with the phone number bound to its token, its status, the time it was created, the production bloque it belongs to, and its order items once the customer submits them. Stored orders MUST be retrievable for back-office viewing.
 
 #### Scenario: Order is retrievable after creation
 - **WHEN** an order has been created for a generated link
-- **THEN** the system can retrieve it with its phone number, status, and creation time
+- **THEN** the system can retrieve it with its phone number, status, creation time, and the bloque it belongs to
 
 #### Scenario: Items are persisted on confirmation
 - **WHEN** a customer confirms an order with items
 - **THEN** the system persists those items on the order
 
-### Requirement: Back office shows orders by day
-The back office SHALL present orders grouped by the day they were created as the primary view, defaulting to the current day, so the manager can forward them to the production line. Each listed order SHALL show its status, items, and the associated phone number. Selecting a day in the orders view SHALL immediately show that day's orders without requiring any separate view or submit action.
+### Requirement: Back office shows orders by bloque
+The back office SHALL present orders grouped by the production bloque they belong to as the primary view, defaulting to the currently open bloque, so the manager can forward them to the production line. Each listed order SHALL show its status, items, and the associated phone number. The response SHALL carry the resolved bloque alongside its orders. Selecting a bloque in the orders view SHALL immediately show that bloque's orders without requiring any separate view or submit action.
 
-#### Scenario: Manager views the day's orders
-- **WHEN** the manager opens the back-office orders view
-- **THEN** the system shows the orders created that day, each with its status, items, and phone number
+#### Scenario: Manager views the open bloque's orders
+- **WHEN** the manager opens the back-office orders view without selecting a bloque
+- **THEN** the system shows the orders in the currently open bloque, each with its status, items, and phone number
 
-#### Scenario: Manager selects a different day
-- **WHEN** the manager selects a specific day in the orders view date-picker
-- **THEN** the system immediately shows the orders created on that day
+#### Scenario: Manager selects a different bloque
+- **WHEN** the manager selects a specific bloque in the orders view bloque-picker
+- **THEN** the system immediately shows the orders in that bloque
 - **AND** no separate view or submit action is required to render them
 
 ### Requirement: Manager can manually update an order's status
@@ -54,12 +54,12 @@ From the back office, the manager SHALL be able to set any persisted order's sta
 - **AND** the order's status is left unchanged
 
 ### Requirement: Manager can create an order manually
-From the back office, the manager SHALL be able to create an order by providing a phone number, an optional list of catalog items with quantities, and an optional free-text `message` capturing the originating customer message (e.g. the pasted WhatsApp text), without generating or sending a customer link. The system MUST persist the created order so it appears in the day's back-office view, MUST record the supplied items, MUST persist the supplied `message` when present and store no message when it is absent or blank, and MUST reject any item that is not in the active catalog, persisting nothing on rejection. A manually created order SHALL carry a valid status from the order status model.
+From the back office, the manager SHALL be able to create an order by providing a phone number, an optional list of catalog items with quantities, and an optional free-text `message` capturing the originating customer message (e.g. the pasted WhatsApp text), without generating or sending a customer link. The system MUST persist the created order in the currently open bloque so it appears in that bloque's back-office view, MUST record the supplied items, MUST persist the supplied `message` when present and store no message when it is absent or blank, and MUST reject any item that is not in the active catalog, persisting nothing on rejection. A manually created order SHALL carry a valid status from the order status model.
 
 #### Scenario: Manager creates an order with items
 - **WHEN** the manager submits a phone number and one or more active-catalog items with quantities
 - **THEN** the system persists a new order bound to that phone number with the supplied items
-- **AND** the order appears in the back-office view for the day it was created
+- **AND** the order appears in the back-office view for the open bloque it was placed in
 
 #### Scenario: Manager creates an order with no items
 - **WHEN** the manager submits a phone number with no items

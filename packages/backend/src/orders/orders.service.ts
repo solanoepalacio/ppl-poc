@@ -9,16 +9,17 @@ import {
   type ConfirmOrderItem,
   type CreateOrderRequest,
   type CreateOrderResponse,
-  type DayViewResponse,
   type DeleteOrderResponse,
   type OrderStatus,
   type Product,
   type ProductionTotalsResponse,
   type ReplaceOrderItemsResponse,
+  type SlotOrdersResponse,
   type TokenValidationResponse,
 } from '@pannico/shared';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { SlotsService, toSlotDto } from '../slots/slots.service';
 import { normalizePhoneE164 } from '../common/phone.util';
 import { generateToken } from '../common/token.util';
 import { computeExpiry } from '../config/token.config';
@@ -29,6 +30,7 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tokenService: TokenService,
+    private readonly slotsService: SlotsService,
   ) {}
 
   /** Active catalog products, used by the form and the `/products` endpoint. */
@@ -156,12 +158,14 @@ export class OrdersService {
     await this.validateItemsAgainstCatalog(items);
 
     const message = input.message?.trim() || null;
+    const slotId = await this.slotsService.getOpenSlotId();
 
     const order = await this.prisma.order.create({
       data: {
         phone,
         token: generateToken(),
         status,
+        slotId,
         expiresAt: computeExpiry(),
         message,
         items:
@@ -274,22 +278,23 @@ export class OrdersService {
   }
 
   /**
-   * Returns orders created on `day` (YYYY-MM-DD, server-local), defaulting to
-   * today, each with its status, items, and phone number for the back office.
+   * Returns the orders in a bloque, defaulting to the currently open bloque when
+   * no `slotId` is given, each with its status, items, and phone number for the
+   * back office. Also returns the resolved bloque for the header/picker.
    */
-  async getOrdersByDay(day?: string): Promise<DayViewResponse> {
-    const { start, end, label } = dayBounds(day);
+  async getOrdersBySlot(slotId?: string): Promise<SlotOrdersResponse> {
+    const slot = await this.slotsService.resolveSlot(slotId);
     const orders = await this.prisma.order.findMany({
-      where: { createdAt: { gte: start, lt: end } },
+      where: { slotId: slot.id },
       orderBy: { createdAt: 'desc' },
       include: { items: true },
     });
     return {
-      day: label,
+      slot: toSlotDto(slot),
       orders: orders.map((o) => ({
         id: o.id,
         phone: o.phone,
-        status: o.status as DayViewResponse['orders'][number]['status'],
+        status: o.status as SlotOrdersResponse['orders'][number]['status'],
         createdAt: o.createdAt.toISOString(),
         items: o.items,
       })),
@@ -297,16 +302,18 @@ export class OrdersService {
   }
 
   /**
-   * Per-item production totals for `day` (YYYY-MM-DD, server-local), defaulting
-   * to today: the summed quantity of each product across orders that represent
+   * Per-item production totals for a bloque, defaulting to the currently open
+   * bloque: the summed quantity of each product across orders that represent
    * real demand (`PRODUCTION_STATUSES`). Returns one entry per product with a
    * positive total, sorted by product name; products with no demand are omitted.
    */
-  async getProductionTotals(day?: string): Promise<ProductionTotalsResponse> {
-    const { start, end, label } = dayBounds(day);
+  async getProductionTotals(
+    slotId?: string,
+  ): Promise<ProductionTotalsResponse> {
+    const slot = await this.slotsService.resolveSlot(slotId);
     const orders = await this.prisma.order.findMany({
       where: {
-        createdAt: { gte: start, lt: end },
+        slotId: slot.id,
         status: { in: PRODUCTION_STATUSES as string[] },
       },
       include: { items: { include: { product: true } } },
@@ -332,28 +339,6 @@ export class OrdersService {
       .map(([productId, { name, quantity }]) => ({ productId, name, quantity }))
       .sort((a, b) => a.name.localeCompare(b.name));
 
-    return { day: label, items };
+    return { slot: toSlotDto(slot), items };
   }
-}
-
-/** Computes [start, end) bounds for a YYYY-MM-DD day in server-local time. */
-function dayBounds(day?: string): { start: Date; end: Date; label: string } {
-  let year: number;
-  let month: number;
-  let date: number;
-  if (day && /^\d{4}-\d{2}-\d{2}$/.test(day)) {
-    const [y, m, d] = day.split('-').map(Number);
-    year = y;
-    month = m;
-    date = d;
-  } else {
-    const now = new Date();
-    year = now.getFullYear();
-    month = now.getMonth() + 1;
-    date = now.getDate();
-  }
-  const start = new Date(year, month - 1, date, 0, 0, 0, 0);
-  const end = new Date(year, month - 1, date + 1, 0, 0, 0, 0);
-  const label = `${year}-${String(month).padStart(2, '0')}-${String(date).padStart(2, '0')}`;
-  return { start, end, label };
 }

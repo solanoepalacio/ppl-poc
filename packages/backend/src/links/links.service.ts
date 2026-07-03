@@ -1,13 +1,17 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import type { CreateLinkResponse } from '@pannico/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { SlotsService } from '../slots/slots.service';
 import { normalizePhoneE164 } from '../common/phone.util';
 import { generateToken } from '../common/token.util';
 import { computeExpiry } from '../config/token.config';
 
 @Injectable()
 export class LinksService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly slotsService: SlotsService,
+  ) {}
 
   /**
    * Normalizes the phone (rejecting missing/malformed), then creates a unique
@@ -22,11 +26,13 @@ export class LinksService {
     }
 
     const expiresAt = computeExpiry();
+    const slotId = await this.slotsService.getOpenSlotId();
     const order = await this.prisma.order.create({
       data: {
         phone,
         token: generateToken(),
         status: 'pending',
+        slotId,
         expiresAt,
       },
     });

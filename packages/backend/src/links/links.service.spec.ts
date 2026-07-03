@@ -1,14 +1,20 @@
 import { BadRequestException } from '@nestjs/common';
 import { LinksService } from './links.service';
 import type { PrismaService } from '../prisma/prisma.service';
+import type { SlotsService } from '../slots/slots.service';
 
 describe('LinksService', () => {
   let prisma: { order: { create: jest.Mock } };
+  let slots: { getOpenSlotId: jest.Mock };
   let service: LinksService;
 
   beforeEach(() => {
     prisma = { order: { create: jest.fn() } };
-    service = new LinksService(prisma as unknown as PrismaService);
+    slots = { getOpenSlotId: jest.fn().mockResolvedValue('slot_open') };
+    service = new LinksService(
+      prisma as unknown as PrismaService,
+      slots as unknown as SlotsService,
+    );
     process.env.FRONTEND_BASE_URL = 'http://localhost:3001';
   });
 
@@ -30,6 +36,8 @@ describe('LinksService', () => {
     expect(createArg.status).toBe('pending');
     expect(createArg.phone).toBe('+5491122334455'); // normalized to E.164
     expect(createArg.token).toBeTruthy();
+    expect(createArg.slotId).toBe('slot_open'); // stamped with the open bloque
+    expect(slots.getOpenSlotId).toHaveBeenCalledTimes(1);
     expect(res.url).toBe(`http://localhost:3001/order/${res.token}`);
     expect(res.phone).toBe('+5491122334455');
   });

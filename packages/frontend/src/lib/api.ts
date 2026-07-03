@@ -1,14 +1,17 @@
 import type {
+  CloseSlotResponse,
   ConfirmOrderItem,
   CreateLinkResponse,
   CreateOrderRequest,
   CreateOrderResponse,
-  DayViewResponse,
   DeleteOrderResponse,
   OrderStatus,
   Product,
   ProductionTotalsResponse,
   ReplaceOrderItemsResponse,
+  Slot,
+  SlotListResponse,
+  SlotOrdersResponse,
   TokenValidationResponse,
   UpdateOrderStatusResponse,
 } from '@pannico/shared';
@@ -84,16 +87,28 @@ export function createLink(phone: string): Promise<CreateLinkResponse> {
   });
 }
 
-export function getOrdersByDay(day?: string): Promise<DayViewResponse> {
-  const qs = day ? `?day=${encodeURIComponent(day)}` : '';
-  return request<DayViewResponse>(`/orders${qs}`);
+export function getOrdersBySlot(slotId?: string): Promise<SlotOrdersResponse> {
+  const qs = slotId ? `?slotId=${encodeURIComponent(slotId)}` : '';
+  return request<SlotOrdersResponse>(`/orders${qs}`);
 }
 
 export function getProductionTotals(
-  day?: string,
+  slotId?: string,
 ): Promise<ProductionTotalsResponse> {
-  const qs = day ? `?day=${encodeURIComponent(day)}` : '';
+  const qs = slotId ? `?slotId=${encodeURIComponent(slotId)}` : '';
   return request<ProductionTotalsResponse>(`/orders/production${qs}`);
+}
+
+export function getSlots(): Promise<SlotListResponse> {
+  return request<SlotListResponse>(`/slots`);
+}
+
+export function getOpenSlot(): Promise<Slot> {
+  return request<Slot>(`/slots/open`);
+}
+
+export function closeCurrentSlot(): Promise<CloseSlotResponse> {
+  return request<CloseSlotResponse>(`/slots/close`, { method: 'POST' });
 }
 
 export function getProducts(): Promise<Product[]> {

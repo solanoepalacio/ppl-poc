@@ -22,13 +22,33 @@ model Product {
   orderItems OrderItem[]
 }
 
+/// A production bloque: the container orders are slotted into. Exactly one
+/// bloque is `open` at any time (enforced by app logic plus a partial unique
+/// index defined in the migration — Prisma's DSL can't express a partial index).
+/// Closing the open bloque atomically opens a fresh one. `seq` is a human-facing
+/// display number assigned as max(seq)+1 in the service (SQLite autoincrement is
+/// PK-only, and our PK is a cuid).
+model Slot {
+  id       String    @id @default(cuid())
+  seq      Int       @unique
+  status   String    @default("open")
+  openedAt DateTime  @default(now())
+  closedAt DateTime?
+
+  orders Order[]
+
+  @@index([status])
+}
+
 /// An order. The single-use token lives on the order (1:1) since a token is
 /// bound to exactly one order. `status` follows the shared OrderStatus union.
+/// Every order belongs to the bloque that was open when it was created.
 model Order {
   id          String    @id @default(cuid())
   phone       String
   token       String    @unique
   status      String    @default("pending")
+  slotId      String
   expiresAt   DateTime
   createdAt   DateTime  @default(now())
   confirmedAt DateTime?
@@ -37,9 +57,11 @@ model Order {
   message     String?
 
   items OrderItem[]
+  slot  Slot        @relation(fields: [slotId], references: [id], onDelete: Restrict)
 
   @@index([createdAt])
   @@index([status])
+  @@index([slotId])
 }
 
 /// A line item recorded on an order at confirmation. References Product so

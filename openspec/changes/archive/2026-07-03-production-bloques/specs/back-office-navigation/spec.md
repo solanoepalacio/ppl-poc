@@ -1,10 +1,9 @@
-# back-office-navigation Specification
+## RENAMED Requirements
 
-## Purpose
+- FROM: `### Requirement: Back office lands on the orders-by-day view`
+- TO: `### Requirement: Back office lands on the orders view`
 
-Defines how the back office is structured around its three views and the persistent navigation the manager uses to move between them, and how this navigation is kept off the customer-facing order form.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Back office lands on the orders view
 The back office SHALL present the orders view (orders grouped by production bloque) as its landing destination. There SHALL NOT be a separate back-office home page; navigating to the back-office root SHALL result in the orders view.
@@ -36,10 +35,3 @@ The back office SHALL present a persistent navigation, visible on every back-off
 - **WHEN** the manager looks at the back-office navigation
 - **THEN** there is no separate Crear orden navigation link
 - **AND** order creation is reached from the orders view instead
-
-### Requirement: Customer order form excludes back-office navigation
-The persistent back-office navigation SHALL NOT appear on the customer-facing order form.
-
-#### Scenario: Order form has no back-office navigation
-- **WHEN** a customer opens their order form via a link
-- **THEN** the back-office navigation is not shown

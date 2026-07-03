@@ -4,6 +4,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule } from './prisma/prisma.module';
 import { LinksModule } from './links/links.module';
 import { OrdersModule } from './orders/orders.module';
+import { SlotsModule } from './slots/slots.module';
 import { ExpiryModule } from './expiry/expiry.module';
 
 @Module({
@@ -11,6 +12,7 @@ import { ExpiryModule } from './expiry/expiry.module';
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
     PrismaModule,
+    SlotsModule,
     LinksModule,
     OrdersModule,
     ExpiryModule,

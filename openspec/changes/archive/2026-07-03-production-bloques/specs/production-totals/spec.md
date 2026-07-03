@@ -1,10 +1,15 @@
-# production-totals Specification
+## RENAMED Requirements
 
-## Purpose
+- FROM: `### Requirement: Production totals aggregate item quantities for a day`
+- TO: `### Requirement: Production totals aggregate item quantities for a bloque`
 
-Defines how the system aggregates per-product quantities to produce for a production bloque from qualifying orders, and how the back office surfaces these production totals to the manager.
+- FROM: `### Requirement: Production totals are scoped by day`
+- TO: `### Requirement: Production totals are scoped by bloque`
 
-## Requirements
+- FROM: `### Requirement: Back office surfaces the day's production totals`
+- TO: `### Requirement: Back office surfaces the bloque's production totals`
+
+## MODIFIED Requirements
 
 ### Requirement: Production totals aggregate item quantities for a bloque
 The system SHALL compute, for a given production bloque, the total quantity to produce of each product by summing the quantities of that product across all qualifying orders in that bloque. The result SHALL contain one entry per product that has a positive total, each carrying the product's identifier, its name, and the summed quantity.
@@ -20,17 +25,6 @@ The system SHALL compute, for a given production bloque, the total quantity to p
 #### Scenario: Products with no demand are omitted
 - **WHEN** no qualifying order in the bloque contains product Q
 - **THEN** the production totals contain no entry for product Q
-
-### Requirement: Only production-relevant statuses are counted
-The system SHALL include in the production totals only orders whose status is `pending`, `issued`, or `finished`. Orders with status `denied` or `ignored` MUST be excluded from the totals.
-
-#### Scenario: Issued and finished orders contribute
-- **WHEN** an `issued` order and a `finished` order in the bloque each contain product P
-- **THEN** both orders' quantities of P are included in P's total
-
-#### Scenario: Denied and ignored orders are excluded
-- **WHEN** a `denied` order and an `ignored` order in the bloque reference product P
-- **THEN** neither order's quantities contribute to P's total
 
 ### Requirement: Production totals are scoped by bloque
 The system SHALL compute production totals over the orders belonging to a single production bloque. When no bloque is specified, the system SHALL use the currently open bloque. When a bloque is specified by its identifier, the system SHALL use that bloque; if the identifier does not match a bloque, the system MUST reject the request. The response SHALL carry the resolved bloque alongside the totals.

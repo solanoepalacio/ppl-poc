@@ -1,34 +1,39 @@
-import { getOrdersByDay, getProducts } from '@/lib/api';
-import { DayPicker } from './DayPicker';
+import { getOrdersBySlot, getProducts, getSlots } from '@/lib/api';
+import { SlotPicker } from '../SlotPicker';
 import { CreateOrderModal } from './CreateOrderModal';
 import { OrderActions } from './OrderActions';
 import { OrderStatusControl } from './OrderStatusControl';
 
 /**
- * Back-office day view: orders created on the selected day (default today),
- * each with status, items, and phone. Selecting a day in the picker navigates
- * immediately, so the selected day lives in the URL (?day=YYYY-MM-DD).
+ * Back-office bloque view: the orders in the selected production bloque (default
+ * the open one), each with status, items, and phone. Selecting a bloque in the
+ * picker navigates immediately, so the selection lives in the URL (?slotId=...).
  */
 export default async function OrdersPage({
   searchParams,
 }: {
-  searchParams: { day?: string };
+  searchParams: { slotId?: string };
 }) {
-  const [view, products] = await Promise.all([
-    getOrdersByDay(searchParams.day),
+  const [view, products, { slots }] = await Promise.all([
+    getOrdersBySlot(searchParams.slotId),
     getProducts(),
+    getSlots(),
   ]);
   const productName = new Map(products.map((p) => [p.id, p.name]));
 
   return (
     <section>
-      <DayPicker
-        day={view.day}
+      <SlotPicker
+        basePath="/orders"
+        slots={slots}
+        currentSlotId={view.slot.id}
         action={<CreateOrderModal products={products} />}
       />
 
       {view.orders.length === 0 && (
-        <p className="muted">No hay órdenes creadas el {view.day}.</p>
+        <p className="muted">
+          No hay órdenes en el bloque #{view.slot.seq}.
+        </p>
       )}
 
       {view.orders.map((order) => (

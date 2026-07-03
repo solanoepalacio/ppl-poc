@@ -23,6 +23,8 @@ export interface Order {
   /** URL-safe, single-use token embedded in the customer link. */
   token: string;
   status: OrderStatus;
+  /** The production bloque this order belongs to (the open one at creation). */
+  slotId: string;
   /** After this instant the token is invalid and a pending order becomes ignored. */
   expiresAt: string;
   createdAt: string;

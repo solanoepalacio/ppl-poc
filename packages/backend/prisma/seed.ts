@@ -81,6 +81,17 @@ async function main() {
   }
   const count = await prisma.product.count();
   console.log(`Seed complete: ${count} products in catalog.`);
+
+  // Ensure there is always an open bloque for new orders to land in. Idempotent:
+  // does nothing when the migration (or a prior run) already created one.
+  const openSlot = await prisma.slot.findFirst({ where: { status: 'open' } });
+  if (!openSlot) {
+    const max = await prisma.slot.aggregate({ _max: { seq: true } });
+    const slot = await prisma.slot.create({
+      data: { seq: (max._max.seq ?? 0) + 1, status: 'open' },
+    });
+    console.log(`Seed complete: opened bloque #${slot.seq}.`);
+  }
 }
 
 main()

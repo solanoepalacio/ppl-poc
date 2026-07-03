@@ -1,22 +1,29 @@
-import { getProductionTotals } from '@/lib/api';
-import { DayPicker } from './DayPicker';
+import { getProductionTotals, getSlots } from '@/lib/api';
+import { SlotPicker } from '../SlotPicker';
 
 /**
- * Back-office daily production view: the per-item quantity to produce on the
- * selected day (default today), summed across pending, issued, and finished
- * orders. Selecting a day in the picker navigates immediately, so the selected
- * day lives in the URL (?day=YYYY-MM-DD), mirroring the orders day view.
+ * Back-office production view: the per-item quantity to produce for the selected
+ * bloque (default the open one), summed across pending, issued, and finished
+ * orders. Selecting a bloque in the picker navigates immediately, so the
+ * selection lives in the URL (?slotId=...), mirroring the orders bloque view.
  */
 export default async function ProductionPage({
   searchParams,
 }: {
-  searchParams: { day?: string };
+  searchParams: { slotId?: string };
 }) {
-  const production = await getProductionTotals(searchParams.day);
+  const [production, { slots }] = await Promise.all([
+    getProductionTotals(searchParams.slotId),
+    getSlots(),
+  ]);
 
   return (
     <section>
-      <DayPicker day={production.day} />
+      <SlotPicker
+        basePath="/production"
+        slots={slots}
+        currentSlotId={production.slot.id}
+      />
 
       {production.items.length > 0 ? (
         <div className="card">
@@ -29,7 +36,9 @@ export default async function ProductionPage({
           </ul>
         </div>
       ) : (
-        <p className="muted">Nada que producir el {production.day}.</p>
+        <p className="muted">
+          Nada que producir en el bloque #{production.slot.seq}.
+        </p>
       )}
     </section>
   );

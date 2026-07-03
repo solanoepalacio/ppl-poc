@@ -1,6 +1,7 @@
 import type { OrderItem } from './models';
 import type { OrderStatus } from './order-status';
 import type { Product } from './models';
+import type { Slot } from './slot';
 
 /** `POST /links` request: the manager supplies a customer phone number. */
 export interface CreateLinkRequest {
@@ -87,8 +88,8 @@ export interface DeleteOrderResponse {
   id: string;
 }
 
-/** An order as shown in the back-office day view. */
-export interface DayViewOrder {
+/** An order as shown in the back-office bloque view. */
+export interface SlotViewOrder {
   id: string;
   phone: string;
   status: OrderStatus;
@@ -96,13 +97,16 @@ export interface DayViewOrder {
   items: OrderItem[];
 }
 
-/** `GET /orders?day=YYYY-MM-DD` response. */
-export interface DayViewResponse {
-  day: string;
-  orders: DayViewOrder[];
+/**
+ * `GET /orders?slotId=` response: the orders in a bloque (the open one when no
+ * `slotId` is given), plus the resolved bloque itself for the header/picker.
+ */
+export interface SlotOrdersResponse {
+  slot: Slot;
+  orders: SlotViewOrder[];
 }
 
-/** A single product's total quantity to produce for a day. */
+/** A single product's total quantity to produce for a bloque. */
 export interface ProductionTotalItem {
   productId: string;
   name: string;
@@ -110,10 +114,11 @@ export interface ProductionTotalItem {
 }
 
 /**
- * `GET /orders/production?day=YYYY-MM-DD` response: per-item production totals
- * for the day, one entry per product with a positive total, sorted by name.
+ * `GET /orders/production?slotId=` response: per-item production totals for the
+ * bloque (the open one when no `slotId` is given), one entry per product with a
+ * positive total, sorted by name.
  */
 export interface ProductionTotalsResponse {
-  day: string;
+  slot: Slot;
   items: ProductionTotalItem[];
 }

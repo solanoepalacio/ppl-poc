@@ -1,3 +1,10 @@
+> **Status: SUPERSEDED — never implemented.** Archived 2026-07-03, superseded by the
+> `2026-07-03-production-bloques` change. That change replaced the entire day-picker
+> mechanism (on both the orders and production views) with a shared bloque `SlotPicker`,
+> so the production view's day picker this proposal set out to make immediate-nav no
+> longer exists. This proposal's `production-totals` delta was never applied to the main
+> specs; the bloques change owns the current production-totals spec.
+
 ## Why
 
 On the back-office production view, changing the day requires two actions: pick a date, then click **"Ver"** to submit the form and load that day's totals. The orders-by-day view already navigates immediately on date change with no button, so the production view is inconsistent and adds needless friction. Aligning the two removes a click and a stale-looking control.

@@ -12,10 +12,10 @@ import {
 } from '@nestjs/common';
 import type {
   CreateOrderResponse,
-  DayViewResponse,
   DeleteOrderResponse,
   ProductionTotalsResponse,
   ReplaceOrderItemsResponse,
+  SlotOrdersResponse,
   TokenValidationResponse,
   UpdateOrderStatusResponse,
 } from '@pannico/shared';
@@ -30,18 +30,18 @@ import { TokenGuard } from './token.guard';
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
-  /** Back-office day view; defaults to today when `day` is omitted. */
+  /** Back-office bloque view; defaults to the open bloque when `slotId` is omitted. */
   @Get()
-  getByDay(@Query('day') day?: string): Promise<DayViewResponse> {
-    return this.ordersService.getOrdersByDay(day);
+  getBySlot(@Query('slotId') slotId?: string): Promise<SlotOrdersResponse> {
+    return this.ordersService.getOrdersBySlot(slotId);
   }
 
-  /** Back-office per-item production totals for a day (defaults to today). */
+  /** Back-office per-item production totals for a bloque (defaults to the open one). */
   @Get('production')
   getProductionTotals(
-    @Query('day') day?: string,
+    @Query('slotId') slotId?: string,
   ): Promise<ProductionTotalsResponse> {
-    return this.ordersService.getProductionTotals(day);
+    return this.ordersService.getProductionTotals(slotId);
   }
 
   /** Back-office manual order creation (order received off-channel). */
