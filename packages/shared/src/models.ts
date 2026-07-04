@@ -1,4 +1,3 @@
-import type { OrderStatus } from './order-status';
 import type { ProductCategory } from './product-category';
 
 /** A product in the predefined catalog. */
@@ -30,21 +29,20 @@ export interface OrderItem {
   quantity: number;
 }
 
-/** An order, created in `pending` status when the manager generates a link. */
+/** An order, created when the manager generates a link. */
 export interface Order {
   id: string;
   /** The client this order is for (references `Client.id`). */
   clientId: string;
   /** URL-safe, single-use token embedded in the customer link. */
   token: string;
-  status: OrderStatus;
   /**
    * The production bloque this order belongs to (the open one at creation). The
-   * order's token is valid only while this bloque is open.
+   * order's token is valid only while this bloque is open and the link is unused.
    */
   slotId: string;
   createdAt: string;
-  /** Set when the customer confirms (status → issued). */
+  /** Set when the customer confirms their order. */
   confirmedAt?: string | null;
   /** Items recorded on confirmation; empty until then. */
   items?: OrderItem[];

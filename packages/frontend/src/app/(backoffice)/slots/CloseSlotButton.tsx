@@ -7,7 +7,7 @@ import { closeCurrentSlot } from '@/lib/api';
 /**
  * Closes the current open bloque (with a confirm), which atomically opens a
  * fresh one on the backend. Refreshes the server-rendered list to reconcile,
- * mirroring the OrderStatusControl mutation pattern.
+ * following the client-island-mutates-then-refresh pattern.
  */
 export function CloseSlotButton() {
   const router = useRouter();

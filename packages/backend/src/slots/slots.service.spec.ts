@@ -12,13 +12,8 @@ type SlotMock = {
   update: jest.Mock;
 };
 
-type OrderMock = {
-  updateMany: jest.Mock;
-};
-
 type PrismaMock = {
   slot: SlotMock;
-  order: OrderMock;
   $transaction: jest.Mock;
 };
 
@@ -31,14 +26,10 @@ function makePrisma(): PrismaMock {
     create: jest.fn(),
     update: jest.fn(),
   };
-  const order: OrderMock = {
-    updateMany: jest.fn().mockResolvedValue({ count: 0 }),
-  };
   return {
     slot,
-    order,
     // Runs the callback with the same mocks as the transactional client.
-    $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb({ slot, order })),
+    $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb({ slot })),
   };
 }
 
@@ -130,31 +121,6 @@ describe('SlotsService', () => {
       expect(res.closed.status).toBe('closed');
       expect(res.open.seq).toBe(3);
       expect(res.open.status).toBe('open');
-    });
-
-    it('expires the bloque’s still-pending orders on close', async () => {
-      prisma.slot.findUnique.mockResolvedValue(openSlot);
-      prisma.slot.update.mockResolvedValue({
-        ...openSlot,
-        status: 'closed',
-        closedAt: new Date('2026-03-20T00:00:00.000Z'),
-      });
-      prisma.slot.aggregate.mockResolvedValue({ _max: { seq: 2 } });
-      prisma.slot.create.mockResolvedValue({
-        id: 'slot_new',
-        seq: 3,
-        status: 'open',
-        openedAt: new Date('2026-03-20T00:00:00.000Z'),
-        closedAt: null,
-      });
-
-      await service.closeSlot('slot_open');
-
-      // Only pending orders of the closing bloque become ignored.
-      expect(prisma.order.updateMany).toHaveBeenCalledWith({
-        where: { slotId: 'slot_open', status: 'pending' },
-        data: { status: 'ignored' },
-      });
     });
 
     it('throws NotFound for a missing bloque', async () => {

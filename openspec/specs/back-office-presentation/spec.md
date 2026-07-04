@@ -2,24 +2,8 @@
 
 ## Purpose
 
-Defines the visual presentation conventions of the back-office views — how order status is labelled, how action button rows are bounded, and which titles and explanatory copy are omitted because the navigation and surrounding controls already convey that information.
-
+Defines the visual presentation conventions of the back-office views — how action button rows are bounded, and which titles and explanatory copy are omitted because the navigation and surrounding controls already convey that information.
 ## Requirements
-
-### Requirement: Order status control is labelled, not color-coded
-The back-office order status control SHALL be preceded by a visible **`Estado`**
-label and SHALL NOT rely on a colored status dot to convey the current status.
-The status itself is presented by the selector's chosen option; the label names
-the control.
-
-#### Scenario: Status control shows the Estado label
-- **WHEN** the manager views an order in the orders-by-day view
-- **THEN** the status control is preceded by a visible `Estado` label
-
-#### Scenario: No status dot is shown
-- **WHEN** the order status control is rendered
-- **THEN** no colored status dot is shown beside the selector
-
 ### Requirement: Action button rows carry no trailing separator
 A row of action buttons in the back office SHALL NOT render a separator line
 beneath it. This covers the order card's action controls (the **Editar
@@ -63,3 +47,4 @@ both category production views.
 #### Scenario: Empty-state message is retained
 - **WHEN** a production view is shown for a bloque with nothing to produce in that category
 - **THEN** the empty-state message is still shown
+

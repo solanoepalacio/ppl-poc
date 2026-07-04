@@ -15,7 +15,7 @@ export class LinksService {
 
   /**
    * Validates the client (rejecting missing/inactive), then creates a unique
-   * token + a `pending` order for that client, and returns the shareable URL.
+   * token + an unconsumed order for that client, and returns the shareable URL.
    */
   async createLink(clientId: string): Promise<CreateLinkResponse> {
     await this.clientsService.assertActive(clientId);
@@ -25,7 +25,6 @@ export class LinksService {
       data: {
         clientId,
         token: generateToken(),
-        status: 'pending',
         slotId: slot.id,
       },
       include: { client: true },

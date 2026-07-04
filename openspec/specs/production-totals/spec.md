@@ -3,9 +3,7 @@
 ## Purpose
 
 Defines how the system aggregates per-product quantities to produce for a production bloque from qualifying orders, and how the back office surfaces these production totals to the manager.
-
 ## Requirements
-
 ### Requirement: Catalog products carry a production category
 Every catalog product SHALL belong to exactly one production category, either `sweet` (*dulces*) or `salty` (*salados*), reflecting the production line it is baked on. The category SHALL be part of the product's representation wherever the catalog is served.
 
@@ -19,30 +17,27 @@ Every catalog product SHALL belong to exactly one production category, either `s
 - **AND** a product baked on the sweet line has category `sweet`
 
 ### Requirement: Production totals aggregate item quantities for a bloque
-The system SHALL compute, for a given production bloque, the total quantity to produce of each product by summing the quantities of that product across all qualifying orders in that bloque. The result SHALL contain one entry per product that has a positive total, each carrying the product's identifier, its name, and the summed quantity.
+The system SHALL compute, for a given production bloque, the total quantity to produce of each product by summing the quantities of that product across every order in that bloque. There is no status filter; to exclude a mistaken order from the totals the manager deletes it. The result SHALL contain one entry per product that has a positive total, each carrying the product's identifier, its name, and the summed quantity.
 
 #### Scenario: Quantities for the same product are summed across orders
-- **WHEN** two qualifying orders in the bloque each contain product P, with quantities 3 and 2
+- **WHEN** two orders in the bloque each contain product P, with quantities 3 and 2
 - **THEN** the production totals include a single entry for product P with quantity 5
 
+#### Scenario: Every order in the bloque contributes
+- **WHEN** any order in the bloque contains product P
+- **THEN** that order's quantity of P is included in P's total, regardless of how the order was created
+
 #### Scenario: Each entry carries the product name
-- **WHEN** a qualifying order in the bloque contains product P
+- **WHEN** an order in the bloque contains product P
 - **THEN** the production totals entry for P includes P's identifier and its product name
 
 #### Scenario: Products with no demand are omitted
-- **WHEN** no qualifying order in the bloque contains product Q
+- **WHEN** no order in the bloque contains product Q
 - **THEN** the production totals contain no entry for product Q
 
-### Requirement: Only production-relevant statuses are counted
-The system SHALL include in the production totals only orders whose status is `pending`, `issued`, or `finished`. Orders with status `denied` or `ignored` MUST be excluded from the totals.
-
-#### Scenario: Issued and finished orders contribute
-- **WHEN** an `issued` order and a `finished` order in the bloque each contain product P
-- **THEN** both orders' quantities of P are included in P's total
-
-#### Scenario: Denied and ignored orders are excluded
-- **WHEN** a `denied` order and an `ignored` order in the bloque reference product P
-- **THEN** neither order's quantities contribute to P's total
+#### Scenario: A deleted order drops out of the totals
+- **WHEN** the manager deletes an order that contained product P
+- **THEN** that order's quantity of P no longer contributes to P's total
 
 ### Requirement: Production totals are scoped by bloque
 The system SHALL compute production totals over the orders belonging to a single production bloque. When no bloque is specified, the system SHALL use the currently open bloque. When a bloque is specified by its identifier, the system SHALL use that bloque; if the identifier does not match a bloque, the system MUST reject the request. The response SHALL carry the resolved bloque alongside the totals.
@@ -90,3 +85,4 @@ The back office SHALL present a bloque's per-item production totals on two dedic
 - **WHEN** the manager selects a different bloque on a production view
 - **THEN** the production totals shown correspond to that bloque and that view's category
 - **AND** no separate submit action is required to render them
+

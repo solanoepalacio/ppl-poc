@@ -16,7 +16,6 @@ export type AnalyticsEvent =
   | 'order_link_generated'
   | 'order_link_copied'
   | 'order_created_direct'
-  | 'order_status_changed'
   | 'order_items_edited'
   | 'order_deleted';
 

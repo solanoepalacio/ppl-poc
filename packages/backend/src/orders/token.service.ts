@@ -6,7 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
 export type OrderWithSlot = Order & { slot: Slot };
 
 /** Minimal shape needed to judge token validity. */
-export type TokenValidatable = Pick<Order, 'status'> & {
+export type TokenValidatable = Pick<Order, 'consumedAt'> & {
   slot: Pick<Slot, 'status'>;
 };
 
@@ -16,18 +16,18 @@ export class TokenService {
 
   /**
    * The single source of truth for token validity (single-use + slot-scoped):
-   * a token is valid only while its order is still `pending` AND the production
-   * bloque it belongs to is still `open`. There is no time-based expiry — a link
-   * lives exactly as long as its bloque stays open. The slot check is kept
-   * alongside the status check so validity holds even if the close-time flip to
-   * `ignored` has not run yet. Every endpoint reuses this predicate so the check
-   * can never drift between call sites.
+   * a token is valid only while its order has not yet been consumed AND the
+   * production bloque it belongs to is still `open`. There is no time-based
+   * expiry — a link lives exactly as long as its bloque stays open and it has
+   * not been used. Confirming an order and choosing the WhatsApp fallback both
+   * consume the link. Every endpoint reuses this predicate so the check can
+   * never drift between call sites.
    */
   isValid(order: TokenValidatable | null): boolean {
     if (!order) {
       return false;
     }
-    return order.status === 'pending' && order.slot.status === 'open';
+    return order.consumedAt == null && order.slot.status === 'open';
   }
 
   /**

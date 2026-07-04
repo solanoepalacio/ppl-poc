@@ -18,13 +18,11 @@ import {
   type ReplaceOrderItemsResponse,
   type SlotOrdersResponse,
   type TokenValidationResponse,
-  type UpdateOrderStatusResponse,
 } from '@pannico/shared';
 import { OrdersService } from './orders.service';
 import { ConfirmOrderDto } from './dto/confirm-order.dto';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { ReplaceOrderItemsDto } from './dto/replace-order-items.dto';
-import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { TokenGuard } from './token.guard';
 
 @Controller('orders')
@@ -57,15 +55,6 @@ export class OrdersController {
     return this.ordersService.createOrder(dto);
   }
 
-  /** Back-office manual status update for an order (free-form transitions). */
-  @Patch(':id/status')
-  updateStatus(
-    @Param('id') id: string,
-    @Body() dto: UpdateOrderStatusDto,
-  ): Promise<UpdateOrderStatusResponse> {
-    return this.ordersService.updateStatus(id, dto.status);
-  }
-
   /** Back-office item edit: replaces the order's whole item list. */
   @Patch(':id/items')
   replaceItems(
@@ -88,26 +77,22 @@ export class OrdersController {
     return this.ordersService.validateToken(token);
   }
 
-  /** Confirm the order (→ issued). Guard rejects invalid/expired/used tokens. */
+  /** Confirm the order. Guard rejects invalid/closed-bloque/used tokens. */
   @Post('by-token/:token/confirm')
   @HttpCode(200)
   @UseGuards(TokenGuard)
   async confirm(
     @Param('token') token: string,
     @Body() dto: ConfirmOrderDto,
-  ): Promise<{ status: 'issued' }> {
+  ): Promise<void> {
     await this.ordersService.confirm(token, dto.items);
-    return { status: 'issued' };
   }
 
-  /** Customer chose the WhatsApp fallback (→ denied). */
+  /** Customer chose the WhatsApp fallback (consumes the link). */
   @Post('by-token/:token/whatsapp')
   @HttpCode(200)
   @UseGuards(TokenGuard)
-  async whatsapp(
-    @Param('token') token: string,
-  ): Promise<{ status: 'denied' }> {
+  async whatsapp(@Param('token') token: string): Promise<void> {
     await this.ordersService.denyForWhatsapp(token);
-    return { status: 'denied' };
   }
 }

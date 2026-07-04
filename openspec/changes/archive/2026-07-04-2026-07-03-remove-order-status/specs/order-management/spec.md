@@ -1,9 +1,15 @@
-# order-management Specification
+## REMOVED Requirements
 
-## Purpose
+### Requirement: Orders carry a status
+**Reason**: The five-value order lifecycle status (`pending|issued|denied|ignored|finished`) is removed entirely. Single-use link validity is now expressed by a nullable `Order.consumedAt` timestamp (valid only while `consumedAt` is null and the bloque is `open`), and production totals no longer filter by status, so no order lifecycle status remains.
+**Migration**: `Order.status` is dropped; a nullable `Order.consumedAt` is added and backfilled to the created instant for orders whose old status was already acted on (`issued`, `denied`, `finished`). No status value is read or written anywhere thereafter.
 
-Defines the order lifecycle status model, persistence of orders with their context, and the back-office view that groups orders by production bloque for the manager to forward to the production line.
-## Requirements
+### Requirement: Manager can manually update an order's status
+**Reason**: With no order status to set, the manual status-update path (and its endpoint) is retired. Excluding a mistaken order from a bloque is done by deleting the order.
+**Migration**: The status selector and its update endpoint are removed from the back office; managers delete an order instead of re-tagging its status.
+
+## MODIFIED Requirements
+
 ### Requirement: Orders are persisted with their context
 The system SHALL persist each order with the client it is for, the time it was created, the production bloque it belongs to, and its order items once the customer submits them. Stored orders MUST be retrievable for back-office viewing.
 
@@ -76,16 +82,3 @@ From the back office, the manager SHALL be able to replace the list of items on 
 #### Scenario: Item edit targets a missing order
 - **WHEN** an item edit references an order that does not exist
 - **THEN** the system rejects the edit
-
-### Requirement: Manager can delete an order
-From the back office, the manager SHALL be able to delete a persisted order. Deleting an order MUST remove the order and all of its items, and the deleted order MUST no longer appear in the back-office view or be counted in production totals.
-
-#### Scenario: Manager deletes an order
-- **WHEN** the manager deletes an existing order
-- **THEN** the system removes the order and its items
-- **AND** the order no longer appears in the back-office view
-
-#### Scenario: Delete targets a missing order
-- **WHEN** a delete references an order that does not exist
-- **THEN** the system rejects the request
-

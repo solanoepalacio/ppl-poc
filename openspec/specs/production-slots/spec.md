@@ -3,9 +3,7 @@
 ## Purpose
 
 Defines the production "bloque" (slot) — the container that orders are grouped into for a production run. It replaces the previous implicit day-based grouping with an explicit, manually-closed entity: at any moment exactly one bloque is open and receives new orders, and the manager closes it when the run is done, which atomically opens a fresh one. Also defines the back-office view for managing bloques.
-
 ## Requirements
-
 ### Requirement: Exactly one open bloque exists at all times
 The system SHALL maintain exactly one production bloque in the `open` status at any time. On startup, if no open bloque exists, the system MUST create one. The single-open invariant MUST be enforced such that two open bloques can never coexist.
 
@@ -40,13 +38,18 @@ Every newly created order SHALL be associated with the currently open bloque, wh
 - **THEN** the created order is associated with the currently open bloque
 
 ### Requirement: Closing the open bloque atomically opens a fresh one
-From the back office, the manager SHALL be able to close the currently open bloque. Closing MUST atomically mark that bloque `closed` (recording its closed instant) and open a new bloque with the next sequence number, so that exactly one open bloque always remains. The system MUST reject a request to close a bloque that does not exist or that is already closed, leaving the bloques unchanged.
+From the back office, the manager SHALL be able to close the currently open bloque. Closing MUST atomically mark that bloque `closed` (recording its closed instant) and open a new bloque with the next sequence number, so that exactly one open bloque always remains. Closing writes no order state: a closed bloque's order links are invalid purely because the bloque is `closed`. The system MUST reject a request to close a bloque that does not exist or that is already closed, leaving the bloques unchanged.
 
 #### Scenario: Closing opens a fresh bloque
 - **WHEN** the manager closes the currently open bloque
 - **THEN** the system marks it closed with a closed instant
 - **AND** a new open bloque with the next sequence number exists
 - **AND** exactly one bloque remains open
+
+#### Scenario: Closing invalidates the bloque's unused links
+- **WHEN** the manager closes a bloque that still holds unused order links
+- **THEN** those order links no longer resolve as valid
+- **AND** the system changes no order's state
 
 #### Scenario: A closed bloque is read-only history
 - **WHEN** a bloque has been closed
@@ -73,3 +76,4 @@ The back office SHALL present a dedicated bloques view, reachable from the persi
 - **WHEN** the manager activates the "close current bloque" control on the bloques view
 - **THEN** the system closes the open bloque and opens a fresh one
 - **AND** the bloques view reflects the newly closed bloque and the new open bloque
+

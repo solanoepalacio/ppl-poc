@@ -4,13 +4,13 @@ Zero-friction bakery order intake. The manager generates a single-use order
 link from the back office and shares it (e.g. WhatsApp); the customer opens it
 and submits a structured order — no login, no prices, no payment — or falls back
 to WhatsApp. A link stays valid while the production bloque it was created in is
-open; closing the bloque expires its unused links. Orders carry a status
-(`pending → issued | denied | ignored`) grouped by bloque.
+open and it has not been used; closing the bloque retires its unused links.
+Orders are grouped by bloque.
 
 ## Layout (Yarn v4 monorepo)
 
 - `packages/shared` — TypeScript types/DTOs shared by backend + frontend.
-- `packages/backend` — NestJS API, Prisma/SQLite, active expiry worker.
+- `packages/backend` — NestJS API, Prisma/SQLite.
 - `packages/frontend` — Next.js (App Router): customer form + back office.
 
 ## Prerequisites
@@ -74,18 +74,17 @@ yarn lint     # typecheck every workspace
 
 | Method | Path                               | Purpose                                    |
 | ------ | ---------------------------------- | ------------------------------------------ |
-| POST   | `/links`                           | Create a `pending` order + link (phone).   |
+| POST   | `/links`                           | Create an order + single-use link.         |
 | GET    | `/orders/by-token/:token`          | Token validity + catalog for the form.     |
-| POST   | `/orders/by-token/:token/confirm`  | Record items, transition to `issued`.      |
-| POST   | `/orders/by-token/:token/whatsapp` | WhatsApp fallback, transition to `denied`. |
+| POST   | `/orders/by-token/:token/confirm`  | Record items, consume the link.            |
+| POST   | `/orders/by-token/:token/whatsapp` | WhatsApp fallback, consume the link.       |
 | GET    | `/products`                        | Active catalog.                            |
-| GET    | `/orders?day=YYYY-MM-DD`           | Day view (defaults to today).              |
+| GET    | `/orders?slotId=`                  | Bloque view (defaults to the open bloque). |
 
-## Statuses
+## Link validity
 
-- `pending` — link generated, not yet acted on.
-- `issued` — customer confirmed via the form.
-- `denied` — customer chose "continue on WhatsApp".
-- `ignored` — link went unused: its bloque was closed while the order was still
-  `pending` (flipped atomically on close, with an in-process worker sweeping
-  every ~minute as a backstop, keeping `GROUP BY status` metrics honest).
+A single-use token is valid only while its order has not been consumed **and** its
+production bloque is still open. Confirming an order and choosing the WhatsApp
+fallback both consume the link (`Order.consumedAt`); closing a bloque invalidates
+every unused link in it (no order state is written — a closed bloque's links are
+simply no longer valid).

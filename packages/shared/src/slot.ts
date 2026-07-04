@@ -6,7 +6,7 @@
  * fresh one — so there is always exactly one open bloque.
  *
  * SQLite has no native enums, so the backend stores `status` as a plain string
- * validated against this union in the service layer (mirroring OrderStatus).
+ * validated against this union in the service layer.
  *
  * - `open`   — currently accepting new orders. Exactly one exists at any time.
  * - `closed` — a finished production run; read-only history.

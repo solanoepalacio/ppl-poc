@@ -6,7 +6,6 @@ import type {
   CreateOrderRequest,
   CreateOrderResponse,
   DeleteOrderResponse,
-  OrderStatus,
   Product,
   ProductCategory,
   ProductionTotalsResponse,
@@ -15,7 +14,6 @@ import type {
   SlotListResponse,
   SlotOrdersResponse,
   TokenValidationResponse,
-  UpdateOrderStatusResponse,
 } from '@pannico/shared';
 
 /**
@@ -71,7 +69,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
     throw new ApiError(res.status, message);
   }
-  return (await res.json()) as T;
+  // Some endpoints (confirm / whatsapp) return 200 with an empty body; `res.json()`
+  // would throw on that, so read text first and only parse when there is a body.
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 export function validateToken(token: string): Promise<TokenValidationResponse> {
@@ -83,16 +84,14 @@ export function validateToken(token: string): Promise<TokenValidationResponse> {
 export function confirmOrder(
   token: string,
   items: ConfirmOrderItem[],
-): Promise<{ status: 'issued' }> {
+): Promise<void> {
   return request(`/orders/by-token/${encodeURIComponent(token)}/confirm`, {
     method: 'POST',
     body: JSON.stringify({ items }),
   });
 }
 
-export function continueOnWhatsapp(
-  token: string,
-): Promise<{ status: 'denied' }> {
+export function continueOnWhatsapp(token: string): Promise<void> {
   return request(`/orders/by-token/${encodeURIComponent(token)}/whatsapp`, {
     method: 'POST',
   });
@@ -139,16 +138,6 @@ export function closeCurrentSlot(): Promise<CloseSlotResponse> {
 
 export function getProducts(): Promise<Product[]> {
   return request<Product[]>(`/products`);
-}
-
-export function updateOrderStatus(
-  orderId: string,
-  status: OrderStatus,
-): Promise<UpdateOrderStatusResponse> {
-  return request<UpdateOrderStatusResponse>(
-    `/orders/${encodeURIComponent(orderId)}/status`,
-    { method: 'PATCH', body: JSON.stringify({ status }) },
-  );
 }
 
 export function createOrder(

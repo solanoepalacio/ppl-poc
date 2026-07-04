@@ -61,16 +61,18 @@ model Slot {
 }
 
 /// An order. The single-use token lives on the order (1:1) since a token is
-/// bound to exactly one order. `status` follows the shared OrderStatus union.
-/// Every order belongs to the bloque that was open when it was created.
+/// bound to exactly one order. Every order belongs to the bloque that was open
+/// when it was created. `consumedAt` is the single-use gate: a token is valid
+/// only while `consumedAt` is null (and its bloque is open). Both confirming an
+/// order and choosing the WhatsApp fallback consume the link.
 model Order {
   id          String    @id @default(cuid())
   clientId    String
   token       String    @unique
-  status      String    @default("pending")
   slotId      String
   createdAt   DateTime  @default(now())
   confirmedAt DateTime?
+  consumedAt  DateTime?
   /// Optional raw customer message (e.g. pasted WhatsApp text) captured when a
   /// manager transcribes an order by hand. Null when no message was captured.
   message     String?
@@ -80,7 +82,6 @@ model Order {
   client Client      @relation(fields: [clientId], references: [id], onDelete: Restrict)
 
   @@index([createdAt])
-  @@index([status])
   @@index([slotId])
   @@index([clientId])
 }

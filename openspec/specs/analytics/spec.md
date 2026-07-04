@@ -3,9 +3,7 @@
 ## Purpose
 
 Defines how the application records usage analytics via umami: automatic page-view tracking through an injected script on deployed environments, a safe helper for emitting custom events from client components, the custom events instrumented across the customer order flow and the back-office, and a documented taxonomy of every available event.
-
 ## Requirements
-
 ### Requirement: Umami script injection on deployed environments
 
 The frontend SHALL load the umami tracking script on deployed environments so
@@ -77,11 +75,6 @@ The back-office SHALL emit custom events for its primary management actions.
 - **THEN** an `order_created_direct` event is emitted with the item count and
   total quantity
 
-#### Scenario: Order status changed
-- **WHEN** a manager changes an order's status
-- **THEN** an `order_status_changed` event is emitted with the previous and new
-  status
-
 #### Scenario: Order edited or deleted
 - **WHEN** a manager edits an order's items
 - **THEN** an `order_items_edited` event is emitted
@@ -98,3 +91,4 @@ instrumented code.
 - **THEN** a docs file enumerates each event name, when it fires, and its
   properties
 - **AND** every custom event emitted by the code appears in that document
+

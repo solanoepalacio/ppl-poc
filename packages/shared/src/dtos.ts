@@ -1,5 +1,4 @@
 import type { OrderItem } from './models';
-import type { OrderStatus } from './order-status';
 import type { Product } from './models';
 import type { Slot } from './slot';
 
@@ -46,34 +45,21 @@ export interface ConfirmOrderRequest {
   items: ConfirmOrderItem[];
 }
 
-/** `PATCH /orders/:id/status` request: the manager sets a new order status. */
-export interface UpdateOrderStatusRequest {
-  status: OrderStatus;
-}
-
-/** `PATCH /orders/:id/status` response: the updated order id and status. */
-export interface UpdateOrderStatusResponse {
-  id: string;
-  status: OrderStatus;
-}
-
 /**
  * `POST /orders` request: the manager records an order received off-channel.
- * `items` defaults to empty and `status` defaults to `issued` when omitted.
+ * `items` defaults to empty when omitted.
  */
 export interface CreateOrderRequest {
   clientId: string;
   items?: ConfirmOrderItem[];
-  status?: OrderStatus;
   /** Optional raw customer message (e.g. pasted WhatsApp text) for manually
    * transcribed orders. Blank/absent stores no message. */
   message?: string;
 }
 
-/** `POST /orders` response: the created order id and status. */
+/** `POST /orders` response: the created order id. */
 export interface CreateOrderResponse {
   id: string;
-  status: OrderStatus;
 }
 
 /**
@@ -101,7 +87,6 @@ export interface SlotViewOrder {
   clientId: string;
   /** Display name of the client the order is for. */
   clientName: string;
-  status: OrderStatus;
   createdAt: string;
   items: OrderItem[];
 }

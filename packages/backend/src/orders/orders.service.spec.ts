@@ -51,11 +51,11 @@ const pendingOrder = {
   id: 'order_1',
   clientId: 'client_1',
   token: 'tok_valid',
-  status: 'pending',
   slotId: 'slot_open',
   slot: { status: 'open' }, // joined bloque — token is valid while it is open
   createdAt: new Date(),
   confirmedAt: null,
+  consumedAt: null, // unconsumed — the single-use gate is open
 };
 
 describe('OrdersService', () => {
@@ -81,7 +81,7 @@ describe('OrdersService', () => {
   });
 
   describe('confirm', () => {
-    it('records items and transitions a valid order to issued', async () => {
+    it('records items and consumes a valid order', async () => {
       prisma.order.findUnique.mockResolvedValue({ ...pendingOrder });
       prisma.product.findMany.mockResolvedValue([{ id: 'p1' }, { id: 'p2' }]);
 
@@ -92,11 +92,11 @@ describe('OrdersService', () => {
 
       expect(prisma.orderItem.createMany).toHaveBeenCalledTimes(1);
       const updateArg = prisma.order.update.mock.calls[0][0];
-      expect(updateArg.data.status).toBe('issued');
+      expect(updateArg.data.consumedAt).toBeInstanceOf(Date);
       expect(updateArg.data.confirmedAt).toBeInstanceOf(Date);
     });
 
-    it('rejects an empty order and leaves it pending', async () => {
+    it('rejects an empty order and leaves the link usable', async () => {
       prisma.order.findUnique.mockResolvedValue({ ...pendingOrder });
 
       await expect(service.confirm('tok_valid', [])).rejects.toBeInstanceOf(
@@ -105,7 +105,7 @@ describe('OrdersService', () => {
       expect(prisma.order.update).not.toHaveBeenCalled();
     });
 
-    it('rejects an out-of-catalog item and leaves it pending', async () => {
+    it('rejects an out-of-catalog item and leaves the link usable', async () => {
       prisma.order.findUnique.mockResolvedValue({ ...pendingOrder });
       prisma.product.findMany.mockResolvedValue([{ id: 'p1' }]); // p9 missing
 
@@ -115,10 +115,10 @@ describe('OrdersService', () => {
       expect(prisma.order.update).not.toHaveBeenCalled();
     });
 
-    it('rejects a consumed (non-pending) token', async () => {
+    it('rejects an already-consumed token', async () => {
       prisma.order.findUnique.mockResolvedValue({
         ...pendingOrder,
-        status: 'issued',
+        consumedAt: new Date(),
       });
       await expect(
         service.confirm('tok_valid', [{ productId: 'p1', quantity: 1 }]),
@@ -137,14 +137,14 @@ describe('OrdersService', () => {
   });
 
   describe('denyForWhatsapp', () => {
-    it('transitions a valid order to denied and records no items', async () => {
+    it('consumes a valid order and records no items', async () => {
       prisma.order.findUnique.mockResolvedValue({ ...pendingOrder });
 
       await service.denyForWhatsapp('tok_valid');
 
       expect(prisma.order.update).toHaveBeenCalledWith({
         where: { id: 'order_1' },
-        data: { status: 'denied' },
+        data: { consumedAt: expect.any(Date) },
       });
       expect(prisma.orderItem.createMany).not.toHaveBeenCalled();
     });
@@ -181,58 +181,10 @@ describe('OrdersService', () => {
     });
   });
 
-  describe('updateStatus', () => {
-    it('marks an order finished and returns the updated id/status', async () => {
-      prisma.order.findUnique.mockResolvedValue({ id: 'order_1' });
-      prisma.order.update.mockResolvedValue({
-        id: 'order_1',
-        status: 'finished',
-      });
-
-      const res = await service.updateStatus('order_1', 'finished');
-
-      expect(res).toEqual({ id: 'order_1', status: 'finished' });
-      expect(prisma.order.update).toHaveBeenCalledWith({
-        where: { id: 'order_1' },
-        data: { status: 'finished' },
-        select: { id: true, status: true },
-      });
-    });
-
-    it('allows a free-form transition (issued → pending)', async () => {
-      prisma.order.findUnique.mockResolvedValue({ id: 'order_1' });
-      prisma.order.update.mockResolvedValue({
-        id: 'order_1',
-        status: 'pending',
-      });
-
-      const res = await service.updateStatus('order_1', 'pending');
-
-      expect(res.status).toBe('pending');
-    });
-
-    it('rejects an invalid status and leaves the order unchanged', async () => {
-      await expect(
-        service.updateStatus('order_1', 'shipped'),
-      ).rejects.toBeInstanceOf(BadRequestException);
-      expect(prisma.order.findUnique).not.toHaveBeenCalled();
-      expect(prisma.order.update).not.toHaveBeenCalled();
-    });
-
-    it('throws NotFound for a missing order', async () => {
-      prisma.order.findUnique.mockResolvedValue(null);
-
-      await expect(
-        service.updateStatus('nope', 'finished'),
-      ).rejects.toBeInstanceOf(NotFoundException);
-      expect(prisma.order.update).not.toHaveBeenCalled();
-    });
-  });
-
   describe('createOrder', () => {
-    it('persists an order with items, defaulting status to issued', async () => {
+    it('persists an order with items and returns its id', async () => {
       prisma.product.findMany.mockResolvedValue([{ id: 'p1' }, { id: 'p2' }]);
-      prisma.order.create.mockResolvedValue({ id: 'order_new', status: 'issued' });
+      prisma.order.create.mockResolvedValue({ id: 'order_new' });
 
       const res = await service.createOrder({
         clientId: 'client_1',
@@ -242,10 +194,9 @@ describe('OrdersService', () => {
         ],
       });
 
-      expect(res).toEqual({ id: 'order_new', status: 'issued' });
+      expect(res).toEqual({ id: 'order_new' });
       const data = prisma.order.create.mock.calls[0][0].data;
       expect(data.clientId).toBe('client_1');
-      expect(data.status).toBe('issued');
       expect(typeof data.token).toBe('string');
       expect(data.token.length).toBeGreaterThan(0);
       expect(data.items.create).toEqual([
@@ -255,7 +206,7 @@ describe('OrdersService', () => {
     });
 
     it('persists an order with no items', async () => {
-      prisma.order.create.mockResolvedValue({ id: 'order_new', status: 'issued' });
+      prisma.order.create.mockResolvedValue({ id: 'order_new' });
 
       await service.createOrder({ clientId: 'client_1' });
 
@@ -265,7 +216,7 @@ describe('OrdersService', () => {
     });
 
     it('persists a captured message', async () => {
-      prisma.order.create.mockResolvedValue({ id: 'order_new', status: 'issued' });
+      prisma.order.create.mockResolvedValue({ id: 'order_new' });
 
       await service.createOrder({
         clientId: 'client_1',
@@ -277,7 +228,7 @@ describe('OrdersService', () => {
     });
 
     it('stores null when the message is absent or blank', async () => {
-      prisma.order.create.mockResolvedValue({ id: 'order_new', status: 'issued' });
+      prisma.order.create.mockResolvedValue({ id: 'order_new' });
 
       await service.createOrder({ clientId: 'client_1' });
       await service.createOrder({ clientId: 'client_1', message: '   ' });
@@ -308,7 +259,7 @@ describe('OrdersService', () => {
     });
 
     it('generates a fresh token per order', async () => {
-      prisma.order.create.mockResolvedValue({ id: 'order_new', status: 'issued' });
+      prisma.order.create.mockResolvedValue({ id: 'order_new' });
 
       await service.createOrder({ clientId: 'client_1' });
       await service.createOrder({ clientId: 'client_1' });
@@ -320,7 +271,7 @@ describe('OrdersService', () => {
   });
 
   describe('replaceItems', () => {
-    it('replaces the item list and leaves status untouched', async () => {
+    it('replaces the item list without touching the order row', async () => {
       prisma.order.findUnique
         .mockResolvedValueOnce({ id: 'order_1' })
         .mockResolvedValueOnce({
@@ -431,7 +382,6 @@ describe('OrdersService', () => {
           id: 'order_1',
           clientId: 'client_1',
           client: { name: 'Il Postino' },
-          status: 'issued',
           createdAt: new Date('2026-03-15T10:00:00.000Z'),
           items: [],
         },
@@ -449,8 +399,8 @@ describe('OrdersService', () => {
 
   describe('getProductionTotals', () => {
     // Builds an order with items shaped as the include returns (product nested).
+    let seq = 0;
     const orderWith = (
-      status: string,
       items: {
         productId: string;
         name: string;
@@ -458,9 +408,8 @@ describe('OrdersService', () => {
         category?: 'sweet' | 'salty';
       }[],
     ) => ({
-      status,
       items: items.map((i, idx) => ({
-        id: `oi_${status}_${idx}`,
+        id: `oi_${seq++}_${idx}`,
         productId: i.productId,
         quantity: i.quantity,
         product: { id: i.productId, name: i.name, category: i.category ?? 'salty' },
@@ -469,8 +418,8 @@ describe('OrdersService', () => {
 
     it('sums the same product across orders and carries the product name', async () => {
       prisma.order.findMany.mockResolvedValue([
-        orderWith('issued', [{ productId: 'p1', name: 'Croissant', quantity: 3 }]),
-        orderWith('finished', [{ productId: 'p1', name: 'Croissant', quantity: 2 }]),
+        orderWith([{ productId: 'p1', name: 'Croissant', quantity: 3 }]),
+        orderWith([{ productId: 'p1', name: 'Croissant', quantity: 2 }]),
       ]);
 
       const res = await service.getProductionTotals('slot_7');
@@ -483,7 +432,7 @@ describe('OrdersService', () => {
 
     it('omits products with no demand (only ordered products appear)', async () => {
       prisma.order.findMany.mockResolvedValue([
-        orderWith('issued', [{ productId: 'p1', name: 'Croissant', quantity: 1 }]),
+        orderWith([{ productId: 'p1', name: 'Croissant', quantity: 1 }]),
       ]);
 
       const res = await service.getProductionTotals('2026-03-15');
@@ -493,7 +442,7 @@ describe('OrdersService', () => {
 
     it('sorts entries by product name', async () => {
       prisma.order.findMany.mockResolvedValue([
-        orderWith('issued', [
+        orderWith([
           { productId: 'p2', name: 'Baguette', quantity: 1 },
           { productId: 'p1', name: 'Croissant', quantity: 1 },
         ]),
@@ -504,17 +453,13 @@ describe('OrdersService', () => {
       expect(res.items.map((i) => i.name)).toEqual(['Baguette', 'Croissant']);
     });
 
-    it('queries only production-relevant statuses (excludes denied/ignored)', async () => {
+    it('sums every order in the bloque (no status filter)', async () => {
       prisma.order.findMany.mockResolvedValue([]);
 
       await service.getProductionTotals('2026-03-15');
 
       const where = prisma.order.findMany.mock.calls[0][0].where;
-      expect(where.status).toEqual({
-        in: ['pending', 'issued', 'finished'],
-      });
-      expect(where.status.in).not.toContain('denied');
-      expect(where.status.in).not.toContain('ignored');
+      expect(where).toEqual({ slotId: 'slot_open' });
     });
 
     it('filters to the requested bloque', async () => {
@@ -543,7 +488,7 @@ describe('OrdersService', () => {
 
     it('scopes totals to the requested category, excluding the other line', async () => {
       prisma.order.findMany.mockResolvedValue([
-        orderWith('issued', [
+        orderWith([
           { productId: 'p1', name: 'Ciabatta', quantity: 2, category: 'salty' },
           { productId: 'p2', name: 'Pavlova', quantity: 5, category: 'sweet' },
         ]),
@@ -558,7 +503,7 @@ describe('OrdersService', () => {
 
     it('includes both categories when none is specified', async () => {
       prisma.order.findMany.mockResolvedValue([
-        orderWith('issued', [
+        orderWith([
           { productId: 'p1', name: 'Ciabatta', quantity: 2, category: 'salty' },
           { productId: 'p2', name: 'Pavlova', quantity: 5, category: 'sweet' },
         ]),

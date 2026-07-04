@@ -30,16 +30,16 @@ describe('LinksService', () => {
     process.env.FRONTEND_BASE_URL = 'http://localhost:3001';
   });
 
-  it('creates a pending order + token and returns the share URL for a valid client', async () => {
+  it('creates an unconsumed order + token and returns the share URL for a valid client', async () => {
     prisma.order.create.mockImplementation(async ({ data }) => ({
       id: 'order_1',
       clientId: data.clientId,
       client: { name: 'Il Postino' },
       token: data.token,
-      status: data.status,
       slotId: data.slotId,
       createdAt: new Date(),
       confirmedAt: null,
+      consumedAt: null,
     }));
 
     const res = await service.createLink('client_1');
@@ -47,7 +47,6 @@ describe('LinksService', () => {
     expect(clients.assertActive).toHaveBeenCalledWith('client_1');
     expect(prisma.order.create).toHaveBeenCalledTimes(1);
     const createArg = prisma.order.create.mock.calls[0][0].data;
-    expect(createArg.status).toBe('pending');
     expect(createArg.clientId).toBe('client_1');
     expect(createArg.token).toBeTruthy();
     expect(createArg.slotId).toBe('slot_open'); // stamped with the open bloque

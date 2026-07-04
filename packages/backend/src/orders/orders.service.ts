@@ -4,13 +4,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
-  isOrderStatus,
-  PRODUCTION_STATUSES,
   type ConfirmOrderItem,
   type CreateOrderRequest,
   type CreateOrderResponse,
   type DeleteOrderResponse,
-  type OrderStatus,
   type Product,
   type ProductCategory,
   type ProductionTotalsResponse,
@@ -72,8 +69,8 @@ export class OrdersService {
 
   /**
    * Confirms an order: validates items against the catalog, records them, and
-   * transitions the order to `issued`. Rejects empty orders and out-of-catalog
-   * items, leaving the order `pending`. Rejects invalid/expired/consumed tokens.
+   * consumes the link. Rejects empty orders and out-of-catalog items, leaving
+   * the link unconsumed. Rejects invalid/closed-bloque/already-used tokens.
    */
   async confirm(token: string, items: ConfirmOrderItem[]): Promise<void> {
     const order = await this.tokenService.resolveValidOrder(token);
@@ -86,7 +83,9 @@ export class OrdersService {
     }
     await this.validateItemsAgainstCatalog(items);
 
-    // Record items and flip to `issued` atomically.
+    // Record items and consume the link atomically. `confirmedAt` marks the
+    // customer confirmation; `consumedAt` closes the single-use gate.
+    const now = new Date();
     await this.prisma.$transaction([
       this.prisma.orderItem.createMany({
         data: items.map((i) => ({
@@ -97,14 +96,15 @@ export class OrdersService {
       }),
       this.prisma.order.update({
         where: { id: order.id },
-        data: { status: 'issued', confirmedAt: new Date() },
+        data: { consumedAt: now, confirmedAt: now },
       }),
     ]);
   }
 
   /**
-   * Records the customer's WhatsApp fallback: transitions the order to `denied`
-   * and records no items. Rejects invalid/expired/consumed tokens.
+   * Records the customer's WhatsApp fallback: consumes the link (so it can no
+   * longer be used) and records no items. Rejects invalid/closed-bloque/
+   * already-used tokens.
    */
   async denyForWhatsapp(token: string): Promise<void> {
     const order = await this.tokenService.resolveValidOrder(token);
@@ -113,53 +113,19 @@ export class OrdersService {
     }
     await this.prisma.order.update({
       where: { id: order.id },
-      data: { status: 'denied' },
+      data: { consumedAt: new Date() },
     });
-  }
-
-  /**
-   * Back-office manual status update: sets an order's status to any valid
-   * status, regardless of its current value (transitions are free-form). Only
-   * `status` is touched — `confirmedAt` and items are left untouched. Rejects
-   * an unknown status (400) and a missing order (404), leaving it unchanged.
-   */
-  async updateStatus(
-    orderId: string,
-    status: string,
-  ): Promise<{ id: string; status: OrderStatus }> {
-    if (!isOrderStatus(status)) {
-      throw new BadRequestException(`Invalid order status: ${status}`);
-    }
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-      select: { id: true },
-    });
-    if (!order) {
-      throw new NotFoundException(`Order ${orderId} not found.`);
-    }
-    const updated = await this.prisma.order.update({
-      where: { id: orderId },
-      data: { status },
-      select: { id: true, status: true },
-    });
-    return { id: updated.id, status: updated.status as OrderStatus };
   }
 
   /**
    * Back-office manual order creation: records an order received off-channel
    * (WhatsApp/in-person) directly, without generating a customer link.
-   * Validates the client and items against the catalog, generates an unused
-   * token + expiry to satisfy the schema, and defaults the status to `issued`
-   * since the order is already real. Rejects a missing/inactive client, an
-   * unknown status, or an out-of-catalog item, persisting nothing on rejection.
+   * Validates the client and items against the catalog and generates an unused
+   * token to satisfy the schema. Rejects a missing/inactive client or an
+   * out-of-catalog item, persisting nothing on rejection.
    */
   async createOrder(input: CreateOrderRequest): Promise<CreateOrderResponse> {
     await this.clientsService.assertActive(input.clientId);
-
-    const status = input.status ?? 'issued';
-    if (!isOrderStatus(status)) {
-      throw new BadRequestException(`Invalid order status: ${status}`);
-    }
 
     const items = input.items ?? [];
     await this.validateItemsAgainstCatalog(items);
@@ -171,7 +137,6 @@ export class OrdersService {
       data: {
         clientId: input.clientId,
         token: generateToken(),
-        status,
         slotId,
         message,
         items:
@@ -184,9 +149,9 @@ export class OrdersService {
               }
             : undefined,
       },
-      select: { id: true, status: true },
+      select: { id: true },
     });
-    return { id: order.id, status: order.status as OrderStatus };
+    return { id: order.id };
   }
 
   /**
@@ -235,8 +200,8 @@ export class OrdersService {
 
   /**
    * Back-office order deletion: removes the order and (via cascade) its items.
-   * Intended for corrections such as duplicates; cancellations that should
-   * still count use a status change instead. Rejects a missing order (404).
+   * Intended for corrections such as duplicates, and the way to drop a mistaken
+   * order from production totals. Rejects a missing order (404).
    */
   async deleteOrder(orderId: string): Promise<DeleteOrderResponse> {
     const exists = await this.prisma.order.findUnique({
@@ -285,8 +250,8 @@ export class OrdersService {
 
   /**
    * Returns the orders in a bloque, defaulting to the currently open bloque when
-   * no `slotId` is given, each with its status, items, and client for the back
-   * office. Also returns the resolved bloque for the header/picker.
+   * no `slotId` is given, each with its items and client for the back office.
+   * Also returns the resolved bloque for the header/picker.
    */
   async getOrdersBySlot(slotId?: string): Promise<SlotOrdersResponse> {
     const slot = await this.slotsService.resolveSlot(slotId);
@@ -301,7 +266,6 @@ export class OrdersService {
         id: o.id,
         clientId: o.clientId,
         clientName: o.client.name,
-        status: o.status as SlotOrdersResponse['orders'][number]['status'],
         createdAt: o.createdAt.toISOString(),
         items: o.items,
       })),
@@ -310,9 +274,10 @@ export class OrdersService {
 
   /**
    * Per-item production totals for a bloque, defaulting to the currently open
-   * bloque: the summed quantity of each product across orders that represent
-   * real demand (`PRODUCTION_STATUSES`). Returns one entry per product with a
-   * positive total, sorted by product name; products with no demand are omitted.
+   * bloque: the summed quantity of each product across every order in the
+   * bloque. Returns one entry per product with a positive total, sorted by
+   * product name; products with no demand are omitted. A mistaken order is
+   * excluded by deleting it.
    *
    * When a `category` is given, only products on that production line contribute,
    * so the salados and dulces views each show just their line's totals.
@@ -323,10 +288,7 @@ export class OrdersService {
   ): Promise<ProductionTotalsResponse> {
     const slot = await this.slotsService.resolveSlot(slotId);
     const orders = await this.prisma.order.findMany({
-      where: {
-        slotId: slot.id,
-        status: { in: PRODUCTION_STATUSES as string[] },
-      },
+      where: { slotId: slot.id },
       include: { items: { include: { product: true } } },
     });
 

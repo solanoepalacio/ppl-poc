@@ -34,7 +34,6 @@ The custom events below capture actions and conversions that page views can't.
 | `order_link_generated` | Manager generates a shareable order link | — | `(backoffice)/orders/CreateOrderModal.tsx` |
 | `order_link_copied` | Manager copies a generated link to the clipboard | — | `(backoffice)/orders/CreateOrderModal.tsx` |
 | `order_created_direct` | Manager creates an order directly from the back-office | `itemCount`, `totalQuantity` | `(backoffice)/orders/CreateOrderModal.tsx` |
-| `order_status_changed` | Manager changes an order's status | `fromStatus`, `toStatus` | `(backoffice)/orders/OrderStatusControl.tsx` |
 | `order_items_edited` | Manager saves an edit to an order's items | `itemCount`, `totalQuantity` | `(backoffice)/orders/OrderActions.tsx` |
 | `order_deleted` | Manager deletes an order | — | `(backoffice)/orders/OrderActions.tsx` |
 

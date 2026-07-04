@@ -9,11 +9,11 @@ is the *how*: stack, layout, commands, conventions.
 
 ## Monorepo (Yarn 4 workspaces)
 
-- `packages/shared` — `@pannico/shared`. TypeScript DTOs + domain contracts (order status,
-  slot status, request/response interfaces) imported by both backend and frontend. Source
+- `packages/shared` — `@pannico/shared`. TypeScript DTOs + domain contracts (slot status,
+  request/response interfaces) imported by both backend and frontend. Source
   of truth for the API contract. Must be built (`tsc`) before the others typecheck.
 - `packages/backend` — NestJS + Prisma over **SQLite**. REST API on `:3000`. Modules:
-  `orders/`, `links/`, `slots/`, `expiry/`, `prisma/`, `config/`, `common/`.
+  `orders/`, `links/`, `slots/`, `clients/`, `prisma/`, `config/`, `common/`.
 - `packages/frontend` — Next.js 14 **App Router**. Back office under
   `src/app/(backoffice)/`, customer form under the order-token routes. Serves on `:3001`.
 
@@ -48,6 +48,6 @@ referencing the new models will typecheck.
   don't redeclare response shapes locally.
 - **Naming:** code identifiers are **English** (`Order`, `Slot`, `slotId`, route `/slots`),
   user-facing text is **Spanish** (`Órdenes`, `Bloques`, "bloque de producción"). Match this.
-- **Enums as strings:** SQLite has no native enums, so `Order.status` and `Slot.status` are
-  plain string columns validated in the service layer against unions in `@pannico/shared`
-  (`isOrderStatus`, `isSlotStatus`).
+- **Enums as strings:** SQLite has no native enums, so `Slot.status` is a plain string
+  column validated in the service layer against a union in `@pannico/shared`
+  (`isSlotStatus`). `ProductCategory` follows the same pattern (`isProductCategory`).

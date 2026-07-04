@@ -316,32 +316,6 @@ select {
   max-width: 32ch;
 }
 
-/* ── Back-office status pills (unchanged surface) ─────────── */
-.status {
-  display: inline-block;
-  padding: 0.1rem 0.5rem;
-  border-radius: 999px;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-.status-pending { background: #fff4ce; }
-.status-issued { background: #d6f5dd; }
-.status-denied { background: #ffe0e0; }
-.status-ignored { background: #ececec; }
-.status-finished { background: #d9e8ff; }
-
-/* Status selector: an "Estado" label beside a plain select. */
-.status-select {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-.status-label {
-  color: var(--ink-muted);
-  font-size: 0.85rem;
-}
-
 .error {
   color: #b42318;
   font-weight: 500;
