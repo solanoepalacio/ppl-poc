@@ -80,20 +80,20 @@ The system SHALL support computing production totals for a single production cat
 - **THEN** products of both categories contribute to the totals
 
 ### Requirement: Back office surfaces the bloque's production totals
-The back office SHALL present a bloque's per-item production totals on two dedicated production views, one per production category — **Producción salados** (`salty`) and **Producción dulces** (`sweet`) — each reachable from the persistent back-office navigation alongside the orders view and the bloques view. Each view SHALL show only the totals for products in its category, defaulting to the open bloque and reflecting the current totals each time the view is loaded for the selected bloque. Selecting a bloque on a production view SHALL apply immediately, without any explicit submit action.
+The back office SHALL present the per-item production totals on two dedicated production views, one per production category — **Producción salados** (`salty`) and **Producción dulces** (`sweet`) — each reachable from the persistent back-office navigation alongside the orders view and the bloques view. Each view SHALL show only the totals for products in its category, always for the currently open (latest) bloque, reflecting the current totals each time the view is loaded. The production views SHALL NOT offer a bloque selector.
 
 #### Scenario: Manager views one line's production totals
-- **WHEN** the manager opens the **Producción salados** view for a bloque
-- **THEN** the system shows each `salty` product to be produced for that bloque with its summed quantity
+- **WHEN** the manager opens the **Producción salados** view
+- **THEN** the system shows each `salty` product to be produced for the open bloque with its summed quantity
 - **AND** no `sweet` products are shown
 
 #### Scenario: Each line has its own view
-- **WHEN** the manager opens the **Producción dulces** view for a bloque
-- **THEN** the system shows each `sweet` product to be produced for that bloque with its summed quantity
+- **WHEN** the manager opens the **Producción dulces** view
+- **THEN** the system shows each `sweet` product to be produced for the open bloque with its summed quantity
 - **AND** no `salty` products are shown
 
-#### Scenario: Totals reflect the selected bloque
-- **WHEN** the manager selects a different bloque on a production view
-- **THEN** the production totals shown correspond to that bloque and that view's category
-- **AND** no separate submit action is required to render them
+#### Scenario: The production views always show the open bloque
+- **WHEN** the manager opens a production view
+- **THEN** the production totals shown are for the currently open bloque and that view's category
+- **AND** the view offers no control to select a different bloque
 

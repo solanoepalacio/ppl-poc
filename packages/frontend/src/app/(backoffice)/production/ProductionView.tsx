@@ -1,37 +1,22 @@
 import type { ProductCategory } from '@pannico/shared';
-import { getProductionTotals, getSlots } from '@/lib/api';
-import { SlotPicker } from '../SlotPicker';
+import { getProductionTotals } from '@/lib/api';
 
 /**
  * Back-office production view for a single production line: the per-item quantity
- * to produce for the selected bloque (default the open one), summed across
- * pending, issued, and finished orders, scoped to `category`. Selecting a bloque
- * navigates immediately, so the selection lives in the URL (?slotId=...); each
- * line has its own `basePath` (/production/salados or /production/dulces) so the
- * picker stays within this view. Rendered by the two category pages.
+ * to produce for the currently open (latest) bloque, summed across its orders and
+ * scoped to `category`. Always shows the open bloque — there is no bloque
+ * selector — reflecting the current totals each time it loads. Rendered by the
+ * two category pages.
  */
 export async function ProductionView({
-  basePath,
   category,
-  slotId,
 }: {
-  basePath: string;
   category: ProductCategory;
-  slotId?: string;
 }) {
-  const [production, { slots }] = await Promise.all([
-    getProductionTotals(slotId, category),
-    getSlots(),
-  ]);
+  const production = await getProductionTotals(undefined, category);
 
   return (
     <section>
-      <SlotPicker
-        basePath={basePath}
-        slots={slots}
-        currentSlotId={production.slot.id}
-      />
-
       {production.items.length > 0 ? (
         <div className="card">
           <ul>

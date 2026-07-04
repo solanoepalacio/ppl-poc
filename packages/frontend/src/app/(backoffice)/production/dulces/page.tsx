@@ -1,16 +1,6 @@
 import { ProductionView } from '../ProductionView';
 
-/** Production totals for the sweet line (*dulces*). */
-export default function ProductionDulcesPage({
-  searchParams,
-}: {
-  searchParams: { slotId?: string };
-}) {
-  return (
-    <ProductionView
-      basePath="/production/dulces"
-      category="sweet"
-      slotId={searchParams.slotId}
-    />
-  );
+/** Production totals for the sweet line (*dulces*), for the open bloque. */
+export default function ProductionDulcesPage() {
+  return <ProductionView category="sweet" />;
 }
