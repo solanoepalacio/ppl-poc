@@ -26,8 +26,8 @@ active tab is the sole indicator of which view is shown. This applies to both
 category production views (**Producción salados** and **Producción dulces**).
 
 #### Scenario: Orders view has no redundant title
-- **WHEN** the manager opens the orders view with the Órdenes tab active
-- **THEN** no `Órdenes` page title is shown above the view content
+- **WHEN** the manager opens the orders view with the Pedidos tab active
+- **THEN** no `Pedidos` page title is shown above the view content
 
 #### Scenario: Production views have no redundant title
 - **WHEN** the manager opens a production view with its Producción salados or Producción dulces tab active

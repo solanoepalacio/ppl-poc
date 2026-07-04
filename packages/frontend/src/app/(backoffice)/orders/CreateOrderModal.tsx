@@ -146,7 +146,7 @@ export function CreateOrderModal({
     <>
       <button
         type="button"
-        className="btn-primary"
+        className="btn-secondary"
         onClick={openModal}
         disabled={disabled}
       >

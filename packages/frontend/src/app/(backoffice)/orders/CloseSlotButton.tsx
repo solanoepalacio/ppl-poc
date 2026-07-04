@@ -36,6 +36,7 @@ export function CloseSlotButton({ disabled }: { disabled?: boolean }) {
     <span>
       <button
         type="button"
+        className="btn-secondary"
         onClick={() => void onClose()}
         disabled={pending || disabled}
       >

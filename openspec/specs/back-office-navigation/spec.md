@@ -18,11 +18,11 @@ The back office SHALL present the orders view (orders grouped by production bloq
 - **THEN** no standalone landing page distinct from the three views is presented
 
 ### Requirement: Persistent navigation across back-office views
-The back office SHALL present a persistent navigation, visible on every back-office view, with one link to each of its views labelled **Órdenes** (orders by bloque), **Producción salados** (savory-line production totals), and **Producción dulces** (sweet-line production totals). Neither order creation nor bloque management SHALL be a standalone navigation destination; both are launched from the orders view. Selecting a link SHALL navigate to that view. The navigation SHALL indicate which view is currently active.
+The back office SHALL present a persistent navigation, visible on every back-office view, with one link to each of its views labelled **Pedidos** (orders by bloque), **Producción salados** (savory-line production totals), and **Producción dulces** (sweet-line production totals). Neither order creation nor bloque management SHALL be a standalone navigation destination; both are launched from the orders view. Selecting a link SHALL navigate to that view. The navigation SHALL indicate which view is currently active.
 
 #### Scenario: Navigation is present on each view
 - **WHEN** the manager is on any back-office view
-- **THEN** the navigation is shown with links to Órdenes, Producción salados, and Producción dulces
+- **THEN** the navigation is shown with links to Pedidos, Producción salados, and Producción dulces
 - **AND** there is no separate Bloques link
 
 #### Scenario: Navigating between views

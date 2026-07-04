@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 
 /** The back-office views, with Spanish labels and their routes. */
 const LINKS = [
-  { href: '/orders', label: 'Órdenes' },
+  { href: '/orders', label: 'Pedidos' },
   { href: '/production/salados', label: 'Producción salados' },
   { href: '/production/dulces', label: 'Producción dulces' },
 ] as const;
