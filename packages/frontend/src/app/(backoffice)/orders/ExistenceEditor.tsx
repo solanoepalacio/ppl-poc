@@ -78,7 +78,7 @@ export function ExistenceEditor({
         footer={
           <>
             <button
-              className="btn-primary"
+              className="btn-secondary"
               onClick={() => void save()}
               disabled={pending}
             >

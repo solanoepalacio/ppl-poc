@@ -116,7 +116,7 @@ export function CreateOrderModal({
   const footer =
     step === 'link' ? (
       <>
-        <button className="btn-primary" onClick={() => void copy()}>
+        <button className="btn-secondary" onClick={() => void copy()}>
           {copied ? '¡Copiado!' : 'Copiar enlace'}
         </button>
         <button className="btn-secondary" onClick={close}>
@@ -126,7 +126,7 @@ export function CreateOrderModal({
     ) : step === 'content' ? (
       <>
         <button
-          className="btn-primary"
+          className="btn-secondary"
           onClick={() => void submitContent()}
           disabled={pending}
         >
@@ -173,7 +173,7 @@ export function CreateOrderModal({
           <div className="row row--no-divider">
             <button
               type="button"
-              className="btn-primary"
+              className="btn-secondary"
               onClick={() => void generateLink()}
               disabled={!valid || busy}
             >
