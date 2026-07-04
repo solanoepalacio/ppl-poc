@@ -321,6 +321,14 @@ select {
   font-weight: 500;
 }
 
+/* Bloque-action buttons below the selector on the orders view, left-aligned. */
+.slot-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
 /* ── Modal dialog ─────────────────────────────────────────── */
 .modal {
   border: none;

@@ -34,7 +34,7 @@ export function CloseSlotButton() {
   return (
     <span>
       <button type="button" onClick={() => void onClose()} disabled={pending}>
-        Cerrar bloque actual
+        Cerrar producción
       </button>
       {error && <span className="muted"> · falló</span>}
     </span>

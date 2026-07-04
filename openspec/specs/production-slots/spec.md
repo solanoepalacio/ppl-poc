@@ -78,30 +78,34 @@ The system SHALL let the manager record, per product, the *existencia* (stock al
 - **THEN** the system rejects the request
 - **AND** leaves that bloque's existencia unchanged
 
-### Requirement: Bloques can be listed for management
-The system SHALL expose all bloques, newest first, each with its status, sequence number, timestamps, and the count of orders it contains, for a dedicated back-office bloques view.
+### Requirement: Bloques can be listed for selection
+The system SHALL expose all bloques, newest first, each with its status, sequence number, and timestamps, so the orders view can present them in a bloque selector for viewing and management. There is no dedicated bloques view.
 
-#### Scenario: The bloques view lists every bloque newest first
-- **WHEN** the manager opens the back-office bloques view
-- **THEN** the system lists all bloques ordered newest first
-- **AND** each entry shows its status and the number of orders it contains
+#### Scenario: The orders view lists every bloque newest first
+- **WHEN** the manager opens the back-office orders view
+- **THEN** its bloque selector lists all bloques ordered newest first
+- **AND** each entry shows its sequence number and status
 
-### Requirement: Back office surfaces bloque management
-The back office SHALL present a dedicated bloques view, reachable from the persistent back-office navigation, that lists the bloques and offers a control to close the currently open bloque.
+### Requirement: Back office surfaces bloque closing on the orders view
+The orders view SHALL offer, for the currently open bloque only, a control (**Cerrar producción**) to close it — which atomically opens a fresh one. This control SHALL NOT appear when a closed bloque is selected.
 
-#### Scenario: Manager closes the current bloque from the bloques view
-- **WHEN** the manager activates the "close current bloque" control on the bloques view
+#### Scenario: Manager closes the current bloque from the orders view
+- **WHEN** the manager activates the **Cerrar producción** control on the orders view while the open bloque is selected
 - **THEN** the system closes the open bloque and opens a fresh one
-- **AND** the bloques view reflects the newly closed bloque and the new open bloque
+- **AND** the orders view reflects the newly closed bloque and the new open bloque
+
+#### Scenario: The close control is hidden for a closed bloque
+- **WHEN** the manager selects a closed bloque in the orders view
+- **THEN** no bloque-closing control is offered
 
 ### Requirement: Back office surfaces existencia editing on the open bloque
-On the bloques view, the back office SHALL offer, for the open bloque only, a control to record per-product existencia. Closed bloques SHALL NOT offer this control.
+On the orders view, the back office SHALL offer, for the open bloque only, a control (**Editar stock**) to record per-product existencia. This control SHALL NOT appear when a closed bloque is selected.
 
 #### Scenario: Manager edits existencia for the open bloque
-- **WHEN** the manager opens the existencia editor on the open bloque and saves per-product quantities
+- **WHEN** the manager opens the stock editor on the orders view while the open bloque is selected and saves per-product quantities
 - **THEN** the system stores them as that bloque's existencia
 
-#### Scenario: A closed bloque offers no existencia control
-- **WHEN** the manager views a closed bloque on the bloques view
-- **THEN** no existencia-editing control is offered for it
+#### Scenario: A closed bloque offers no stock control
+- **WHEN** the manager selects a closed bloque in the orders view
+- **THEN** no stock-editing control is offered for it
 

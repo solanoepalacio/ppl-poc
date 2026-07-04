@@ -1,12 +1,23 @@
-import { getClients, getOrdersBySlot, getProducts, getSlots } from '@/lib/api';
+import {
+  getClients,
+  getOrdersBySlot,
+  getProducts,
+  getSlotExistence,
+  getSlots,
+} from '@/lib/api';
 import { SlotPicker } from '../SlotPicker';
+import { CloseSlotButton } from './CloseSlotButton';
 import { CreateOrderModal } from './CreateOrderModal';
+import { ExistenceEditor } from './ExistenceEditor';
 import { OrderActions } from './OrderActions';
 
 /**
- * Back-office bloque view: the orders in the selected production bloque (default
+ * Back-office orders view: the orders in the selected production bloque (default
  * the open one), each with its items and client. Selecting a bloque in the
  * picker navigates immediately, so the selection lives in the URL (?slotId=...).
+ * This view is also where bloques are managed — below the selector sit the
+ * bloque actions: always "Agregar pedido", plus (open bloque only) "Editar
+ * stock" and "Cerrar producción".
  */
 export default async function OrdersPage({
   searchParams,
@@ -20,6 +31,10 @@ export default async function OrdersPage({
     getClients(),
   ]);
   const productName = new Map(products.map((p) => [p.id, p.name]));
+  // Stock and closing only apply to the open bloque; existence is fetched only
+  // when we'll actually render its editor.
+  const isOpen = view.slot.status === 'open';
+  const existence = isOpen ? await getSlotExistence(view.slot.id) : null;
 
   return (
     <section>
@@ -27,7 +42,19 @@ export default async function OrdersPage({
         basePath="/orders"
         slots={slots}
         currentSlotId={view.slot.id}
-        action={<CreateOrderModal products={products} clients={clients} />}
+        action={
+          <>
+            <CreateOrderModal products={products} clients={clients} />
+            {isOpen && existence && (
+              <ExistenceEditor
+                slotId={view.slot.id}
+                products={products}
+                current={existence.items}
+              />
+            )}
+            {isOpen && <CloseSlotButton />}
+          </>
+        }
       />
 
       {view.orders.length === 0 && (

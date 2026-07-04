@@ -4,11 +4,8 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ExistenceItem, Product } from '@pannico/shared';
 import { setSlotExistence } from '@/lib/api';
-import {
-  ItemQuantityFields,
-  itemsFromQuantities,
-} from '../orders/ItemQuantityFields';
-import { Modal } from '../orders/Modal';
+import { ItemQuantityFields, itemsFromQuantities } from './ItemQuantityFields';
+import { Modal } from './Modal';
 
 /**
  * Open-bloque control to record existencia (stock already on hand), which the
@@ -61,16 +58,14 @@ export function ExistenceEditor({
 
   return (
     <>
-      <div className="row row--no-divider">
-        <button
-          className="btn-secondary"
-          onClick={startEditing}
-          disabled={pending}
-        >
-          Editar existencias
-        </button>
-        {error && !editing && <span className="error"> · {error}</span>}
-      </div>
+      <button
+        className="btn-secondary"
+        onClick={startEditing}
+        disabled={pending}
+      >
+        Editar stock
+      </button>
+      {error && !editing && <span className="error"> · {error}</span>}
       <Modal
         open={editing}
         onClose={() => setEditing(false)}

@@ -8,7 +8,6 @@ const LINKS = [
   { href: '/orders', label: 'Órdenes' },
   { href: '/production/salados', label: 'Producción salados' },
   { href: '/production/dulces', label: 'Producción dulces' },
-  { href: '/slots', label: 'Bloques' },
 ] as const;
 
 /**

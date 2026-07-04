@@ -18,11 +18,12 @@ The back office SHALL present the orders view (orders grouped by production bloq
 - **THEN** no standalone landing page distinct from the three views is presented
 
 ### Requirement: Persistent navigation across back-office views
-The back office SHALL present a persistent navigation, visible on every back-office view, with one link to each of its views labelled **Órdenes** (orders by bloque), **Producción salados** (savory-line production totals), **Producción dulces** (sweet-line production totals), and **Bloques** (production-bloque management). Order creation SHALL NOT be a standalone navigation destination; it is launched as a modal action from the orders view. Selecting a link SHALL navigate to that view. The navigation SHALL indicate which view is currently active.
+The back office SHALL present a persistent navigation, visible on every back-office view, with one link to each of its views labelled **Órdenes** (orders by bloque), **Producción salados** (savory-line production totals), and **Producción dulces** (sweet-line production totals). Neither order creation nor bloque management SHALL be a standalone navigation destination; both are launched from the orders view. Selecting a link SHALL navigate to that view. The navigation SHALL indicate which view is currently active.
 
 #### Scenario: Navigation is present on each view
 - **WHEN** the manager is on any back-office view
-- **THEN** the navigation is shown with links to Órdenes, Producción salados, Producción dulces, and Bloques
+- **THEN** the navigation is shown with links to Órdenes, Producción salados, and Producción dulces
+- **AND** there is no separate Bloques link
 
 #### Scenario: Navigating between views
 - **WHEN** the manager selects a navigation link
@@ -39,8 +40,13 @@ The back office SHALL present a persistent navigation, visible on every back-off
 
 #### Scenario: No standalone order-creation destination
 - **WHEN** the manager looks at the back-office navigation
-- **THEN** there is no separate Crear orden navigation link
+- **THEN** there is no separate order-creation navigation link
 - **AND** order creation is reached from the orders view instead
+
+#### Scenario: No standalone bloque-management destination
+- **WHEN** the manager looks at the back-office navigation
+- **THEN** there is no separate Bloques navigation link
+- **AND** bloque management (closing the bloque, editing its stock) is reached from the orders view instead
 
 ### Requirement: Customer order form excludes back-office navigation
 The persistent back-office navigation SHALL NOT appear on the customer-facing order form.

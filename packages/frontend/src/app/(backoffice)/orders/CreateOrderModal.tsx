@@ -142,7 +142,7 @@ export function CreateOrderModal({
   return (
     <>
       <button type="button" className="btn-primary" onClick={openModal}>
-        Crear orden
+        Agregar pedido
       </button>
 
       <Modal

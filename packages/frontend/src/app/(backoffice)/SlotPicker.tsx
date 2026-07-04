@@ -25,9 +25,8 @@ export function slotLabel(slot: {
  * Back-office bloque selector: a `<select>` of every production bloque that
  * navigates to the chosen one immediately on change — no submit button. The
  * selected bloque lives in the URL (?slotId=...); when absent the server
- * defaults to the open bloque. Replaces the old day picker on both the orders
- * and production views. An optional `action` slot (e.g. the create-order
- * trigger) sits on the right of the same card.
+ * defaults to the open bloque. An optional `action` slot (the bloque-action
+ * buttons) sits in a left-aligned row below the selector, in the same card.
  */
 export function SlotPicker({
   basePath,
@@ -54,10 +53,9 @@ export function SlotPicker({
       className="card"
       style={{
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: '1rem',
-        flexWrap: 'wrap',
+        flexDirection: 'column',
+        alignItems: 'stretch',
+        gap: '0.85rem',
       }}
     >
       <div>
@@ -76,7 +74,7 @@ export function SlotPicker({
           ))}
         </select>
       </div>
-      {action}
+      {action && <div className="slot-actions">{action}</div>}
     </div>
   );
 }
