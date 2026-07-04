@@ -17,7 +17,7 @@ Every catalog product SHALL belong to exactly one production category, either `s
 - **AND** a product baked on the sweet line has category `sweet`
 
 ### Requirement: Production totals aggregate item quantities for a bloque
-The system SHALL compute, for a given production bloque, the total quantity to produce of each product by summing the quantities of that product across every order in that bloque. There is no status filter; to exclude a mistaken order from the totals the manager deletes it. The result SHALL contain one entry per product that has a positive total, each carrying the product's identifier, its name, and the summed quantity.
+The system SHALL compute, for a given production bloque, the quantity to produce of each product by summing the quantities of that product across every order in that bloque, then subtracting the bloque's existencia (see *Existencia is subtracted from production totals*). There is no status filter; to exclude a mistaken order from the totals the manager deletes it. The result SHALL contain one entry per product with a positive net, each carrying the product's identifier, its name, and the net quantity to produce.
 
 #### Scenario: Quantities for the same product are summed across orders
 - **WHEN** two orders in the bloque each contain product P, with quantities 3 and 2
@@ -38,6 +38,17 @@ The system SHALL compute, for a given production bloque, the total quantity to p
 #### Scenario: A deleted order drops out of the totals
 - **WHEN** the manager deletes an order that contained product P
 - **THEN** that order's quantity of P no longer contributes to P's total
+
+### Requirement: Existencia is subtracted from production totals
+For each product, the system SHALL subtract the bloque's recorded existencia (stock already on hand) from that product's summed order quantity, flooring the net at zero. A product whose net quantity is zero — whether fully covered by existencia or with no demand — SHALL be omitted from the totals. Each remaining entry's quantity SHALL be the net to produce.
+
+#### Scenario: Existencia reduces the quantity to produce
+- **WHEN** product P is ordered for a total of 8 in the bloque and the bloque records existencia of 3 for P
+- **THEN** the production totals entry for P has quantity 5
+
+#### Scenario: Existencia covering all demand omits the product
+- **WHEN** product P is ordered for a total of 8 in the bloque and the bloque records existencia of 8 or more for P
+- **THEN** the production totals contain no entry for product P
 
 ### Requirement: Production totals are scoped by bloque
 The system SHALL compute production totals over the orders belonging to a single production bloque. When no bloque is specified, the system SHALL use the currently open bloque. When a bloque is specified by its identifier, the system SHALL use that bloque; if the identifier does not match a bloque, the system MUST reject the request. The response SHALL carry the resolved bloque alongside the totals.

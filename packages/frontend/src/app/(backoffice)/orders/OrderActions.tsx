@@ -100,6 +100,7 @@ export function OrderActions({
         open={editing}
         onClose={() => setEditing(false)}
         title="Editar artículos"
+        bodyClassName="modal-body--scroll"
         footer={
           <>
             <button

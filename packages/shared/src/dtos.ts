@@ -116,3 +116,30 @@ export interface ProductionTotalsResponse {
   slot: Slot;
   items: ProductionTotalItem[];
 }
+
+/**
+ * A single product's manually-entered existencia (stock on hand) for a bloque,
+ * subtracted from that product's production total.
+ */
+export interface ExistenceItem {
+  productId: string;
+  quantity: number;
+}
+
+/**
+ * `GET /slots/:id/existence` response: the recorded existencia for the bloque,
+ * one entry per product with a positive quantity. Products without a row have
+ * zero existence.
+ */
+export interface SlotExistenceResponse {
+  slot: Slot;
+  items: ExistenceItem[];
+}
+
+/**
+ * `PUT /slots/:id/existence` request: the complete desired existencia for the
+ * bloque (replace-all). Zero-quantity entries clear a product's existence.
+ */
+export interface SetExistenceRequest {
+  items: ExistenceItem[];
+}

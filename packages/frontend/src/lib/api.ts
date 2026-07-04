@@ -6,11 +6,13 @@ import type {
   CreateOrderRequest,
   CreateOrderResponse,
   DeleteOrderResponse,
+  ExistenceItem,
   Product,
   ProductCategory,
   ProductionTotalsResponse,
   ReplaceOrderItemsResponse,
   Slot,
+  SlotExistenceResponse,
   SlotListResponse,
   SlotOrdersResponse,
   TokenValidationResponse,
@@ -134,6 +136,24 @@ export function getOpenSlot(): Promise<Slot> {
 
 export function closeCurrentSlot(): Promise<CloseSlotResponse> {
   return request<CloseSlotResponse>(`/slots/close`, { method: 'POST' });
+}
+
+export function getSlotExistence(
+  slotId: string,
+): Promise<SlotExistenceResponse> {
+  return request<SlotExistenceResponse>(
+    `/slots/${encodeURIComponent(slotId)}/existence`,
+  );
+}
+
+export function setSlotExistence(
+  slotId: string,
+  items: ExistenceItem[],
+): Promise<SlotExistenceResponse> {
+  return request<SlotExistenceResponse>(
+    `/slots/${encodeURIComponent(slotId)}/existence`,
+    { method: 'PUT', body: JSON.stringify({ items }) },
+  );
 }
 
 export function getProducts(): Promise<Product[]> {

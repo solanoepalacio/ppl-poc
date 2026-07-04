@@ -25,6 +25,7 @@ model Product {
   category String  @default("salty")
 
   orderItems OrderItem[]
+  existence  SlotExistence[]
 }
 
 /// A client an order can be attached to. The directory is a fixed preset list
@@ -55,7 +56,8 @@ model Slot {
   openedAt DateTime  @default(now())
   closedAt DateTime?
 
-  orders Order[]
+  orders    Order[]
+  existence SlotExistence[]
 
   @@index([status])
 }
@@ -98,4 +100,21 @@ model OrderItem {
   product Product @relation(fields: [productId], references: [id])
 
   @@index([orderId])
+}
+
+/// Manually-entered stock already on hand when a bloque started, per product.
+/// Subtracted from that bloque's production totals. A bloque with no row for a
+/// product has zero existence for it. Rows exist only for the bloque they belong
+/// to; a freshly opened bloque has none, so it starts at zero everywhere.
+model SlotExistence {
+  id        String @id @default(cuid())
+  slotId    String
+  productId String
+  quantity  Int
+
+  slot    Slot    @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([slotId, productId])
+  @@index([slotId])
 }

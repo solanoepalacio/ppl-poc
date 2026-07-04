@@ -275,9 +275,10 @@ export class OrdersService {
   /**
    * Per-item production totals for a bloque, defaulting to the currently open
    * bloque: the summed quantity of each product across every order in the
-   * bloque. Returns one entry per product with a positive total, sorted by
-   * product name; products with no demand are omitted. A mistaken order is
-   * excluded by deleting it.
+   * bloque, minus the bloque's manually-entered existencia (stock on hand).
+   * Returns one entry per product with a positive net, sorted by product name;
+   * products with no demand — or fully covered by existencia — are omitted. A
+   * mistaken order is excluded by deleting it.
    *
    * When a `category` is given, only products on that production line contribute,
    * so the salados and dulces views each show just their line's totals.
@@ -311,8 +312,17 @@ export class OrdersService {
       }
     }
 
+    // Subtract the bloque's manually-entered existencia (stock on hand). A
+    // product fully covered by existence nets to zero and drops off the list,
+    // just like a product with no demand.
+    const existence = await this.slotsService.getExistenceMap(slot.id);
     const items = [...totals.entries()]
-      .map(([productId, { name, quantity }]) => ({ productId, name, quantity }))
+      .map(([productId, { name, quantity }]) => ({
+        productId,
+        name,
+        quantity: Math.max(0, quantity - (existence.get(productId) ?? 0)),
+      }))
+      .filter((item) => item.quantity > 0)
       .sort((a, b) => a.name.localeCompare(b.name));
 
     return { slot: toSlotDto(slot), items };

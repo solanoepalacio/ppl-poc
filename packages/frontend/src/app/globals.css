@@ -369,6 +369,15 @@ select {
   padding: 1rem 1.25rem 1.25rem;
   border-radius: 0 0 var(--radius) var(--radius);
 }
+/* Bodies whose content is a single long list (edit items, edit existence) make
+   the whole body the scroller, so the list stays reachable inside the card's
+   max-height instead of overflowing off-screen. min-height:0 lets the flex body
+   shrink below its content height so overflow-y actually kicks in. */
+.modal-body--scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
 /*
  * Content-step layout: three regions inside the body — client selector fixed at
  * top, the items list as the only scroller in the middle, message fixed at the

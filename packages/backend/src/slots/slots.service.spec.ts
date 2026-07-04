@@ -12,8 +12,20 @@ type SlotMock = {
   update: jest.Mock;
 };
 
+type SlotExistenceMock = {
+  findMany: jest.Mock;
+  deleteMany: jest.Mock;
+  createMany: jest.Mock;
+};
+
+type ProductMock = {
+  findMany: jest.Mock;
+};
+
 type PrismaMock = {
   slot: SlotMock;
+  slotExistence: SlotExistenceMock;
+  product: ProductMock;
   $transaction: jest.Mock;
 };
 
@@ -26,10 +38,20 @@ function makePrisma(): PrismaMock {
     create: jest.fn(),
     update: jest.fn(),
   };
+  const slotExistence: SlotExistenceMock = {
+    findMany: jest.fn(),
+    deleteMany: jest.fn(),
+    createMany: jest.fn(),
+  };
+  const product: ProductMock = { findMany: jest.fn() };
   return {
     slot,
+    slotExistence,
+    product,
     // Runs the callback with the same mocks as the transactional client.
-    $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb({ slot })),
+    $transaction: jest.fn((cb: (tx: unknown) => unknown) =>
+      cb({ slot, slotExistence, product }),
+    ),
   };
 }
 
@@ -170,6 +192,107 @@ describe('SlotsService', () => {
       const res = await service.resolveSlot();
 
       expect(res).toBe(openSlot);
+    });
+  });
+
+  describe('getExistence', () => {
+    it('returns recorded existence rows for the resolved bloque', async () => {
+      prisma.slot.findUnique.mockResolvedValue(openSlot);
+      prisma.slotExistence.findMany.mockResolvedValue([
+        { productId: 'p1', quantity: 3 },
+        { productId: 'p2', quantity: 5 },
+      ]);
+
+      const res = await service.getExistence('slot_open');
+
+      expect(prisma.slotExistence.findMany).toHaveBeenCalledWith({
+        where: { slotId: 'slot_open' },
+        select: { productId: true, quantity: true },
+      });
+      expect(res.slot.id).toBe('slot_open');
+      expect(res.items).toEqual([
+        { productId: 'p1', quantity: 3 },
+        { productId: 'p2', quantity: 5 },
+      ]);
+    });
+  });
+
+  describe('setExistence', () => {
+    it('replaces existence, dropping zero-quantity entries', async () => {
+      prisma.slot.findUnique.mockResolvedValue(openSlot);
+      prisma.product.findMany.mockResolvedValue([{ id: 'p1' }, { id: 'p2' }]);
+
+      const res = await service.setExistence('slot_open', [
+        { productId: 'p1', quantity: 4 },
+        { productId: 'p2', quantity: 0 },
+      ]);
+
+      expect(prisma.slotExistence.deleteMany).toHaveBeenCalledWith({
+        where: { slotId: 'slot_open' },
+      });
+      expect(prisma.slotExistence.createMany).toHaveBeenCalledWith({
+        data: [{ slotId: 'slot_open', productId: 'p1', quantity: 4 }],
+      });
+      expect(res.items).toEqual([{ productId: 'p1', quantity: 4 }]);
+    });
+
+    it('clears all existence when every quantity is zero (no createMany)', async () => {
+      prisma.slot.findUnique.mockResolvedValue(openSlot);
+      prisma.product.findMany.mockResolvedValue([{ id: 'p1' }]);
+
+      const res = await service.setExistence('slot_open', [
+        { productId: 'p1', quantity: 0 },
+      ]);
+
+      expect(prisma.slotExistence.deleteMany).toHaveBeenCalledWith({
+        where: { slotId: 'slot_open' },
+      });
+      expect(prisma.slotExistence.createMany).not.toHaveBeenCalled();
+      expect(res.items).toEqual([]);
+    });
+
+    it('rejects setting existence on a closed bloque', async () => {
+      prisma.slot.findUnique.mockResolvedValue({
+        ...openSlot,
+        status: 'closed',
+      });
+
+      await expect(
+        service.setExistence('slot_open', [{ productId: 'p1', quantity: 1 }]),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.slotExistence.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('rejects a product not in the catalog', async () => {
+      prisma.slot.findUnique.mockResolvedValue(openSlot);
+      prisma.product.findMany.mockResolvedValue([]);
+
+      await expect(
+        service.setExistence('slot_open', [{ productId: 'ghost', quantity: 1 }]),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.slotExistence.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('rejects a negative quantity', async () => {
+      prisma.slot.findUnique.mockResolvedValue(openSlot);
+      prisma.product.findMany.mockResolvedValue([{ id: 'p1' }]);
+
+      await expect(
+        service.setExistence('slot_open', [{ productId: 'p1', quantity: -2 }]),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('getExistenceMap', () => {
+    it('maps productId to quantity for the bloque', async () => {
+      prisma.slotExistence.findMany.mockResolvedValue([
+        { productId: 'p1', quantity: 3 },
+      ]);
+
+      const map = await service.getExistenceMap('slot_open');
+
+      expect(map.get('p1')).toBe(3);
+      expect(map.has('p2')).toBe(false);
     });
   });
 

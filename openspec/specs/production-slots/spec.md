@@ -61,6 +61,23 @@ From the back office, the manager SHALL be able to close the currently open bloq
 - **THEN** the system rejects the request
 - **AND** leaves the existing bloques unchanged
 
+### Requirement: A bloque carries manually-entered existencia
+The system SHALL let the manager record, per product, the *existencia* (stock already on hand) for a production bloque. A product with no recorded existencia for a bloque SHALL be treated as zero existencia. A freshly opened bloque SHALL start with all existencia at zero. Existencia SHALL be editable only while the bloque is open; the system MUST reject setting existencia on a closed bloque, leaving its existencia unchanged.
+
+#### Scenario: A freshly opened bloque starts at zero existencia
+- **WHEN** a new bloque is opened
+- **THEN** every product's existencia for that bloque is zero
+
+#### Scenario: The manager records existencia on the open bloque
+- **WHEN** the manager records existencia quantities for products on the open bloque
+- **THEN** the system stores those quantities as that bloque's existencia
+- **AND** a product left at zero is stored as no existencia
+
+#### Scenario: Setting existencia on a closed bloque is rejected
+- **WHEN** existencia is set for a bloque that is already closed
+- **THEN** the system rejects the request
+- **AND** leaves that bloque's existencia unchanged
+
 ### Requirement: Bloques can be listed for management
 The system SHALL expose all bloques, newest first, each with its status, sequence number, timestamps, and the count of orders it contains, for a dedicated back-office bloques view.
 
@@ -76,4 +93,15 @@ The back office SHALL present a dedicated bloques view, reachable from the persi
 - **WHEN** the manager activates the "close current bloque" control on the bloques view
 - **THEN** the system closes the open bloque and opens a fresh one
 - **AND** the bloques view reflects the newly closed bloque and the new open bloque
+
+### Requirement: Back office surfaces existencia editing on the open bloque
+On the bloques view, the back office SHALL offer, for the open bloque only, a control to record per-product existencia. Closed bloques SHALL NOT offer this control.
+
+#### Scenario: Manager edits existencia for the open bloque
+- **WHEN** the manager opens the existencia editor on the open bloque and saves per-product quantities
+- **THEN** the system stores them as that bloque's existencia
+
+#### Scenario: A closed bloque offers no existencia control
+- **WHEN** the manager views a closed bloque on the bloques view
+- **THEN** no existencia-editing control is offered for it
 

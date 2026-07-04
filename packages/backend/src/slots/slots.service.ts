@@ -6,7 +6,9 @@ import {
 } from '@nestjs/common';
 import type {
   CloseSlotResponse,
+  ExistenceItem,
   Slot as SlotDto,
+  SlotExistenceResponse,
   SlotListItem,
   SlotListResponse,
 } from '@pannico/shared';
@@ -138,6 +140,105 @@ export class SlotsService implements OnModuleInit {
       return { closed, open };
     });
     return { closed: toDto(closed), open: toDto(open) };
+  }
+
+  /**
+   * The manually-entered existencia (stock on hand) for a bloque, defaulting to
+   * the open one. Returns one entry per product with a recorded quantity; a
+   * product with no row has zero existence.
+   */
+  async getExistence(slotId?: string): Promise<SlotExistenceResponse> {
+    const slot = await this.resolveSlot(slotId);
+    const rows = await this.prisma.slotExistence.findMany({
+      where: { slotId: slot.id },
+      select: { productId: true, quantity: true },
+    });
+    return {
+      slot: toDto(slot),
+      items: rows.map((r) => ({ productId: r.productId, quantity: r.quantity })),
+    };
+  }
+
+  /**
+   * The bloque's existencia as a productId → quantity map, for subtracting from
+   * production totals. Consumed by the production-totals aggregation.
+   */
+  async getExistenceMap(slotId: string): Promise<Map<string, number>> {
+    const rows = await this.prisma.slotExistence.findMany({
+      where: { slotId },
+      select: { productId: true, quantity: true },
+    });
+    return new Map(rows.map((r) => [r.productId, r.quantity]));
+  }
+
+  /**
+   * Replaces a bloque's existencia with `items` (replace-all). Only the open
+   * bloque is editable — closed bloques are history. Validates non-negative
+   * integer quantities against the active catalog; zero-quantity entries clear a
+   * product's existence rather than storing a zero row.
+   */
+  async setExistence(
+    slotId: string,
+    items: ExistenceItem[],
+  ): Promise<SlotExistenceResponse> {
+    const slot = await this.resolveSlot(slotId);
+    if (slot.status !== 'open') {
+      throw new BadRequestException(
+        `Slot ${slot.id} is closed; existence can only be set on the open bloque.`,
+      );
+    }
+
+    const productIds = [...new Set(items.map((i) => i.productId))];
+    if (productIds.length > 0) {
+      const products = await this.prisma.product.findMany({
+        where: { id: { in: productIds }, active: true },
+        select: { id: true },
+      });
+      const validIds = new Set(products.map((p) => p.id));
+      for (const item of items) {
+        if (!validIds.has(item.productId)) {
+          throw new BadRequestException(
+            `Product ${item.productId} is not in the catalog.`,
+          );
+        }
+        if (!Number.isInteger(item.quantity) || item.quantity < 0) {
+          throw new BadRequestException(
+            'Existence quantities must be non-negative integers.',
+          );
+        }
+      }
+    }
+
+    // Drop zeros and collapse duplicate productIds (last wins) before persisting.
+    const positives = new Map<string, number>();
+    for (const item of items) {
+      if (item.quantity > 0) {
+        positives.set(item.productId, item.quantity);
+      } else {
+        positives.delete(item.productId);
+      }
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.slotExistence.deleteMany({ where: { slotId: slot.id } });
+      if (positives.size > 0) {
+        await tx.slotExistence.createMany({
+          data: [...positives.entries()].map(([productId, quantity]) => ({
+            slotId: slot.id,
+            productId,
+            quantity,
+          })),
+        });
+      }
+    });
+
+    return {
+      slot: toDto(slot),
+      items: [...positives.entries()].map(([productId, quantity]) => ({
+        productId,
+        quantity,
+      })),
+    };
   }
 }
 

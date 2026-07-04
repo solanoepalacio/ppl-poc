@@ -60,7 +60,11 @@ const pendingOrder = {
 
 describe('OrdersService', () => {
   let prisma: PrismaMock;
-  let slots: { getOpenSlotId: jest.Mock; resolveSlot: jest.Mock };
+  let slots: {
+    getOpenSlotId: jest.Mock;
+    resolveSlot: jest.Mock;
+    getExistenceMap: jest.Mock;
+  };
   let clients: { assertActive: jest.Mock };
   let service: OrdersService;
 
@@ -69,6 +73,7 @@ describe('OrdersService', () => {
     slots = {
       getOpenSlotId: jest.fn().mockResolvedValue('slot_open'),
       resolveSlot: jest.fn().mockResolvedValue(openSlot),
+      getExistenceMap: jest.fn().mockResolvedValue(new Map<string, number>()),
     };
     clients = { assertActive: jest.fn().mockResolvedValue(undefined) };
     const tokenService = new TokenService(prisma as unknown as PrismaService);
@@ -427,6 +432,41 @@ describe('OrdersService', () => {
       expect(res.slot.id).toBe('slot_open');
       expect(res.items).toEqual([
         { productId: 'p1', name: 'Croissant', quantity: 5 },
+      ]);
+    });
+
+    it('subtracts existencia from the demand total', async () => {
+      prisma.order.findMany.mockResolvedValue([
+        orderWith([{ productId: 'p1', name: 'Croissant', quantity: 8 }]),
+      ]);
+      slots.getExistenceMap.mockResolvedValue(new Map([['p1', 3]]));
+
+      const res = await service.getProductionTotals('slot_open');
+
+      expect(slots.getExistenceMap).toHaveBeenCalledWith('slot_open');
+      expect(res.items).toEqual([
+        { productId: 'p1', name: 'Croissant', quantity: 5 },
+      ]);
+    });
+
+    it('drops a product fully covered by existencia (clamped at zero)', async () => {
+      prisma.order.findMany.mockResolvedValue([
+        orderWith([
+          { productId: 'p1', name: 'Croissant', quantity: 8 },
+          { productId: 'p2', name: 'Baguette', quantity: 4 },
+        ]),
+      ]);
+      slots.getExistenceMap.mockResolvedValue(
+        new Map([
+          ['p1', 10],
+          ['p2', 1],
+        ]),
+      );
+
+      const res = await service.getProductionTotals('slot_open');
+
+      expect(res.items).toEqual([
+        { productId: 'p2', name: 'Baguette', quantity: 3 },
       ]);
     });
 
