@@ -28,7 +28,11 @@ The back office SHALL present orders grouped by the production bloque they belon
 - **AND** no separate view or submit action is required to render them
 
 ### Requirement: Manager can create an order manually
-From the back office, the manager SHALL be able to create an order by selecting a client, an optional list of catalog items with quantities, and an optional free-text `message` capturing the originating customer message (e.g. the pasted WhatsApp text), without generating or sending a customer link. The system MUST persist the created order in the currently open bloque so it appears in that bloque's back-office view, MUST record the supplied items, MUST persist the supplied `message` when present and store no message when it is absent or blank, MUST reject any item that is not in the active catalog, and MUST reject a missing or inactive client, persisting nothing on rejection.
+From the back office, the manager SHALL be able to create an order by selecting a client, an optional list of catalog items with quantities, and an optional free-text `message` capturing the originating customer message (e.g. the pasted WhatsApp text), without generating or sending a customer link. The system MUST persist the created order in the currently open bloque so it appears in that bloque's back-office view, MUST record the supplied items, MUST persist the supplied `message` when present and store no message when it is absent or blank, MUST reject any item that is not in the active catalog, and MUST reject a missing or inactive client, persisting nothing on rejection. Because a manual order always lands in the open bloque, the order-creation control (**Agregar pedido**) on the orders view SHALL always be present but SHALL be disabled (visibly grayed and unclickable) unless the open bloque is selected.
+
+#### Scenario: Order creation is disabled off the open bloque
+- **WHEN** the manager selects a closed bloque in the orders view
+- **THEN** the **Agregar pedido** control is shown disabled and cannot be activated
 
 #### Scenario: Manager creates an order with items
 - **WHEN** the manager selects a client and one or more active-catalog items with quantities

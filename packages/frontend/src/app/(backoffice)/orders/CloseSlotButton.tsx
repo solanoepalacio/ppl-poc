@@ -7,9 +7,10 @@ import { closeCurrentSlot } from '@/lib/api';
 /**
  * Closes the current open bloque (with a confirm), which atomically opens a
  * fresh one on the backend. Refreshes the server-rendered list to reconcile,
- * following the client-island-mutates-then-refresh pattern.
+ * following the client-island-mutates-then-refresh pattern. Grayed out and
+ * unclickable via `disabled` when the selected bloque is not the open one.
  */
-export function CloseSlotButton() {
+export function CloseSlotButton({ disabled }: { disabled?: boolean }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState(false);
@@ -33,7 +34,11 @@ export function CloseSlotButton() {
 
   return (
     <span>
-      <button type="button" onClick={() => void onClose()} disabled={pending}>
+      <button
+        type="button"
+        onClick={() => void onClose()}
+        disabled={pending || disabled}
+      >
         Cerrar producción
       </button>
       {error && <span className="muted"> · falló</span>}

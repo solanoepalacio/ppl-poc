@@ -11,16 +11,20 @@ import { Modal } from './Modal';
  * Open-bloque control to record existencia (stock already on hand), which the
  * production views subtract from their totals. Edits the whole per-product map
  * in a modal (replace-all, prefilled from current existence) and refreshes the
- * server-rendered list on success. Only rendered for the open bloque.
+ * server-rendered list on success. Existencia is only editable on the open
+ * bloque, so the trigger is grayed out and unclickable when `disabled`.
  */
 export function ExistenceEditor({
   slotId,
   products,
   current,
+  disabled,
 }: {
   slotId: string;
   products: Product[];
   current: ExistenceItem[];
+  /** Grayed-out and unclickable when the selected bloque is not the open one. */
+  disabled?: boolean;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -61,7 +65,7 @@ export function ExistenceEditor({
       <button
         className="btn-secondary"
         onClick={startEditing}
-        disabled={pending}
+        disabled={pending || disabled}
       >
         Editar stock
       </button>

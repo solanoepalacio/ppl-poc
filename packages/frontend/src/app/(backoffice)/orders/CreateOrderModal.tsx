@@ -23,9 +23,12 @@ import { ItemQuantityFields, itemsFromQuantities } from './ItemQuantityFields';
 export function CreateOrderModal({
   products,
   clients,
+  disabled,
 }: {
   products: Product[];
   clients: Client[];
+  /** Grayed-out and unclickable when the selected bloque is not the open one. */
+  disabled?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -141,7 +144,12 @@ export function CreateOrderModal({
 
   return (
     <>
-      <button type="button" className="btn-primary" onClick={openModal}>
+      <button
+        type="button"
+        className="btn-primary"
+        onClick={openModal}
+        disabled={disabled}
+      >
         Agregar pedido
       </button>
 

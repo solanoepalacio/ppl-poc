@@ -87,25 +87,25 @@ The system SHALL expose all bloques, newest first, each with its status, sequenc
 - **AND** each entry shows its sequence number and status
 
 ### Requirement: Back office surfaces bloque closing on the orders view
-The orders view SHALL offer, for the currently open bloque only, a control (**Cerrar producción**) to close it — which atomically opens a fresh one. This control SHALL NOT appear when a closed bloque is selected.
+The orders view SHALL present a control (**Cerrar producción**) to close the currently open bloque — which atomically opens a fresh one. The control SHALL always be present but SHALL be disabled (visibly grayed and unclickable) unless the open bloque is selected.
 
 #### Scenario: Manager closes the current bloque from the orders view
 - **WHEN** the manager activates the **Cerrar producción** control on the orders view while the open bloque is selected
 - **THEN** the system closes the open bloque and opens a fresh one
 - **AND** the orders view reflects the newly closed bloque and the new open bloque
 
-#### Scenario: The close control is hidden for a closed bloque
+#### Scenario: The close control is disabled for a closed bloque
 - **WHEN** the manager selects a closed bloque in the orders view
-- **THEN** no bloque-closing control is offered
+- **THEN** the **Cerrar producción** control is shown disabled and cannot be activated
 
 ### Requirement: Back office surfaces existencia editing on the open bloque
-On the orders view, the back office SHALL offer, for the open bloque only, a control (**Editar stock**) to record per-product existencia. This control SHALL NOT appear when a closed bloque is selected.
+The orders view SHALL present a control (**Editar stock**) to record per-product existencia for the open bloque. The control SHALL always be present but SHALL be disabled (visibly grayed and unclickable) unless the open bloque is selected.
 
 #### Scenario: Manager edits existencia for the open bloque
 - **WHEN** the manager opens the stock editor on the orders view while the open bloque is selected and saves per-product quantities
 - **THEN** the system stores them as that bloque's existencia
 
-#### Scenario: A closed bloque offers no stock control
+#### Scenario: The stock control is disabled for a closed bloque
 - **WHEN** the manager selects a closed bloque in the orders view
-- **THEN** no stock-editing control is offered for it
+- **THEN** the **Editar stock** control is shown disabled and cannot be activated
 

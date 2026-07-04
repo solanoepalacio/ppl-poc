@@ -31,8 +31,9 @@ export default async function OrdersPage({
     getClients(),
   ]);
   const productName = new Map(products.map((p) => [p.id, p.name]));
-  // Stock and closing only apply to the open bloque; existence is fetched only
-  // when we'll actually render its editor.
+  // All three bloque actions only apply to the open bloque. On any other bloque
+  // they show grayed out and unclickable rather than disappearing. Existence is
+  // only fetched (and editable) for the open bloque.
   const isOpen = view.slot.status === 'open';
   const existence = isOpen ? await getSlotExistence(view.slot.id) : null;
 
@@ -44,15 +45,18 @@ export default async function OrdersPage({
         currentSlotId={view.slot.id}
         action={
           <>
-            <CreateOrderModal products={products} clients={clients} />
-            {isOpen && existence && (
-              <ExistenceEditor
-                slotId={view.slot.id}
-                products={products}
-                current={existence.items}
-              />
-            )}
-            {isOpen && <CloseSlotButton />}
+            <CreateOrderModal
+              products={products}
+              clients={clients}
+              disabled={!isOpen}
+            />
+            <ExistenceEditor
+              slotId={view.slot.id}
+              products={products}
+              current={existence?.items ?? []}
+              disabled={!isOpen}
+            />
+            <CloseSlotButton disabled={!isOpen} />
           </>
         }
       />
