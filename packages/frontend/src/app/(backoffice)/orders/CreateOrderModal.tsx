@@ -14,11 +14,12 @@ import { ClientCombobox } from './ClientCombobox';
 import { ItemQuantityFields, itemsFromQuantities } from './ItemQuantityFields';
 
 /**
- * Client-first order creation, launched as a modal from the orders view. The
- * manager selects a client (filtering by name), then chooses a path: "Generar
- * link" issues a shareable tokenized link, while "Cargar contenido" reveals the
- * catalog so the order can be recorded directly. Both paths reuse the single
- * client selection; the items list stays hidden until content is loaded.
+ * Client-first order creation, launched as a modal from the bloque toolbar. The
+ * manager selects a client (filtering by name), then either records the order's
+ * contents directly ("Agregar pedido") or issues a shareable tokenized link
+ * ("Generar link") for the customer to fill in. Both paths reuse the single
+ * client selection; the catalog + message are shown up-front so the direct path
+ * needs no extra step.
  */
 export function CreateOrderModal({
   products,
@@ -32,7 +33,7 @@ export function CreateOrderModal({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<'choose' | 'link' | 'content'>('choose');
+  const [step, setStep] = useState<'form' | 'link'>('form');
 
   const [clientId, setClientId] = useState<string | null>(null);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
@@ -47,7 +48,7 @@ export function CreateOrderModal({
   const valid = clientId !== null;
 
   function reset() {
-    setStep('choose');
+    setStep('form');
     setClientId(null);
     setQuantities({});
     setMessage('');
@@ -116,80 +117,76 @@ export function CreateOrderModal({
   const footer =
     step === 'link' ? (
       <>
-        <button className="btn-secondary" onClick={() => void copy()}>
+        <button className="btn-modal-secondary" onClick={() => void copy()}>
           {copied ? '¡Copiado!' : 'Copiar enlace'}
         </button>
-        <button className="btn-secondary" onClick={close}>
+        <button className="btn-modal-primary" onClick={close}>
           Listo
         </button>
       </>
-    ) : step === 'content' ? (
+    ) : (
       <>
-        <button
-          className="btn-secondary"
-          onClick={() => void submitContent()}
-          disabled={pending}
-        >
-          {pending ? 'Creando…' : 'Crear orden'}
+        <button className="btn-modal-secondary" onClick={close}>
+          Cancelar
         </button>
         <button
-          className="btn-secondary"
-          onClick={() => setStep('choose')}
-          disabled={pending}
+          className="btn-modal-secondary"
+          onClick={() => void generateLink()}
+          disabled={!valid || busy}
         >
-          Volver
+          {busy ? 'Generando…' : 'Generar link'}
+        </button>
+        <button
+          className="btn-modal-primary"
+          onClick={() => void submitContent()}
+          disabled={!valid || pending}
+        >
+          {pending ? 'Creando…' : 'Agregar pedido'}
         </button>
       </>
-    ) : undefined;
+    );
 
   return (
     <>
       <button
         type="button"
-        className="btn-secondary"
+        className="btn-toolbar-primary"
         onClick={openModal}
         disabled={disabled}
       >
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+        >
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
         Agregar pedido
       </button>
 
       <Modal
         open={open}
         onClose={close}
-        title="Crear orden"
+        title="Agregar pedido"
         footer={footer}
-        bodyClassName={step === 'content' ? 'modal-body--content' : undefined}
+        aboveBody={
+          step === 'form' ? (
+            <ClientCombobox
+              key={open ? 'open' : 'closed'}
+              id="create-order-client"
+              clients={clients}
+              onSelect={setClientId}
+              disabled={busy || pending}
+              autoFocus
+            />
+          ) : undefined
+        }
       >
-        <ClientCombobox
-          key={open ? 'open' : 'closed'}
-          id="create-order-client"
-          clients={clients}
-          onSelect={setClientId}
-          disabled={busy || pending || step === 'link'}
-          autoFocus
-        />
-
-        {step === 'choose' && (
-          <div className="row row--no-divider">
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => void generateLink()}
-              disabled={!valid || busy}
-            >
-              {busy ? 'Generando…' : 'Generar link'}
-            </button>
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => setStep('content')}
-              disabled={!valid}
-            >
-              Cargar contenido
-            </button>
-          </div>
-        )}
-
         {step === 'link' && result && (
           <div className="card">
             <p className="muted">
@@ -205,36 +202,29 @@ export function CreateOrderModal({
           </div>
         )}
 
-        {/*
-          Content step: the client selector (above) stays fixed, the items list
-          is the only scrollable region, and the message field below stays
-          fixed. The modal-body--content class turns the body into a flex column
-          so the items region can flex-grow and scroll on its own.
-        */}
-        {step === 'content' && (
-          <div className="order-content__items">
+        {step === 'form' && (
+          <>
             <ItemQuantityFields
               products={products}
               quantities={quantities}
               onChange={setQuantity}
               disabled={pending}
+              unitLabel="cant."
             />
-          </div>
-        )}
-
-        {step === 'content' && (
-          <div className="field order-content__message">
-            <label htmlFor="create-order-message">Mensaje (opcional)</label>
-            <textarea
-              id="create-order-message"
-              rows={6}
-              placeholder="Pegá el mensaje de WhatsApp que generó esta orden…"
-              value={message}
-              disabled={pending}
-              onChange={(e) => setMessage(e.target.value)}
-              style={{ width: '100%', resize: 'vertical' }}
-            />
-          </div>
+            <div className="modal-message">
+              <label htmlFor="create-order-message">
+                Mensaje del pedido (opcional)
+              </label>
+              <textarea
+                id="create-order-message"
+                rows={3}
+                placeholder="Ej. sin azúcar, retira a las 9hs…"
+                value={message}
+                disabled={pending}
+                onChange={(e) => setMessage(e.target.value)}
+              />
+            </div>
+          </>
         )}
 
         {error && <p className="error">{error}</p>}

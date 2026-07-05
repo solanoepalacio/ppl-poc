@@ -63,33 +63,31 @@ export function ExistenceEditor({
   return (
     <>
       <button
-        className="btn-secondary"
+        className="btn-toolbar-ghost"
         onClick={startEditing}
         disabled={pending || disabled}
       >
-        Editar stock
+        Ver stock
       </button>
-      {error && !editing && <span className="error"> · {error}</span>}
       <Modal
         open={editing}
         onClose={() => setEditing(false)}
-        title="Existencias del bloque"
-        bodyClassName="modal-body--scroll"
+        title="Editar stock"
         footer={
           <>
             <button
-              className="btn-secondary"
-              onClick={() => void save()}
-              disabled={pending}
-            >
-              Guardar existencias
-            </button>
-            <button
-              className="btn-secondary"
+              className="btn-modal-secondary"
               onClick={() => setEditing(false)}
               disabled={pending}
             >
               Cancelar
+            </button>
+            <button
+              className="btn-modal-primary"
+              onClick={() => void save()}
+              disabled={pending}
+            >
+              Guardar existencia
             </button>
           </>
         }
@@ -102,6 +100,7 @@ export function ExistenceEditor({
           quantities={quantities}
           onChange={setQuantity}
           disabled={pending}
+          unitLabel="en stock"
         />
         {error && <p className="error">{error}</p>}
       </Modal>

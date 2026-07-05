@@ -79,43 +79,67 @@ export function OrderActions({
 
   return (
     <>
-      <div className="row row--no-divider">
-        <button
-          className="btn-secondary"
-          onClick={startEditing}
-          disabled={pending}
+      <button
+        className="btn-row-edit"
+        onClick={startEditing}
+        disabled={pending}
+      >
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
         >
-          Editar artículos
-        </button>
-        <button
-          className="btn-secondary"
-          onClick={() => void remove()}
-          disabled={pending}
+          <path d="M12 20h9" />
+          <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+        </svg>
+        Editar artículos
+      </button>
+      <button
+        className="btn-row-delete"
+        onClick={() => void remove()}
+        disabled={pending}
+      >
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
         >
-          Eliminar
-        </button>
-        {error && !editing && <span className="error"> · {error}</span>}
-      </div>
+          <polyline points="3 6 5 6 21 6" />
+          <path d="M19 6l-1 14H6L5 6" />
+          <path d="M10 11v6M14 11v6" />
+        </svg>
+        Eliminar
+      </button>
+      {error && !editing && <span className="error"> · {error}</span>}
       <Modal
         open={editing}
         onClose={() => setEditing(false)}
         title="Editar artículos"
-        bodyClassName="modal-body--scroll"
         footer={
           <>
             <button
-              className="btn-secondary"
-              onClick={() => void save()}
-              disabled={pending}
-            >
-              Guardar artículos
-            </button>
-            <button
-              className="btn-secondary"
+              className="btn-modal-secondary"
               onClick={() => setEditing(false)}
               disabled={pending}
             >
               Cancelar
+            </button>
+            <button
+              className="btn-modal-primary"
+              onClick={() => void save()}
+              disabled={pending}
+            >
+              Guardar artículos
             </button>
           </>
         }
@@ -125,6 +149,7 @@ export function OrderActions({
           quantities={quantities}
           onChange={setQuantity}
           disabled={pending}
+          unitLabel="cant."
         />
         {error && <p className="error">{error}</p>}
       </Modal>

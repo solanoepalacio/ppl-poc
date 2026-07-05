@@ -1,12 +1,19 @@
 import type { ProductCategory } from '@pannico/shared';
 import { getProductionTotals } from '@/lib/api';
+import { slotLabel } from '../slotLabel';
+import { ViewHeader } from '../ViewHeader';
+
+/** Per-line copy for the header + toolbar. */
+const COPY: Record<ProductCategory, { title: string; subtitle: string }> = {
+  salty: { title: 'Producción salados', subtitle: 'Línea salada · cantidades a producir' },
+  sweet: { title: 'Producción dulces', subtitle: 'Línea dulce · cantidades a producir' },
+};
 
 /**
  * Back-office production view for a single production line: the per-item quantity
  * to produce for the currently open (latest) bloque, summed across its orders and
  * scoped to `category`. Always shows the open bloque — there is no bloque
- * selector — reflecting the current totals each time it loads. Rendered by the
- * two category pages.
+ * selector — reflecting the current totals each time it loads. Read-only.
  */
 export async function ProductionView({
   category,
@@ -14,24 +21,48 @@ export async function ProductionView({
   category: ProductCategory;
 }) {
   const production = await getProductionTotals(undefined, category);
+  const { title, subtitle } = COPY[category];
+  const total = production.items.reduce((sum, it) => sum + it.quantity, 0);
 
   return (
-    <section>
-      {production.items.length > 0 ? (
-        <div className="card">
-          <ul>
-            {production.items.map((item) => (
-              <li key={item.productId}>
-                {item.name} × {item.quantity}
-              </li>
-            ))}
-          </ul>
+    <>
+      <ViewHeader title={title} subtitle={subtitle} />
+      <div className="bo-content">
+        <div className="bo-toolbar">
+          <div className="bo-toolbar-left">
+            <span className="bo-toolbar-label">Bloque</span>
+            <span className="bo-chip">{slotLabel(production.slot)}</span>
+          </div>
+          <span className="bo-toolbar-note">
+            Totales de solo lectura · sumados sobre todos los pedidos del bloque
+          </span>
         </div>
-      ) : (
-        <p className="muted">
-          Nada que producir en el bloque #{production.slot.seq}.
-        </p>
-      )}
-    </section>
+
+        {production.items.length > 0 ? (
+          <div className="ptable" role="table">
+            <div className="ptable-head" role="row">
+              <div>Producto</div>
+              <div className="col-right">Cantidad a producir</div>
+            </div>
+            {production.items.map((item) => (
+              <div className="ptable-row" role="row" key={item.productId}>
+                <div className="ptable-name">{item.name}</div>
+                <div className="ptable-qty-cell">
+                  <span className="ptable-qty">{item.quantity}</span>
+                </div>
+              </div>
+            ))}
+            <div className="ptable-foot" role="row">
+              <div className="ptable-foot-label">Total unidades</div>
+              <div className="ptable-foot-total">{total}</div>
+            </div>
+          </div>
+        ) : (
+          <p className="muted">
+            Nada que producir en el bloque #{production.slot.seq}.
+          </p>
+        )}
+      </div>
+    </>
   );
 }

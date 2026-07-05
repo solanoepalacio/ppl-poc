@@ -5,8 +5,9 @@ import { useEffect, useRef, type ReactNode } from 'react';
 /**
  * Lightweight modal built on the native <dialog> element: ESC-to-close, focus
  * trapping, and top-layer rendering (centered over the viewport, never clipped
- * by the card it's declared in) come for free. The body scrolls while the
- * header and footer stay pinned, so long catalogs stay easy to navigate.
+ * by the card it's declared in) come for free. Every dialog shares one fixed
+ * frame (560×620) so the UI never jumps between dialogs; only the body scrolls,
+ * while the header, footer, and an optional `aboveBody` region stay pinned.
  */
 export function Modal({
   open,
@@ -14,15 +15,15 @@ export function Modal({
   title,
   children,
   footer,
-  bodyClassName,
+  aboveBody,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
   footer?: ReactNode;
-  /** Extra class on the scrolling body, e.g. to opt into a custom region layout. */
-  bodyClassName?: string;
+  /** A pinned region between the header and the scrolling body (e.g. a picker). */
+  aboveBody?: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
 
@@ -53,16 +54,26 @@ export function Modal({
           <strong>{title}</strong>
           <button
             type="button"
-            className="btn-secondary"
+            className="modal-close"
             aria-label="Cerrar"
             onClick={onClose}
           >
-            ✕
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+            >
+              <line x1="6" y1="6" x2="18" y2="18" />
+              <line x1="18" y1="6" x2="6" y2="18" />
+            </svg>
           </button>
         </div>
-        <div className={`modal-body${bodyClassName ? ` ${bodyClassName}` : ''}`}>
-          {children}
-        </div>
+        {aboveBody && <div className="modal-above">{aboveBody}</div>}
+        <div className="modal-body">{children}</div>
         {footer && <div className="modal-footer">{footer}</div>}
       </div>
     </dialog>

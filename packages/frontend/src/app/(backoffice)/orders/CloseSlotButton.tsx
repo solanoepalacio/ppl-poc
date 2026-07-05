@@ -33,16 +33,16 @@ export function CloseSlotButton({ disabled }: { disabled?: boolean }) {
   }
 
   return (
-    <span>
+    <>
       <button
         type="button"
-        className="btn-secondary"
+        className="btn-toolbar-ghost"
         onClick={() => void onClose()}
         disabled={pending || disabled}
       >
-        Cerrar producción
+        Cerrar bloque
       </button>
-      {error && <span className="muted"> · falló</span>}
-    </span>
+      {error && <span className="bo-toolbar-note"> · falló</span>}
+    </>
   );
 }

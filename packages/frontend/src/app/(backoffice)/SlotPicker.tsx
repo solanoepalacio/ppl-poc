@@ -3,40 +3,28 @@
 import { useTransition, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import type { SlotListItem } from '@pannico/shared';
-
-/** e.g. "Bloque #3 · 12/6/2026 – 15/6/2026" or "Bloque #4 · 15/6/2026 (abierto)". */
-export function slotLabel(slot: {
-  seq: number;
-  status: string;
-  openedAt: string;
-  closedAt: string | null;
-}): string {
-  const opened = new Date(slot.openedAt).toLocaleDateString();
-  if (slot.status === 'open') {
-    return `Bloque #${slot.seq} · desde ${opened} (abierto)`;
-  }
-  const closed = slot.closedAt
-    ? new Date(slot.closedAt).toLocaleDateString()
-    : '';
-  return `Bloque #${slot.seq} · ${opened} – ${closed}`;
-}
+import { slotLabel } from './slotLabel';
 
 /**
- * Back-office bloque selector: a `<select>` of every production bloque that
- * navigates to the chosen one immediately on change — no submit button. The
- * selected bloque lives in the URL (?slotId=...); when absent the server
- * defaults to the open bloque. An optional `action` slot (the bloque-action
- * buttons) sits in a left-aligned row below the selector, in the same card.
+ * Back-office bloque toolbar: the slate header bar over the orders view. On the
+ * left, a `<select>` of every production bloque that navigates to the chosen one
+ * immediately on change — no submit button; the selection lives in the URL
+ * (?slotId=...), and when absent the server defaults to the open bloque. On the
+ * right, the bloque-action buttons (passed as `action`), preceded by a "Bloque
+ * cerrado" pill when a closed bloque is selected.
  */
 export function SlotPicker({
   basePath,
   slots,
   currentSlotId,
+  closed,
   action,
 }: {
   basePath: string;
   slots: SlotListItem[];
   currentSlotId: string;
+  /** True when the selected bloque is not the open one (actions are disabled). */
+  closed?: boolean;
   action?: ReactNode;
 }) {
   const router = useRouter();
@@ -49,20 +37,15 @@ export function SlotPicker({
   }
 
   return (
-    <div
-      className="card"
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'stretch',
-        gap: '0.85rem',
-      }}
-    >
-      <div>
-        <label htmlFor="slot">Bloque </label>
+    <div className="bo-toolbar">
+      <div className="bo-toolbar-left">
+        <label htmlFor="slot" className="bo-toolbar-label">
+          Bloque
+        </label>
         <select
           id="slot"
           name="slot"
+          className="bo-select"
           value={currentSlotId}
           disabled={pending}
           onChange={(e) => onChange(e.target.value)}
@@ -74,7 +57,12 @@ export function SlotPicker({
           ))}
         </select>
       </div>
-      {action && <div className="slot-actions">{action}</div>}
+      {action && (
+        <div className="bo-toolbar-actions">
+          {closed && <span className="bo-closed-pill">Bloque cerrado</span>}
+          {action}
+        </div>
+      )}
     </div>
   );
 }
