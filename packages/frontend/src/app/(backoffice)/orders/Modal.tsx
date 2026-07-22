@@ -6,8 +6,9 @@ import { useEffect, useRef, type ReactNode } from 'react';
  * Lightweight modal built on the native <dialog> element: ESC-to-close, focus
  * trapping, and top-layer rendering (centered over the viewport, never clipped
  * by the card it's declared in) come for free. Every dialog shares one fixed
- * frame (560×620) so the UI never jumps between dialogs; only the body scrolls,
- * while the header, footer, and an optional `aboveBody` region stay pinned.
+ * near-full-screen frame so the UI never jumps between dialogs; only the body
+ * scrolls, while the header, footer, and an optional `aboveBody` region stay
+ * pinned.
  */
 export function Modal({
   open,

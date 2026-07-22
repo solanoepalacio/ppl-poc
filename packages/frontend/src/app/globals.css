@@ -824,10 +824,12 @@ select {
 .modal {
   border: none;
   padding: 0;
-  width: 560px;
-  max-width: calc(100vw - 2rem);
-  height: 620px;
-  max-height: calc(100vh - 64px);
+  /* Near-full-screen shared frame: dense dialogs (order items, stock) need the
+     room. Still one fixed frame for every dialog, so the UI never jumps. */
+  width: calc(100vw - 4rem);
+  max-width: 1400px;
+  height: calc(100vh - 4rem);
+  max-height: none;
   border-radius: 16px;
   background: var(--paper);
   color: var(--ink);
