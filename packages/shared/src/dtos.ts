@@ -100,11 +100,22 @@ export interface SlotOrdersResponse {
   orders: SlotViewOrder[];
 }
 
-/** A single product's total quantity to produce for a bloque. */
+/**
+ * A single product's production breakdown for a bloque: how many are needed, how
+ * many are already in stock, and the difference still to bake.
+ */
 export interface ProductionTotalItem {
   productId: string;
   name: string;
-  quantity: number;
+  /** Total demanded across the bloque's orders (summed order quantities). */
+  demand: number;
+  /** Recorded existencia (stock on hand) for the bloque; 0 when none recorded. */
+  existence: number;
+  /**
+   * Net units to produce: `max(0, demand − existence)`. Floored at zero — a
+   * product covered by existencia shows 0, never a negative surplus.
+   */
+  toProduce: number;
 }
 
 /**

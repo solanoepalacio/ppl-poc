@@ -17,15 +17,15 @@ Every catalog product SHALL belong to exactly one production category, either `s
 - **AND** a product baked on the sweet line has category `sweet`
 
 ### Requirement: Production totals aggregate item quantities for a bloque
-The system SHALL compute, for a given production bloque, the quantity to produce of each product by summing the quantities of that product across every order in that bloque, then subtracting the bloque's existencia (see *Existencia is subtracted from production totals*). There is no status filter; to exclude a mistaken order from the totals the manager deletes it. The result SHALL contain one entry per product with a positive net, each carrying the product's identifier, its name, and the net quantity to produce.
+The system SHALL compute, for a given production bloque, the demand for each product by summing the quantities of that product across every order in that bloque. There is no status filter; to exclude a mistaken order from the totals the manager deletes it. The result SHALL contain one entry per product with positive demand, each carrying the product's identifier, its name, the summed demand, the bloque's recorded existencia for that product, and the net quantity to produce (see *Production totals expose existencia and the net to produce*). Products with no demand SHALL be omitted.
 
 #### Scenario: Quantities for the same product are summed across orders
 - **WHEN** two orders in the bloque each contain product P, with quantities 3 and 2
-- **THEN** the production totals include a single entry for product P with quantity 5
+- **THEN** the production totals include a single entry for product P with demand 5
 
 #### Scenario: Every order in the bloque contributes
 - **WHEN** any order in the bloque contains product P
-- **THEN** that order's quantity of P is included in P's total, regardless of how the order was created
+- **THEN** that order's quantity of P is included in P's demand, regardless of how the order was created
 
 #### Scenario: Each entry carries the product name
 - **WHEN** an order in the bloque contains product P
@@ -37,18 +37,7 @@ The system SHALL compute, for a given production bloque, the quantity to produce
 
 #### Scenario: A deleted order drops out of the totals
 - **WHEN** the manager deletes an order that contained product P
-- **THEN** that order's quantity of P no longer contributes to P's total
-
-### Requirement: Existencia is subtracted from production totals
-For each product, the system SHALL subtract the bloque's recorded existencia (stock already on hand) from that product's summed order quantity, flooring the net at zero. A product whose net quantity is zero — whether fully covered by existencia or with no demand — SHALL be omitted from the totals. Each remaining entry's quantity SHALL be the net to produce.
-
-#### Scenario: Existencia reduces the quantity to produce
-- **WHEN** product P is ordered for a total of 8 in the bloque and the bloque records existencia of 3 for P
-- **THEN** the production totals entry for P has quantity 5
-
-#### Scenario: Existencia covering all demand omits the product
-- **WHEN** product P is ordered for a total of 8 in the bloque and the bloque records existencia of 8 or more for P
-- **THEN** the production totals contain no entry for product P
+- **THEN** that order's quantity of P no longer contributes to P's demand
 
 ### Requirement: Production totals are scoped by bloque
 The system SHALL compute production totals over the orders belonging to a single production bloque. When no bloque is specified, the system SHALL use the currently open bloque. When a bloque is specified by its identifier, the system SHALL use that bloque; if the identifier does not match a bloque, the system MUST reject the request. The response SHALL carry the resolved bloque alongside the totals.
@@ -80,20 +69,47 @@ The system SHALL support computing production totals for a single production cat
 - **THEN** products of both categories contribute to the totals
 
 ### Requirement: Back office surfaces the bloque's production totals
-The back office SHALL present the per-item production totals on two dedicated production views, one per production category — **Producción salados** (`salty`) and **Producción dulces** (`sweet`) — each reachable from the persistent back-office navigation alongside the orders view and the bloques view. Each view SHALL show only the totals for products in its category, always for the currently open (latest) bloque, reflecting the current totals each time the view is loaded. The production views SHALL NOT offer a bloque selector.
+The back office SHALL present the per-item production totals on two dedicated production views, one per production category — **Producción salados** (`salty`) and **Producción dulces** (`sweet`) — each reachable from the persistent back-office navigation alongside the orders view and the bloques view. Each view SHALL show only the totals for products in its category, always for the currently open (latest) bloque, reflecting the current totals each time the view is loaded. For each product the view SHALL show three figures: the total needed (demand), the existing stock (existencia), and the difference (net to produce), which is never negative — a product covered by existencia shows zero. The production views SHALL NOT offer a bloque selector.
 
 #### Scenario: Manager views one line's production totals
 - **WHEN** the manager opens the **Producción salados** view
-- **THEN** the system shows each `salty` product to be produced for the open bloque with its summed quantity
+- **THEN** the system shows each `salty` product ordered for the open bloque with its demand, its existencia, and the net to produce
 - **AND** no `sweet` products are shown
 
 #### Scenario: Each line has its own view
 - **WHEN** the manager opens the **Producción dulces** view
-- **THEN** the system shows each `sweet` product to be produced for the open bloque with its summed quantity
+- **THEN** the system shows each `sweet` product ordered for the open bloque with its demand, its existencia, and the net to produce
 - **AND** no `salty` products are shown
+
+#### Scenario: Each product shows needed, stock, and difference
+- **WHEN** product P is ordered for a total of 8 in the open bloque and the bloque records existencia of 3 for P
+- **THEN** P's row shows a demand of 8, an existencia of 3, and a net to produce of 5
+
+#### Scenario: A covered product shows zero to produce
+- **WHEN** product P is ordered in the open bloque and its existencia meets or exceeds its demand
+- **THEN** P's row shows its demand and existencia with a net to produce of 0
 
 #### Scenario: The production views always show the open bloque
 - **WHEN** the manager opens a production view
 - **THEN** the production totals shown are for the currently open bloque and that view's category
 - **AND** the view offers no control to select a different bloque
+
+### Requirement: Production totals expose existencia and the net to produce
+For each product with demand, the system SHALL report the bloque's recorded existencia (stock already on hand) and the net quantity to produce, computed as demand minus existencia and floored at zero. When existencia meets or exceeds demand the net to produce SHALL be zero, never negative — surplus stock is not counted against other products. A product with demand SHALL remain in the totals regardless of whether existencia meets or exceeds it; only products with no demand are omitted. A product without a recorded existencia entry SHALL be treated as existencia zero, so its net equals its demand.
+
+#### Scenario: Existencia reduces the net to produce
+- **WHEN** product P is ordered for a total of 8 in the bloque and the bloque records existencia of 3 for P
+- **THEN** the production totals entry for P has demand 8, existencia 3, and a net to produce of 5
+
+#### Scenario: Existencia equal to demand nets zero but stays
+- **WHEN** product P is ordered for a total of 8 in the bloque and the bloque records existencia of exactly 8 for P
+- **THEN** the production totals still include P, with demand 8, existencia 8, and a net to produce of 0
+
+#### Scenario: Existencia exceeding demand floors the net at zero
+- **WHEN** product P is ordered for a total of 4 in the bloque and the bloque records existencia of 9 for P
+- **THEN** the production totals include P with demand 4, existencia 9, and a net to produce of 0
+
+#### Scenario: A product with no recorded existencia defaults to zero
+- **WHEN** product P is ordered in the bloque and the bloque records no existencia for P
+- **THEN** P's existencia is 0 and its net to produce equals its demand
 

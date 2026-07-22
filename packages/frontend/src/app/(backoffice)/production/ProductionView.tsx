@@ -22,7 +22,7 @@ export async function ProductionView({
 }) {
   const production = await getProductionTotals(undefined, category);
   const { title, subtitle } = COPY[category];
-  const total = production.items.reduce((sum, it) => sum + it.quantity, 0);
+  const total = production.items.reduce((sum, it) => sum + it.toProduce, 0);
 
   return (
     <>
@@ -39,21 +39,31 @@ export async function ProductionView({
         </div>
 
         {production.items.length > 0 ? (
-          <div className="ptable" role="table">
+          <div className="ptable ptable--breakdown" role="table">
             <div className="ptable-head" role="row">
               <div>Producto</div>
-              <div className="col-right">Cantidad a producir</div>
+              <div className="col-right">Necesario</div>
+              <div className="col-right">Stock</div>
+              <div className="col-right">A producir</div>
             </div>
             {production.items.map((item) => (
               <div className="ptable-row" role="row" key={item.productId}>
                 <div className="ptable-name">{item.name}</div>
+                <div className="ptable-num">{item.demand}</div>
+                <div className="ptable-num">{item.existence}</div>
                 <div className="ptable-qty-cell">
-                  <span className="ptable-qty">{item.quantity}</span>
+                  <span
+                    className={
+                      item.toProduce > 0 ? 'ptable-qty' : 'ptable-qty ptable-qty--covered'
+                    }
+                  >
+                    {item.toProduce}
+                  </span>
                 </div>
               </div>
             ))}
             <div className="ptable-foot" role="row">
-              <div className="ptable-foot-label">Total unidades</div>
+              <div className="ptable-foot-label">Total a producir</div>
               <div className="ptable-foot-total">{total}</div>
             </div>
           </div>

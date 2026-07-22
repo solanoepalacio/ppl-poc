@@ -795,6 +795,29 @@ select {
   color: var(--brand-slate);
 }
 
+/* Breakdown layout: product name + three numeric columns
+   (Necesario / Stock / A producir). */
+.ptable--breakdown .ptable-head,
+.ptable--breakdown .ptable-row,
+.ptable--breakdown .ptable-foot {
+  grid-template-columns: minmax(0, 1fr) repeat(3, minmax(84px, 128px));
+}
+.ptable-num {
+  padding: 15px 24px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 15.5px;
+  color: var(--ink-muted);
+}
+/* "A producir" of zero: fully covered by existencia, nothing left to bake. */
+.ptable-qty--covered {
+  background: #eef0ee;
+  color: var(--ink-muted);
+}
+.ptable--breakdown .ptable-foot-label {
+  grid-column: 1 / -2;
+}
+
 /* ── Modal dialog ─────────────────────────────────────────── */
 /* One fixed frame shared by every dialog, so the UI never jumps between them:
    a short modal and a tall one are the same window with different contents. */

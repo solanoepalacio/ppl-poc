@@ -431,11 +431,11 @@ describe('OrdersService', () => {
 
       expect(res.slot.id).toBe('slot_open');
       expect(res.items).toEqual([
-        { productId: 'p1', name: 'Croissant', quantity: 5 },
+        { productId: 'p1', name: 'Croissant', demand: 5, existence: 0, toProduce: 5 },
       ]);
     });
 
-    it('subtracts existencia from the demand total', async () => {
+    it('reports demand, existencia, and the net to produce', async () => {
       prisma.order.findMany.mockResolvedValue([
         orderWith([{ productId: 'p1', name: 'Croissant', quantity: 8 }]),
       ]);
@@ -445,11 +445,11 @@ describe('OrdersService', () => {
 
       expect(slots.getExistenceMap).toHaveBeenCalledWith('slot_open');
       expect(res.items).toEqual([
-        { productId: 'p1', name: 'Croissant', quantity: 5 },
+        { productId: 'p1', name: 'Croissant', demand: 8, existence: 3, toProduce: 5 },
       ]);
     });
 
-    it('drops a product fully covered by existencia (clamped at zero)', async () => {
+    it('keeps a covered product, flooring the net to produce at zero', async () => {
       prisma.order.findMany.mockResolvedValue([
         orderWith([
           { productId: 'p1', name: 'Croissant', quantity: 8 },
@@ -459,14 +459,15 @@ describe('OrdersService', () => {
       slots.getExistenceMap.mockResolvedValue(
         new Map([
           ['p1', 10],
-          ['p2', 1],
+          ['p2', 4],
         ]),
       );
 
       const res = await service.getProductionTotals('slot_open');
 
       expect(res.items).toEqual([
-        { productId: 'p2', name: 'Baguette', quantity: 3 },
+        { productId: 'p2', name: 'Baguette', demand: 4, existence: 4, toProduce: 0 },
+        { productId: 'p1', name: 'Croissant', demand: 8, existence: 10, toProduce: 0 },
       ]);
     });
 
@@ -537,7 +538,7 @@ describe('OrdersService', () => {
       const res = await service.getProductionTotals('slot_7', 'salty');
 
       expect(res.items).toEqual([
-        { productId: 'p1', name: 'Ciabatta', quantity: 2 },
+        { productId: 'p1', name: 'Ciabatta', demand: 2, existence: 0, toProduce: 2 },
       ]);
     });
 
