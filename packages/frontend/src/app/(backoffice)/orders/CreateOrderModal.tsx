@@ -11,15 +11,17 @@ import { createLink, createOrder } from '@/lib/api';
 import { trackEvent } from '@/lib/analytics';
 import { Modal } from './Modal';
 import { ClientCombobox } from './ClientCombobox';
-import { ItemQuantityFields, itemsFromQuantities } from './ItemQuantityFields';
+import { ProductCombobox } from './ProductCombobox';
+import { SelectedItems } from './SelectedItems';
+import { itemsFromQuantities } from './ItemQuantityFields';
 
 /**
  * Client-first order creation, launched as a modal from the bloque toolbar. The
  * manager selects a client (filtering by name), then either records the order's
  * contents directly ("Agregar pedido") or issues a shareable tokenized link
- * ("Generar link") for the customer to fill in. Both paths reuse the single
- * client selection; the catalog + message are shown up-front so the direct path
- * needs no extra step.
+ * ("Generar link") for the customer to fill in. Products are added one at a time
+ * from a search box, so the body lists only what is on the order; the client
+ * pickers stay pinned above and the optional message pinned below.
  */
 export function CreateOrderModal({
   products,
@@ -71,6 +73,20 @@ export function CreateOrderModal({
   function setQuantity(productId: string, quantity: number) {
     setQuantities((q) => ({ ...q, [productId]: quantity }));
   }
+
+  function addProduct(productId: string) {
+    setQuantities((q) => (q[productId] ? q : { ...q, [productId]: 1 }));
+  }
+
+  function removeProduct(productId: string) {
+    setQuantities((q) => {
+      const next = { ...q };
+      delete next[productId];
+      return next;
+    });
+  }
+
+  const addedIds = Object.keys(quantities).filter((id) => quantities[id] > 0);
 
   async function generateLink() {
     setError(null);
@@ -176,14 +192,40 @@ export function CreateOrderModal({
         footer={footer}
         aboveBody={
           step === 'form' ? (
-            <ClientCombobox
-              key={open ? 'open' : 'closed'}
-              id="create-order-client"
-              clients={clients}
-              onSelect={setClientId}
-              disabled={busy || pending}
-              autoFocus
-            />
+            <>
+              <ClientCombobox
+                key={open ? 'open' : 'closed'}
+                id="create-order-client"
+                clients={clients}
+                onSelect={setClientId}
+                disabled={busy || pending}
+                autoFocus
+              />
+              <ProductCombobox
+                id="create-order-product"
+                products={products}
+                addedIds={addedIds}
+                onAdd={addProduct}
+                disabled={pending}
+              />
+            </>
+          ) : undefined
+        }
+        belowBody={
+          step === 'form' ? (
+            <div className="modal-message">
+              <label htmlFor="create-order-message">
+                Mensaje del pedido (opcional)
+              </label>
+              <textarea
+                id="create-order-message"
+                rows={2}
+                placeholder="Ej. sin azúcar, retira a las 9hs…"
+                value={message}
+                disabled={pending}
+                onChange={(e) => setMessage(e.target.value)}
+              />
+            </div>
           ) : undefined
         }
       >
@@ -203,28 +245,13 @@ export function CreateOrderModal({
         )}
 
         {step === 'form' && (
-          <>
-            <ItemQuantityFields
-              products={products}
-              quantities={quantities}
-              onChange={setQuantity}
-              disabled={pending}
-              unitLabel="cant."
-            />
-            <div className="modal-message">
-              <label htmlFor="create-order-message">
-                Mensaje del pedido (opcional)
-              </label>
-              <textarea
-                id="create-order-message"
-                rows={3}
-                placeholder="Ej. sin azúcar, retira a las 9hs…"
-                value={message}
-                disabled={pending}
-                onChange={(e) => setMessage(e.target.value)}
-              />
-            </div>
-          </>
+          <SelectedItems
+            products={products}
+            quantities={quantities}
+            onChange={setQuantity}
+            onRemove={removeProduct}
+            disabled={pending}
+          />
         )}
 
         {error && <p className="error">{error}</p>}

@@ -878,9 +878,12 @@ select {
   background: var(--line);
   color: var(--ink);
 }
-/* Fixed region between header and the scrolling body (the client picker). */
+/* Fixed region between header and the scrolling body (the pickers). */
 .modal-above {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
   padding: 20px 24px 16px;
   background: var(--surface);
   border-bottom: 1px solid #eee6d8;
@@ -893,6 +896,13 @@ select {
   min-height: 0;
   overflow-y: auto;
   padding: 8px 24px 20px;
+}
+/* Fixed region between the scrolling body and the footer (the order message). */
+.modal-below {
+  flex-shrink: 0;
+  padding: 14px 24px 16px;
+  background: var(--surface);
+  border-top: 1px solid #eee6d8;
 }
 .modal-footer {
   display: flex;
@@ -1058,9 +1068,34 @@ select {
   margin: 0;
 }
 
-/* Order message (Agregar pedido only). */
+/* Order message (Agregar pedido only) — pinned in the modal's bottom region. */
 .modal-message {
-  margin-top: 18px;
+  margin-top: 0;
+}
+/* Empty state when no products have been added to the order yet. */
+.items-empty {
+  padding: 32px 8px;
+  text-align: center;
+}
+/* Remove-from-order button on an added item row. */
+.item-remove {
+  width: 40px;
+  height: 40px;
+  min-height: auto;
+  padding: 0;
+  margin-left: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink-muted);
+  flex-shrink: 0;
+}
+.item-remove:not(:disabled):hover {
+  background: #f7e7e2;
+  color: #b4442f;
 }
 .modal-message label {
   display: block;
@@ -1074,7 +1109,7 @@ select {
 }
 .modal-message textarea {
   width: 100%;
-  min-height: 84px;
+  min-height: 52px;
   resize: vertical;
   padding: 12px 14px;
   border: 1px solid #d7cdb9;
@@ -1123,6 +1158,10 @@ select {
   box-shadow: var(--shadow-card);
 }
 .combobox-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   padding: 0.5rem 0.6rem;
   border-radius: 8px;
   cursor: pointer;
