@@ -72,14 +72,9 @@ export function GenerateLinkModal({
   }
 
   const footer = result ? (
-    <>
-      <button className="btn-modal-secondary" onClick={() => void copy()}>
-        {copied ? '¡Copiado!' : 'Copiar enlace'}
-      </button>
-      <button className="btn-modal-primary" onClick={close}>
-        Listo
-      </button>
-    </>
+    <button className="btn-modal-primary" onClick={close}>
+      Listo
+    </button>
   ) : (
     <>
       <button className="btn-modal-secondary" onClick={close}>
@@ -107,29 +102,68 @@ export function GenerateLinkModal({
       </button>
 
       <Modal open={open} onClose={close} title="Generar link" footer={footer}>
-        {result ? (
-          <div className="card">
+        <ClientCombobox
+          key={open ? 'open' : 'closed'}
+          id="generate-link-client"
+          clients={clients}
+          onSelect={setClientId}
+          // Once the link is generated the selection is locked in — the link is
+          // bound to this client, so the picker becomes read-only.
+          disabled={busy || result !== null}
+          autoFocus
+        />
+
+        {result && (
+          <div className="card link-card">
             <p className="muted">
               Compartí este enlace con el cliente por WhatsApp:
             </p>
-            <p>
+            <div className="link-row">
               <code>{result.url}</code>
-            </p>
+              <button
+                type="button"
+                className={copied ? 'copy-btn is-copied' : 'copy-btn'}
+                onClick={() => void copy()}
+                aria-label={copied ? 'Enlace copiado' : 'Copiar enlace'}
+                title={copied ? 'Copiado' : 'Copiar enlace'}
+              >
+                {copied ? (
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                ) : (
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                  </svg>
+                )}
+              </button>
+            </div>
             <p className="muted">
               Para {result.clientName} · válido durante el bloque #
               {result.slotSeq}
             </p>
           </div>
-        ) : (
-          <ClientCombobox
-            key={open ? 'open' : 'closed'}
-            id="generate-link-client"
-            clients={clients}
-            onSelect={setClientId}
-            disabled={busy}
-            autoFocus
-          />
         )}
+
         {error && <p className="error">{error}</p>}
       </Modal>
     </>

@@ -718,7 +718,6 @@ select {
 .otable-detail-head {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
   gap: 16px;
   margin-bottom: 14px;
 }
@@ -732,7 +731,9 @@ select {
 }
 .otable-detail-actions {
   display: flex;
+  justify-content: flex-end;
   gap: 10px;
+  margin-top: 18px;
 }
 .otable-items {
   display: grid;
@@ -1304,4 +1305,40 @@ code {
   padding: 0.15rem 0.35rem;
   border-radius: 6px;
   word-break: break-all;
+}
+
+/* Generated-link row: the URL and its copy button side by side. */
+.link-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0.6rem 0;
+}
+.link-row code {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+  word-break: normal;
+}
+.copy-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+.copy-btn:hover {
+  background: rgba(54, 85, 102, 0.06);
+  color: var(--ink);
+}
+.copy-btn.is-copied {
+  color: #2e7d32;
+  border-color: #2e7d32;
 }

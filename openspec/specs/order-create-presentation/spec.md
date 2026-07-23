@@ -21,7 +21,7 @@ The back office SHALL let the manager start creating an order from the orders-by
 - **THEN** the modal is dismissed and the orders view is shown unchanged
 
 ### Requirement: Generar link produces a shareable customer link
-The orders view SHALL present a **Generar link** trigger in the bloque toolbar, next to the **Agregar pedido** trigger. Activating it SHALL open a dedicated link-generation modal — separate from the order-creation modal — in which the manager selects a client and generates a shareable tokenized order link bound to that client. The generated link SHALL be presented in that modal for the manager to copy and share, without revealing or requiring the catalog items list. This reuses the existing order-link generation behavior. The trigger is only meaningful for the open bloque, so it SHALL be grayed out and unclickable when the selected bloque is not the open one.
+The orders view SHALL present a **Generar link** trigger in the bloque toolbar, next to the **Agregar pedido** trigger. Activating it SHALL open a dedicated link-generation modal — separate from the order-creation modal — in which the manager selects a client and generates a shareable tokenized order link bound to that client. The generated link SHALL be presented in that modal for the manager to copy and share, without revealing or requiring the catalog items list. After the link is generated, the selected client SHALL remain shown as a locked (read-only) selection so it is clear who the link is for, and a copy control SHALL sit directly with the generated link. This reuses the existing order-link generation behavior. The trigger is only meaningful for the open bloque, so it SHALL be grayed out and unclickable when the selected bloque is not the open one.
 
 #### Scenario: Generar link trigger is present next to Agregar pedido
 - **WHEN** the manager opens the orders-by-day view
@@ -33,16 +33,10 @@ The orders view SHALL present a **Generar link** trigger in the bloque toolbar, 
 - **AND** presents the link in the dedicated link-generation modal for the manager to copy and share
 - **AND** the order-creation modal is not involved
 
-### Requirement: Creation modal omits per-path explanatory copy
-The order-creation modal SHALL NOT display the explanatory paragraphs that previously framed the two paths (e.g. "Ingresá la orden directamente cuando la tomás vos.", "Generá un enlace para compartir con el cliente…", "Registrá una orden recibida por teléfono, WhatsApp o en persona."). The two labelled buttons SHALL communicate the available paths on their own. Inline result text (e.g. the generated link) is not explanatory copy and SHALL remain.
-
-#### Scenario: No explanatory paragraphs in the modal
-- **WHEN** the order-creation modal is shown
-- **THEN** it does not present the previous per-path explanatory paragraphs
-
-#### Scenario: Functional inline text is retained
-- **WHEN** a link has been generated
-- **THEN** the generated-link result is still shown
+#### Scenario: Client stays locked with the generated link
+- **WHEN** the manager has generated the link
+- **THEN** the selected client is still shown as a locked, read-only selection
+- **AND** a copy control sits directly with the generated link
 
 ### Requirement: Content step uses three regions with only items scrollable
 The order-creation modal SHALL be laid out between its pinned title/close header and its pinned action buttons as: the client selector fixed at the top, the added-products list in the middle, and the optional message field fixed at the bottom. The product search SHALL be pinned at the bottom of the added-products list — it does not scroll with the list, and when the list is long enough to scroll it stays fixed at the bottom, rendered over the list's contents. The added-products list SHALL be the only scrollable region; the client selector, the product search, and the message field SHALL remain visible regardless of how far the list is scrolled.
@@ -134,4 +128,11 @@ The order-creation modal SHALL present a client selector first — a control tha
 #### Scenario: Agregar pedido gated by client selection
 - **WHEN** no client is selected
 - **THEN** the Agregar pedido action is unavailable until a client is selected
+
+### Requirement: Creation modal omits explanatory copy
+The order-creation modal SHALL NOT display explanatory paragraphs framing how to use it (e.g. "Ingresá la orden directamente cuando la tomás vos.", "Registrá una orden recibida por teléfono, WhatsApp o en persona."). The **Agregar pedido** action together with the client selector and product search SHALL communicate what the modal does on their own.
+
+#### Scenario: No explanatory paragraphs in the modal
+- **WHEN** the order-creation modal is shown
+- **THEN** it does not present explanatory framing paragraphs
 

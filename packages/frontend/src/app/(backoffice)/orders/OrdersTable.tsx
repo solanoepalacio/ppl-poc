@@ -91,13 +91,6 @@ export function OrdersTable({
                   <span className="otable-detail-title">
                     Detalle del pedido
                   </span>
-                  <div className="otable-detail-actions">
-                    <OrderActions
-                      orderId={order.id}
-                      items={order.items}
-                      products={products}
-                    />
-                  </div>
                 </div>
                 {order.items.length > 0 ? (
                   <div className="otable-items">
@@ -115,6 +108,13 @@ export function OrdersTable({
                 ) : (
                   <p className="muted">Sin artículos.</p>
                 )}
+                <div className="otable-detail-actions">
+                  <OrderActions
+                    orderId={order.id}
+                    items={order.items}
+                    products={products}
+                  />
+                </div>
               </div>
             )}
           </div>

@@ -23,6 +23,7 @@ export function SelectedItems({
   disabled,
   highlight,
   emptyText = 'Todavía no agregaste productos. Buscá uno abajo para agregarlo al pedido.',
+  showCategory = true,
 }: {
   products: Product[];
   quantities: Record<string, number>;
@@ -33,6 +34,8 @@ export function SelectedItems({
   highlight?: { id: string; n: number } | null;
   /** Empty-state copy; the direction to the search differs by surface. */
   emptyText?: string;
+  /** The salado/dulce pill is production-facing; hidden on the customer view. */
+  showCategory?: boolean;
 }) {
   const selectAllOnFocus = useSelectAllOnFocus();
   const listRef = useRef<HTMLUListElement>(null);
@@ -73,9 +76,11 @@ export function SelectedItems({
           >
             <span className="item-field-name">
               <label htmlFor={`qty-${p.id}`}>{p.name}</label>
-              <span className={salty ? 'cat-tag salty' : 'cat-tag sweet'}>
-                {salty ? 'salado' : 'dulce'}
-              </span>
+              {showCategory && (
+                <span className={salty ? 'cat-tag salty' : 'cat-tag sweet'}>
+                  {salty ? 'salado' : 'dulce'}
+                </span>
+              )}
             </span>
             <div className="item-qty">
               <input

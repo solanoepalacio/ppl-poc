@@ -168,6 +168,7 @@ export function OrderForm({
           onRemove={(id) => setQty(id, 0)}
           highlight={justAdded}
           emptyText={COPY.empty}
+          showCategory={false}
         />
       </div>
 
