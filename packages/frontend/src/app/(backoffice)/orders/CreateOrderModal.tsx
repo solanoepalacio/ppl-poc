@@ -40,6 +40,11 @@ export function CreateOrderModal({
   const [clientId, setClientId] = useState<string | null>(null);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [message, setMessage] = useState('');
+  // The product most recently added, with a bump counter so re-adding the same
+  // product still re-triggers the scroll-to + highlight in the added list.
+  const [justAdded, setJustAdded] = useState<{ id: string; n: number } | null>(
+    null,
+  );
 
   const [result, setResult] = useState<CreateLinkResponse | null>(null);
   const [copied, setCopied] = useState(false);
@@ -54,6 +59,7 @@ export function CreateOrderModal({
     setClientId(null);
     setQuantities({});
     setMessage('');
+    setJustAdded(null);
     setResult(null);
     setCopied(false);
     setBusy(false);
@@ -76,6 +82,7 @@ export function CreateOrderModal({
 
   function addProduct(productId: string) {
     setQuantities((q) => (q[productId] ? q : { ...q, [productId]: 1 }));
+    setJustAdded((prev) => ({ id: productId, n: (prev?.n ?? 0) + 1 }));
   }
 
   function removeProduct(productId: string) {
@@ -251,6 +258,7 @@ export function CreateOrderModal({
             onChange={setQuantity}
             onRemove={removeProduct}
             disabled={pending}
+            highlight={justAdded}
           />
         )}
 

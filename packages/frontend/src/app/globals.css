@@ -997,6 +997,23 @@ select {
   padding: 12px 0;
   border-bottom: 1px solid #eee6d8;
 }
+/* Brief highlight when a product is just added, so the pick is easy to spot. */
+@keyframes item-added-flash {
+  0% {
+    background-color: #fbeaca;
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+.item-field.is-added {
+  animation: item-added-flash 1.1s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .item-field.is-added {
+    animation: none;
+  }
+}
 .item-field-name {
   font-size: 14.5px;
   color: var(--ink);

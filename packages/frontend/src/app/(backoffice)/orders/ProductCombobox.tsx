@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { normalizeForSearch, type Product } from '@pannico/shared';
 
 /**
@@ -28,7 +28,6 @@ export function ProductCombobox({
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const added = useMemo(() => new Set(addedIds), [addedIds]);
   const filtered = useMemo(() => {
@@ -42,8 +41,7 @@ export function ProductCombobox({
     onAdd(product.id);
     setQuery('');
     setActiveIndex(0);
-    setOpen(true); // keep the list open to add the next one
-    inputRef.current?.focus();
+    setOpen(false); // close on pick; the added row highlights so the pick is clear
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -72,7 +70,6 @@ export function ProductCombobox({
       <label htmlFor={id}>Agregar producto</label>
       <div className="combobox-control">
         <input
-          ref={inputRef}
           id={id}
           type="text"
           role="combobox"
