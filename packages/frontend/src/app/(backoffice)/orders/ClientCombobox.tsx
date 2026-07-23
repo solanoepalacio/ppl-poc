@@ -64,7 +64,13 @@ export function ClientCombobox({
         choose(filtered[activeIndex]);
       }
     } else if (e.key === 'Escape') {
-      setOpen(false);
+      if (open) {
+        // Close only the dropdown; stop the native <dialog> from also closing.
+        // When the dropdown is already closed, let Escape bubble to close the dialog.
+        e.preventDefault();
+        e.stopPropagation();
+        setOpen(false);
+      }
     }
   }
 
