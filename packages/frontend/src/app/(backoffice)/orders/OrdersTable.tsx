@@ -87,11 +87,6 @@ export function OrdersTable({
 
             {isOpen && (
               <div className="otable-detail">
-                <div className="otable-detail-head">
-                  <span className="otable-detail-title">
-                    Detalle del pedido
-                  </span>
-                </div>
                 {order.items.length > 0 ? (
                   <div className="otable-items">
                     {order.items.map((item) => (
