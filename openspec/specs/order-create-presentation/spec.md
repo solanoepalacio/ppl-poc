@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines how order creation is presented in the back office: launched as a modal from the orders view, client-first with a two-path choice between generating a shareable customer link and loading content for direct entry.
+Defines how order creation is presented in the back office: launched as a modal from the orders view, client-first, for recording an order's contents directly. Issuing a shareable customer link is a separate, single-purpose trigger and modal in the bloque toolbar next to it.
 ## Requirements
 ### Requirement: Order creation is launched from the orders view
 The back office SHALL let the manager start creating an order from the orders-by-day view, without navigating to a separate page. The orders view SHALL present an order-creation trigger positioned near the day picker at the top of the view. Activating the trigger SHALL open the order-creation modal over the orders view. There SHALL NOT be a separate route or page dedicated to order creation.
@@ -21,12 +21,17 @@ The back office SHALL let the manager start creating an order from the orders-by
 - **THEN** the modal is dismissed and the orders view is shown unchanged
 
 ### Requirement: Generar link produces a shareable customer link
-From the order-creation modal, choosing **Generar link** SHALL generate a shareable tokenized order link bound to the selected client and present that link to the manager to share, without revealing or requiring the catalog items list. This reuses the existing order-link generation behavior.
+The orders view SHALL present a **Generar link** trigger in the bloque toolbar, next to the **Agregar pedido** trigger. Activating it SHALL open a dedicated link-generation modal — separate from the order-creation modal — in which the manager selects a client and generates a shareable tokenized order link bound to that client. The generated link SHALL be presented in that modal for the manager to copy and share, without revealing or requiring the catalog items list. This reuses the existing order-link generation behavior. The trigger is only meaningful for the open bloque, so it SHALL be grayed out and unclickable when the selected bloque is not the open one.
 
-#### Scenario: Manager generates a link from the modal
-- **WHEN** the manager selects a client and activates Generar link
+#### Scenario: Generar link trigger is present next to Agregar pedido
+- **WHEN** the manager opens the orders-by-day view
+- **THEN** a Generar link trigger is shown in the bloque toolbar next to the Agregar pedido trigger
+
+#### Scenario: Manager generates a link from its own modal
+- **WHEN** the manager activates Generar link, selects a client, and confirms
 - **THEN** the system generates a tokenized order link bound to that client
-- **AND** presents the link in the modal for the manager to copy and share
+- **AND** presents the link in the dedicated link-generation modal for the manager to copy and share
+- **AND** the order-creation modal is not involved
 
 ### Requirement: Creation modal omits per-path explanatory copy
 The order-creation modal SHALL NOT display the explanatory paragraphs that previously framed the two paths (e.g. "Ingresá la orden directamente cuando la tomás vos.", "Generá un enlace para compartir con el cliente…", "Registrá una orden recibida por teléfono, WhatsApp o en persona."). The two labelled buttons SHALL communicate the available paths on their own. Inline result text (e.g. the generated link) is not explanatory copy and SHALL remain.
@@ -59,22 +64,6 @@ The order-creation modal SHALL be laid out between its pinned title/close header
 #### Scenario: Search and message remain reachable without scrolling the list
 - **WHEN** the added-products list is scrolled to any position
 - **THEN** the client selector, the product search, and the message field are still on screen without needing to scroll the list back
-
-### Requirement: Creation modal is client-first with a two-path choice
-The order-creation modal SHALL present a client selector first — a control that lists the directory's selectable clients and lets the manager narrow them by typing part of a name — together with a product search for adding items, and exactly two action buttons labelled **Generar link** and **Agregar pedido**. The modal SHALL NOT list the full catalog; items are added individually through the product search (see *Order contents are entered by searching and adding products*). Both buttons SHALL require a client to be selected before they can act.
-
-#### Scenario: Modal opens on the client-selection step
-- **WHEN** the order-creation modal opens
-- **THEN** it shows the client selector, the product search, and the two buttons Generar link and Agregar pedido
-- **AND** it does not list the full catalog
-
-#### Scenario: Manager filters the client list by typing
-- **WHEN** the manager types part of a client name into the selector
-- **THEN** the selector narrows to the clients whose name matches what was typed
-
-#### Scenario: Path buttons gated by client selection
-- **WHEN** no client is selected
-- **THEN** the Generar link and Agregar pedido actions are unavailable until a client is selected
 
 ### Requirement: Order contents are entered by searching and adding products
 The order-creation modal SHALL let the manager build the order by adding products one at a time through a product search that filters the catalog by name (accent/case-insensitive); picking a result SHALL add that product to the order. The modal SHALL show only the products already added — each with a quantity control and a control to remove it — and SHALL NOT display the full catalog. A product already on the order SHALL NOT appear in the search results. Activating **Agregar pedido** SHALL create the order for the selected client with the added products and the optional message, reusing the existing manual order-creation behavior, and on success the new order SHALL appear in the bloque's orders view.
@@ -128,4 +117,21 @@ While a picker's dropdown — the client selector or the product search — is o
 #### Scenario: Escape with no dropdown open closes the modal
 - **WHEN** no picker dropdown is open and the manager presses Escape
 - **THEN** the order-creation modal closes
+
+### Requirement: Creation modal is client-first for direct order entry
+The order-creation modal SHALL present a client selector first — a control that lists the directory's selectable clients and lets the manager narrow them by typing part of a name — together with a product search for adding items, and a single action button labelled **Agregar pedido**. The modal SHALL NOT offer link generation; that path has its own trigger and modal (see *Generar link produces a shareable customer link*). The modal SHALL NOT list the full catalog; items are added individually through the product search (see *Order contents are entered by searching and adding products*). The Agregar pedido action SHALL require a client to be selected before it can act.
+
+#### Scenario: Modal opens on the client-selection step
+- **WHEN** the order-creation modal opens
+- **THEN** it shows the client selector, the product search, and the single Agregar pedido button
+- **AND** it does not list the full catalog
+- **AND** it does not present a Generar link action
+
+#### Scenario: Manager filters the client list by typing
+- **WHEN** the manager types part of a client name into the selector
+- **THEN** the selector narrows to the clients whose name matches what was typed
+
+#### Scenario: Agregar pedido gated by client selection
+- **WHEN** no client is selected
+- **THEN** the Agregar pedido action is unavailable until a client is selected
 

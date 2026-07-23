@@ -9,6 +9,7 @@ import { SlotPicker } from '../SlotPicker';
 import { ViewHeader } from '../ViewHeader';
 import { CloseSlotButton } from './CloseSlotButton';
 import { CreateOrderModal } from './CreateOrderModal';
+import { GenerateLinkModal } from './GenerateLinkModal';
 import { ExistenceEditor } from './ExistenceEditor';
 import { OrdersTable } from './OrdersTable';
 
@@ -56,6 +57,7 @@ export default async function OrdersPage({
                 clients={clients}
                 disabled={!isOpen}
               />
+              <GenerateLinkModal clients={clients} disabled={!isOpen} />
               <CloseSlotButton disabled={!isOpen} />
               <ExistenceEditor
                 slotId={view.slot.id}
