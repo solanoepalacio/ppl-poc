@@ -208,13 +208,7 @@ export function CreateOrderModal({
                 disabled={busy || pending}
                 autoFocus
               />
-              <ProductCombobox
-                id="create-order-product"
-                products={products}
-                addedIds={addedIds}
-                onAdd={addProduct}
-                disabled={pending}
-              />
+              <span className="modal-section-label">Productos en el pedido</span>
             </>
           ) : undefined
         }
@@ -252,14 +246,25 @@ export function CreateOrderModal({
         )}
 
         {step === 'form' && (
-          <SelectedItems
-            products={products}
-            quantities={quantities}
-            onChange={setQuantity}
-            onRemove={removeProduct}
-            disabled={pending}
-            highlight={justAdded}
-          />
+          <div className="order-form-body">
+            <SelectedItems
+              products={products}
+              quantities={quantities}
+              onChange={setQuantity}
+              onRemove={removeProduct}
+              disabled={pending}
+              highlight={justAdded}
+            />
+            <div className="product-add-bar">
+              <ProductCombobox
+                id="create-order-product"
+                products={products}
+                addedIds={addedIds}
+                onAdd={addProduct}
+                disabled={pending}
+              />
+            </div>
+          </div>
         )}
 
         {error && <p className="error">{error}</p>}

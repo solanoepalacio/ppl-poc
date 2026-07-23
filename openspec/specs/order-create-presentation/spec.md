@@ -40,24 +40,25 @@ The order-creation modal SHALL NOT display the explanatory paragraphs that previ
 - **THEN** the generated-link result is still shown
 
 ### Requirement: Content step uses three regions with only items scrollable
-The order-creation modal SHALL be laid out as three regions between its pinned title/close header and its pinned action buttons: the client selector and the product search fixed at the top, the list of added products in the middle, and the optional message field fixed at the bottom. The added-products list SHALL be the only scrollable region; the top selectors and the bottom message field SHALL remain visible regardless of how far the list is scrolled.
+The order-creation modal SHALL be laid out between its pinned title/close header and its pinned action buttons as: the client selector fixed at the top, the added-products list in the middle, and the optional message field fixed at the bottom. The product search SHALL be pinned at the bottom of the added-products list — it does not scroll with the list, and when the list is long enough to scroll it stays fixed at the bottom, rendered over the list's contents. The added-products list SHALL be the only scrollable region; the client selector, the product search, and the message field SHALL remain visible regardless of how far the list is scrolled.
 
-#### Scenario: Three regions are present
+#### Scenario: Regions are present
 - **WHEN** the order-creation modal is shown
-- **THEN** the client selector and product search are shown fixed at the top
-- **AND** the added-products list is shown between them and the message
+- **THEN** the client selector is shown fixed at the top
+- **AND** the added-products list is shown below it, with the product search pinned at the bottom of that list
 - **AND** the optional message field is shown fixed at the bottom
 
 #### Scenario: Only the added-products list scrolls
 - **WHEN** the manager scrolls because the added-products list exceeds the available height
 - **THEN** only that list scrolls within its region
-- **AND** the client selector and product search stay visible at the top
+- **AND** the client selector stays visible at the top
+- **AND** the product search stays fixed at the bottom of the list, rendered over its contents
 - **AND** the message field stays visible at the bottom
 - **AND** the action buttons stay pinned below
 
-#### Scenario: Selectors and message remain reachable without scrolling the list
+#### Scenario: Search and message remain reachable without scrolling the list
 - **WHEN** the added-products list is scrolled to any position
-- **THEN** the top selectors and the message field are still on screen without needing to scroll the list back
+- **THEN** the client selector, the product search, and the message field are still on screen without needing to scroll the list back
 
 ### Requirement: Creation modal is client-first with a two-path choice
 The order-creation modal SHALL present a client selector first — a control that lists the directory's selectable clients and lets the manager narrow them by typing part of a name — together with a product search for adding items, and exactly two action buttons labelled **Generar link** and **Agregar pedido**. The modal SHALL NOT list the full catalog; items are added individually through the product search (see *Order contents are entered by searching and adding products*). Both buttons SHALL require a client to be selected before they can act.

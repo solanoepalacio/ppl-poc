@@ -72,18 +72,20 @@ export function ProductCombobox({
   }
 
   return (
-    <div className="field combobox">
-      <label htmlFor={id}>Agregar producto</label>
+    // `combobox-up` opens the results above the input — the search sits at the
+    // bottom of the list, so a downward menu would spill past the modal.
+    <div className="field combobox combobox-up">
       <div className="combobox-control">
         <input
           id={id}
           type="text"
           role="combobox"
+          aria-label="Buscar un producto para agregar"
           aria-expanded={open}
           aria-autocomplete="list"
           aria-controls={`${id}-list`}
           autoComplete="off"
-          placeholder="Buscá un producto…"
+          placeholder="Buscá un producto para agregar…"
           value={query}
           disabled={disabled}
           onChange={(e) => {

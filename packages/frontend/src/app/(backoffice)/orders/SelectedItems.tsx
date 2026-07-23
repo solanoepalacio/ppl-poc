@@ -56,17 +56,13 @@ export function SelectedItems({
   if (added.length === 0) {
     return (
       <p className="muted items-empty">
-        Todavía no agregaste productos. Buscá uno arriba para agregarlo al pedido.
+        Todavía no agregaste productos. Buscá uno abajo para agregarlo al pedido.
       </p>
     );
   }
 
   return (
-    <ul className="item-fields" ref={listRef}>
-      <li className="item-fields-head" aria-hidden="true">
-        <span>Producto</span>
-        <span>cant.</span>
-      </li>
+    <ul className="item-fields item-fields--order" ref={listRef}>
       {added.map((p) => {
         const value = quantities[p.id] ?? 0;
         const salty = p.category === 'salty';
