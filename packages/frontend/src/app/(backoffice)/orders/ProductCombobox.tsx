@@ -92,6 +92,9 @@ export function ProductCombobox({
             setActiveIndex(0);
           }}
           onFocus={() => setOpen(true)}
+          // Re-open on click too: after adding a product the input keeps focus,
+          // so a click would not re-fire onFocus to expand the list again.
+          onClick={() => setOpen(true)}
           // Delay the close so a click on an option registers before blur.
           onBlur={() => window.setTimeout(() => setOpen(false), 120)}
           onKeyDown={handleKeyDown}
