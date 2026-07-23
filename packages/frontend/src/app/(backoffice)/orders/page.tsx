@@ -52,19 +52,19 @@ export default async function OrdersPage({
           closed={!isOpen}
           action={
             <>
-              <CreateOrderModal
-                products={products}
-                clients={clients}
-                disabled={!isOpen}
-              />
-              <GenerateLinkModal clients={clients} disabled={!isOpen} />
-              <CloseSlotButton disabled={!isOpen} />
               <ExistenceEditor
                 slotId={view.slot.id}
                 products={products}
                 current={existence?.items ?? []}
                 disabled={!isOpen}
               />
+              <GenerateLinkModal clients={clients} disabled={!isOpen} />
+              <CreateOrderModal
+                products={products}
+                clients={clients}
+                disabled={!isOpen}
+              />
+              <CloseSlotButton disabled={!isOpen} />
             </>
           }
         />

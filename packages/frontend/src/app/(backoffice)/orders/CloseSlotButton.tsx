@@ -36,7 +36,7 @@ export function CloseSlotButton({ disabled }: { disabled?: boolean }) {
     <>
       <button
         type="button"
-        className="btn-toolbar-ghost"
+        className="btn-toolbar-danger"
         onClick={() => void onClose()}
         disabled={pending || disabled}
       >

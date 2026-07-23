@@ -103,7 +103,7 @@ export function CreateOrderModal({
         onClick={openModal}
         disabled={disabled}
       >
-        Agregar pedido
+        Agregar
       </button>
 
       <Modal

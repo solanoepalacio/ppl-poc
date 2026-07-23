@@ -119,7 +119,6 @@ export function GenerateLinkModal({
               Compartí este enlace con el cliente por WhatsApp:
             </p>
             <div className="link-row">
-              <code>{result.url}</code>
               <button
                 type="button"
                 className={copied ? 'copy-btn is-copied' : 'copy-btn'}
@@ -156,6 +155,7 @@ export function GenerateLinkModal({
                   </svg>
                 )}
               </button>
+              <code>{result.url}</code>
             </div>
             <p className="muted">
               Para {result.clientName} · válido durante el bloque #

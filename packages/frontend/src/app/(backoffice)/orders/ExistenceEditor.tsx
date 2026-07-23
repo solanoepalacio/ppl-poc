@@ -67,7 +67,7 @@ export function ExistenceEditor({
         onClick={startEditing}
         disabled={pending || disabled}
       >
-        Ver stock
+        Stock
       </button>
       <Modal
         open={editing}
