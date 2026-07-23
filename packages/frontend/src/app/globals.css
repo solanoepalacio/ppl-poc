@@ -357,10 +357,9 @@ select {
   margin: 0;
 }
 
-/* ── Sticky action bar ────────────────────────────────────── */
+/* ── Pinned action bar (bottom of the customer app shell) ─────── */
 .action-bar {
-  position: sticky;
-  bottom: 0;
+  flex-shrink: 0;
   margin: 0 -1.25rem;
   padding: 0.85rem 1.25rem calc(0.85rem + env(safe-area-inset-bottom));
   background: var(--paper);
@@ -386,9 +385,30 @@ select {
   text-decoration: underline;
 }
 
-/* ── Customer order: add-by-search list (shares SelectedItems/ProductCombobox
-      with the back office; styling here is scoped to the customer page) ────── */
+/* ── Customer order: full-viewport app shell — pinned brand header, title and
+      search on top, the added-products list as the only scrolling region, and a
+      pinned action bar at the bottom (so it stays put whether the list is empty
+      or long). Shares SelectedItems / ProductCombobox with the back office;
+      styling here is scoped to the customer page, so the back office is
+      unaffected. ──────────────────────────────────────────────────────────── */
+.customer-shell {
+  display: flex;
+  flex-direction: column;
+  /* Fixed viewport height (not min-height) so the list — not the window — is the
+     scroll region: the header, search, and action bar stay pinned. */
+  height: 100vh;
+  height: 100dvh;
+  /* Cancel <main>'s padding so the shell spans the reading column edge-to-edge
+     and fills the viewport; the top/side insets are re-added here. */
+  margin: -1.25rem -1.25rem -2rem;
+  padding: 1.25rem 1.25rem 0;
+}
+.customer-shell > h1 {
+  flex-shrink: 0;
+  margin: 0.6rem 0 0.85rem;
+}
 .order-search {
+  flex-shrink: 0;
   margin: 0 0 1rem;
 }
 .order-search .combobox-control input {
@@ -406,32 +426,32 @@ select {
   outline: none;
   border-color: var(--brand-amber);
 }
-/* The added-products list as a branded card. */
-.customer-order .item-fields {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-card);
-  padding: 0 1rem;
+/* The added-products list is the only scrolling region. */
+.customer-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   margin: 0 0 1rem;
 }
-.customer-order .item-field:last-child {
+.customer-list .item-field:last-child {
   border-bottom: none;
 }
-.customer-order .items-empty {
+.customer-list .items-empty {
   padding: 1.75rem 1rem;
 }
-/* Clear a just-added row from under the taller sticky action bar. */
-.customer-order .item-fields--order .item-field {
-  scroll-margin-bottom: 180px;
+/* Smaller quantity field than the back office — customer quantities are small,
+   and a narrow field leaves room for the product name. */
+.customer-shell .qty-input {
+  width: 56px;
+  font-size: 16px;
 }
 /* Touch-friendly + visible keyboard focus (customer a11y requirements). */
-.customer-order .item-remove {
+.customer-shell .item-remove {
   width: 44px;
   height: 44px;
 }
-.customer-order .qty-input:focus-visible,
-.customer-order .item-remove:focus-visible,
+.customer-shell .qty-input:focus-visible,
+.customer-shell .item-remove:focus-visible,
 .order-search .combobox-control input:focus-visible {
   outline: 3px solid var(--brand-slate);
   outline-offset: 1px;

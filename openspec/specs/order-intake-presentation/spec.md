@@ -17,11 +17,11 @@ The customer order page SHALL present the Pannico brand identity on every state 
 - **THEN** the Pannico wordmark/logo and brand palette are still present, consistent with the entry screen
 
 ### Requirement: Customer-facing copy is in Spanish
-All text the customer reads on the order page SHALL be written in Spanish, including the title and subtitle, the primary and secondary action labels, the busy/submitting state, and the confirmation, WhatsApp-fallback, and invalid-link messages.
+All text the customer reads on the order page SHALL be written in Spanish, including the title, the primary and secondary action labels, the busy/submitting state, and the confirmation, WhatsApp-fallback, and invalid-link messages.
 
 #### Scenario: Entry screen text is Spanish
 - **WHEN** the order entry screen is rendered
-- **THEN** the title, subtitle, and action labels are presented in Spanish
+- **THEN** the title and action labels are presented in Spanish
 
 #### Scenario: Outcome and error text is Spanish
 - **WHEN** any of the order-received, continue-on-WhatsApp, or invalid-link states is rendered
@@ -39,19 +39,19 @@ The order page SHALL be designed for one-handed phone use as the primary case an
 - **THEN** the content is constrained to a centered reading column rather than spanning the full width
 
 ### Requirement: A running selection summary and primary action are always reachable
-The order entry screen SHALL show a running summary of how many products are currently selected and SHALL keep the primary "confirm order" action reachable without requiring the customer to scroll past the full catalog. The primary action MUST be disabled while no products are selected and while a submission is in progress, and the WhatsApp fallback control SHALL be presented as a secondary, lower-emphasis action.
+The order entry screen SHALL show a running summary of how many products are currently selected and SHALL keep the primary "confirm order" action reachable without requiring the customer to scroll the order to reach it. The primary action MUST be disabled while no products are selected and while a submission is in progress, and the WhatsApp fallback control SHALL be presented as a secondary, lower-emphasis action.
 
 #### Scenario: Summary reflects current selection
-- **WHEN** the customer has set one or more products to a quantity greater than zero
+- **WHEN** the customer has added one or more products
 - **THEN** the running summary reflects the number of selected products
 
-#### Scenario: Primary action reachable without scrolling the whole list
-- **WHEN** the catalog is long enough to require scrolling
-- **THEN** the primary confirm action remains reachable (e.g. via a pinned action bar) without scrolling to the very bottom of the list
+#### Scenario: Primary action reachable without scrolling the list
+- **WHEN** the added-products list is long enough to require scrolling
+- **THEN** the primary confirm action remains reachable (via a pinned action bar) without scrolling the list
 
 #### Scenario: Primary action disabled when nothing is selected
-- **WHEN** no product has a quantity greater than zero
-- **THEN** the confirm action is disabled and a hint indicates at least one product must be added
+- **WHEN** no product has been added to the order
+- **THEN** the confirm action is disabled
 
 #### Scenario: Actions disabled during submission
 - **WHEN** a confirm or WhatsApp action is in progress

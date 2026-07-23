@@ -13,9 +13,7 @@ type Outcome = 'open' | 'issued' | 'denied' | 'invalid';
 
 const COPY = {
   title: 'Tu pedido',
-  subtitle: 'Buscá lo que querés, agregalo y elegí la cantidad.',
   empty: 'Todavía no agregaste productos. Buscá uno arriba para empezar.',
-  emptyHint: 'Agregá al menos un producto.',
   confirm: 'Confirmar pedido',
   busy: 'Enviando…',
   whatsapp: 'Seguir por WhatsApp',
@@ -149,21 +147,20 @@ export function OrderForm({
     items.length === 1 ? '1 producto' : `${items.length} productos`;
 
   return (
-    <>
+    <div className="customer-shell">
       <BrandHeader />
-      <section className="customer-order">
-        <h1>{COPY.title}</h1>
-        <p className="subtitle">{COPY.subtitle}</p>
+      <h1>{COPY.title}</h1>
 
-        <div className="order-search">
-          <ProductCombobox
-            id="order-product"
-            products={catalog}
-            addedIds={addedIds}
-            onAdd={addProduct}
-          />
-        </div>
+      <div className="order-search">
+        <ProductCombobox
+          id="order-product"
+          products={catalog}
+          addedIds={addedIds}
+          onAdd={addProduct}
+        />
+      </div>
 
+      <div className="customer-list">
         <SelectedItems
           products={catalog}
           quantities={quantities}
@@ -172,26 +169,25 @@ export function OrderForm({
           highlight={justAdded}
           emptyText={COPY.empty}
         />
+      </div>
 
-        {error && <p className="error">{error}</p>}
+      {error && <p className="error">{error}</p>}
 
-        <div className="action-bar">
-          <p className="summary" aria-live="polite">
-            {summary}
-          </p>
-          <button
-            className="btn-primary"
-            disabled={busy || items.length === 0}
-            onClick={submit}
-          >
-            {busy ? COPY.busy : COPY.confirm}
-          </button>
-          <button className="btn-secondary" disabled={busy} onClick={whatsapp}>
-            {COPY.whatsapp}
-          </button>
-          {items.length === 0 && <p className="muted">{COPY.emptyHint}</p>}
-        </div>
-      </section>
-    </>
+      <div className="action-bar">
+        <p className="summary" aria-live="polite">
+          {summary}
+        </p>
+        <button
+          className="btn-primary"
+          disabled={busy || items.length === 0}
+          onClick={submit}
+        >
+          {busy ? COPY.busy : COPY.confirm}
+        </button>
+        <button className="btn-secondary" disabled={busy} onClick={whatsapp}>
+          {COPY.whatsapp}
+        </button>
+      </div>
+    </div>
   );
 }
