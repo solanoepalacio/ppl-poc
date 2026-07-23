@@ -920,8 +920,8 @@ select {
   padding: 0;
   /* Tall shared frame, but narrower than full-bleed so it reads as a dialog.
      Still one fixed frame for every dialog, so the UI never jumps. */
-  width: 66vw;
-  max-width: 1100px;
+  width: 50vw;
+  max-width: 900px;
   height: calc(100vh - 4rem);
   max-height: none;
   border-radius: 16px;

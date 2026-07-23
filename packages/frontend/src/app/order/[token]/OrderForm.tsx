@@ -157,6 +157,7 @@ export function OrderForm({
           products={catalog}
           addedIds={addedIds}
           onAdd={addProduct}
+          showCategory={false}
         />
       </div>
 

@@ -18,6 +18,7 @@ export function ProductCombobox({
   id = 'product-combobox',
   disabled,
   dropUp,
+  showCategory = true,
 }: {
   products: Product[];
   /** Ids already on the order — hidden from the results. */
@@ -27,6 +28,8 @@ export function ProductCombobox({
   disabled?: boolean;
   /** Open the results above the input (when the search sits at the bottom). */
   dropUp?: boolean;
+  /** The salado/dulce pill is production-facing; hidden on the customer view. */
+  showCategory?: boolean;
 }) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
@@ -129,9 +132,11 @@ export function ProductCombobox({
                     onMouseEnter={() => setActiveIndex(i)}
                   >
                     <span>{p.name}</span>
-                    <span className={salty ? 'cat-tag salty' : 'cat-tag sweet'}>
-                      {salty ? 'salado' : 'dulce'}
-                    </span>
+                    {showCategory && (
+                      <span className={salty ? 'cat-tag salty' : 'cat-tag sweet'}>
+                        {salty ? 'salado' : 'dulce'}
+                      </span>
+                    )}
                   </li>
                 );
               })
