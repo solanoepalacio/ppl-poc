@@ -4,15 +4,17 @@ import { useMemo, useState } from 'react';
 import type { Product } from '@pannico/shared';
 import { ApiError, confirmOrder, continueOnWhatsapp } from '@/lib/api';
 import { trackEvent } from '@/lib/analytics';
+import { ProductCombobox } from '@/app/(backoffice)/orders/ProductCombobox';
+import { SelectedItems } from '@/app/(backoffice)/orders/SelectedItems';
 import { BrandHeader } from './BrandHeader';
 import { InvalidLinkNotice } from './InvalidLinkNotice';
-import { QuantityStepper } from './QuantityStepper';
 
 type Outcome = 'open' | 'issued' | 'denied' | 'invalid';
 
 const COPY = {
   title: 'Tu pedido',
-  subtitle: 'Elegí lo que querés y la cantidad.',
+  subtitle: 'Buscá lo que querés, agregalo y elegí la cantidad.',
+  empty: 'Todavía no agregaste productos. Buscá uno arriba para empezar.',
   emptyHint: 'Agregá al menos un producto.',
   confirm: 'Confirmar pedido',
   busy: 'Enviando…',
@@ -22,8 +24,10 @@ const COPY = {
 
 /**
  * Frictionless picklist form: no login, no prices, no payment. The customer
- * picks catalog products with quantities and submits, or chooses the WhatsApp
- * fallback. Confirmation is immediate on success.
+ * searches the catalog, adds products one at a time, types each quantity, and
+ * submits — or chooses the WhatsApp fallback. The same add-by-search UX as the
+ * back-office order dialogs; only the products already added are shown.
+ * Confirmation is immediate on success.
  */
 export function OrderForm({
   token,
@@ -33,6 +37,9 @@ export function OrderForm({
   catalog: Product[];
 }) {
   const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [justAdded, setJustAdded] = useState<{ id: string; n: number } | null>(
+    null,
+  );
   const [outcome, setOutcome] = useState<Outcome>('open');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -44,9 +51,17 @@ export function OrderForm({
         .map(([productId, quantity]) => ({ productId, quantity })),
     [quantities],
   );
+  const addedIds = items.map((i) => i.productId);
 
   function setQty(productId: string, value: number) {
     setQuantities((prev) => ({ ...prev, [productId]: Math.max(0, value) }));
+  }
+
+  function addProduct(productId: string) {
+    setQuantities((prev) =>
+      prev[productId] > 0 ? prev : { ...prev, [productId]: 1 },
+    );
+    setJustAdded((prev) => ({ id: productId, n: (prev?.n ?? 0) + 1 }));
   }
 
   /**
@@ -136,28 +151,27 @@ export function OrderForm({
   return (
     <>
       <BrandHeader />
-      <section>
+      <section className="customer-order">
         <h1>{COPY.title}</h1>
         <p className="subtitle">{COPY.subtitle}</p>
 
-        <div className="product-list">
-          {catalog.map((product) => {
-            const qty = quantities[product.id] ?? 0;
-            return (
-              <div
-                className={`product-row${qty > 0 ? ' selected' : ''}`}
-                key={product.id}
-              >
-                <span className="product-name">{product.name}</span>
-                <QuantityStepper
-                  productName={product.name}
-                  value={qty}
-                  onChange={(next) => setQty(product.id, next)}
-                />
-              </div>
-            );
-          })}
+        <div className="order-search">
+          <ProductCombobox
+            id="order-product"
+            products={catalog}
+            addedIds={addedIds}
+            onAdd={addProduct}
+          />
         </div>
+
+        <SelectedItems
+          products={catalog}
+          quantities={quantities}
+          onChange={setQty}
+          onRemove={(id) => setQty(id, 0)}
+          highlight={justAdded}
+          emptyText={COPY.empty}
+        />
 
         {error && <p className="error">{error}</p>}
 

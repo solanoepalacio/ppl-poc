@@ -17,6 +17,7 @@ export function ProductCombobox({
   onAdd,
   id = 'product-combobox',
   disabled,
+  dropUp,
 }: {
   products: Product[];
   /** Ids already on the order — hidden from the results. */
@@ -24,6 +25,8 @@ export function ProductCombobox({
   onAdd: (productId: string) => void;
   id?: string;
   disabled?: boolean;
+  /** Open the results above the input (when the search sits at the bottom). */
+  dropUp?: boolean;
 }) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
@@ -72,9 +75,9 @@ export function ProductCombobox({
   }
 
   return (
-    // `combobox-up` opens the results above the input — the search sits at the
-    // bottom of the list, so a downward menu would spill past the modal.
-    <div className="field combobox combobox-up">
+    // `combobox-up` opens the results above the input (used when the search sits
+    // at the bottom of a list, so a downward menu would spill past the frame).
+    <div className={dropUp ? 'field combobox combobox-up' : 'field combobox'}>
       <div className="combobox-control">
         <input
           id={id}

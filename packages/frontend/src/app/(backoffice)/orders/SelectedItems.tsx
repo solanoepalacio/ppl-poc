@@ -22,6 +22,7 @@ export function SelectedItems({
   onRemove,
   disabled,
   highlight,
+  emptyText = 'Todavía no agregaste productos. Buscá uno abajo para agregarlo al pedido.',
 }: {
   products: Product[];
   quantities: Record<string, number>;
@@ -30,6 +31,8 @@ export function SelectedItems({
   disabled?: boolean;
   /** Product to reveal + flash; `n` bumps so a re-add re-triggers the effect. */
   highlight?: { id: string; n: number } | null;
+  /** Empty-state copy; the direction to the search differs by surface. */
+  emptyText?: string;
 }) {
   const selectAllOnFocus = useSelectAllOnFocus();
   const listRef = useRef<HTMLUListElement>(null);
@@ -54,11 +57,7 @@ export function SelectedItems({
   }, [highlightId, highlightN]);
 
   if (added.length === 0) {
-    return (
-      <p className="muted items-empty">
-        Todavía no agregaste productos. Buscá uno abajo para agregarlo al pedido.
-      </p>
-    );
+    return <p className="muted items-empty">{emptyText}</p>;
   }
 
   return (

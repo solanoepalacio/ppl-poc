@@ -56,6 +56,7 @@ export function ProductPicker({
           addedIds={addedIds}
           onAdd={add}
           disabled={disabled}
+          dropUp
         />
       </div>
     </div>
