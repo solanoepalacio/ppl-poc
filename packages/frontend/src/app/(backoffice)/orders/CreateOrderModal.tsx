@@ -11,9 +11,7 @@ import { createLink, createOrder } from '@/lib/api';
 import { trackEvent } from '@/lib/analytics';
 import { Modal } from './Modal';
 import { ClientCombobox } from './ClientCombobox';
-import { ProductCombobox } from './ProductCombobox';
-import { SelectedItems } from './SelectedItems';
-import { itemsFromQuantities } from './ItemQuantityFields';
+import { ProductPicker, itemsFromQuantities } from './ProductPicker';
 
 /**
  * Client-first order creation, launched as a modal from the bloque toolbar. The
@@ -40,11 +38,6 @@ export function CreateOrderModal({
   const [clientId, setClientId] = useState<string | null>(null);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [message, setMessage] = useState('');
-  // The product most recently added, with a bump counter so re-adding the same
-  // product still re-triggers the scroll-to + highlight in the added list.
-  const [justAdded, setJustAdded] = useState<{ id: string; n: number } | null>(
-    null,
-  );
 
   const [result, setResult] = useState<CreateLinkResponse | null>(null);
   const [copied, setCopied] = useState(false);
@@ -59,7 +52,6 @@ export function CreateOrderModal({
     setClientId(null);
     setQuantities({});
     setMessage('');
-    setJustAdded(null);
     setResult(null);
     setCopied(false);
     setBusy(false);
@@ -79,21 +71,6 @@ export function CreateOrderModal({
   function setQuantity(productId: string, quantity: number) {
     setQuantities((q) => ({ ...q, [productId]: quantity }));
   }
-
-  function addProduct(productId: string) {
-    setQuantities((q) => (q[productId] ? q : { ...q, [productId]: 1 }));
-    setJustAdded((prev) => ({ id: productId, n: (prev?.n ?? 0) + 1 }));
-  }
-
-  function removeProduct(productId: string) {
-    setQuantities((q) => {
-      const next = { ...q };
-      delete next[productId];
-      return next;
-    });
-  }
-
-  const addedIds = Object.keys(quantities).filter((id) => quantities[id] > 0);
 
   async function generateLink() {
     setError(null);
@@ -246,25 +223,13 @@ export function CreateOrderModal({
         )}
 
         {step === 'form' && (
-          <div className="order-form-body">
-            <SelectedItems
-              products={products}
-              quantities={quantities}
-              onChange={setQuantity}
-              onRemove={removeProduct}
-              disabled={pending}
-              highlight={justAdded}
-            />
-            <div className="product-add-bar">
-              <ProductCombobox
-                id="create-order-product"
-                products={products}
-                addedIds={addedIds}
-                onAdd={addProduct}
-                disabled={pending}
-              />
-            </div>
-          </div>
+          <ProductPicker
+            products={products}
+            quantities={quantities}
+            onChange={setQuantity}
+            disabled={pending}
+            searchId="create-order-product"
+          />
         )}
 
         {error && <p className="error">{error}</p>}

@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ExistenceItem, Product } from '@pannico/shared';
 import { setSlotExistence } from '@/lib/api';
-import { ItemQuantityFields, itemsFromQuantities } from './ItemQuantityFields';
+import { ProductPicker, itemsFromQuantities } from './ProductPicker';
 import { Modal } from './Modal';
 
 /**
@@ -73,6 +73,15 @@ export function ExistenceEditor({
         open={editing}
         onClose={() => setEditing(false)}
         title="Editar stock"
+        aboveBody={
+          <>
+            <p className="muted modal-above-hint">
+              Lo que ya hay en existencia se descuenta de los totales de
+              producción.
+            </p>
+            <span className="modal-section-label">Productos en stock</span>
+          </>
+        }
         footer={
           <>
             <button
@@ -92,15 +101,12 @@ export function ExistenceEditor({
           </>
         }
       >
-        <p className="muted">
-          Lo que ya hay en existencia se descuenta de los totales de producción.
-        </p>
-        <ItemQuantityFields
+        <ProductPicker
           products={products}
           quantities={quantities}
           onChange={setQuantity}
           disabled={pending}
-          unitLabel="en stock"
+          searchId="stock-product"
         />
         {error && <p className="error">{error}</p>}
       </Modal>

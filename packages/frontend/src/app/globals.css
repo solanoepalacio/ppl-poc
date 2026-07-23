@@ -966,6 +966,12 @@ select {
 .product-add-bar .combobox-control input:focus {
   border-color: var(--brand-amber);
 }
+/* Explanatory hint in the pinned top region (e.g. the stock dialog). */
+.modal-above-hint {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.4;
+}
 /* Section label in the pinned top region, titling the added-products list. */
 .modal-section-label {
   font-family: var(--font-display);

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { OrderItem, Product } from '@pannico/shared';
 import { deleteOrder, replaceOrderItems } from '@/lib/api';
 import { trackEvent } from '@/lib/analytics';
-import { ItemQuantityFields, itemsFromQuantities } from './ItemQuantityFields';
+import { ProductPicker, itemsFromQuantities } from './ProductPicker';
 import { Modal } from './Modal';
 
 /**
@@ -125,6 +125,9 @@ export function OrderActions({
         open={editing}
         onClose={() => setEditing(false)}
         title="Editar artículos"
+        aboveBody={
+          <span className="modal-section-label">Productos en el pedido</span>
+        }
         footer={
           <>
             <button
@@ -144,12 +147,12 @@ export function OrderActions({
           </>
         }
       >
-        <ItemQuantityFields
+        <ProductPicker
           products={products}
           quantities={quantities}
           onChange={setQuantity}
           disabled={pending}
-          unitLabel="cant."
+          searchId="edit-items-product"
         />
         {error && <p className="error">{error}</p>}
       </Modal>
