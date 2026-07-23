@@ -1,6 +1,5 @@
 import type { ProductCategory } from '@pannico/shared';
 import { getProductionTotals } from '@/lib/api';
-import { slotLabel } from '../slotLabel';
 import { ViewHeader } from '../ViewHeader';
 
 /** Per-line copy for the header + toolbar. */
@@ -28,16 +27,6 @@ export async function ProductionView({
     <>
       <ViewHeader title={title} subtitle={subtitle} />
       <div className="bo-content">
-        <div className="bo-toolbar">
-          <div className="bo-toolbar-left">
-            <span className="bo-toolbar-label">Bloque</span>
-            <span className="bo-chip">{slotLabel(production.slot)}</span>
-          </div>
-          <span className="bo-toolbar-note">
-            Totales de solo lectura · sumados sobre todos los pedidos del bloque
-          </span>
-        </div>
-
         {production.items.length > 0 ? (
           <div className="ptable ptable--breakdown" role="table">
             <div className="ptable-head" role="row">
