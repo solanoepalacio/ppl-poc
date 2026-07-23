@@ -78,21 +78,14 @@ export function SelectedItems({
                 {salty ? 'salado' : 'dulce'}
               </span>
             </span>
-            <div className="item-stepper">
-              <button
-                type="button"
-                className="step-btn"
-                aria-label={`Restar ${p.name}`}
-                disabled={disabled || value <= 1}
-                onClick={() => onChange(p.id, Math.max(1, value - 1))}
-              >
-                −
-              </button>
+            <div className="item-qty">
               <input
                 id={`qty-${p.id}`}
-                className="step-value"
+                className="qty-input"
                 type="number"
                 min={1}
+                inputMode="numeric"
+                aria-label={`Cantidad de ${p.name}`}
                 value={value}
                 disabled={disabled}
                 {...selectAllOnFocus}
@@ -103,15 +96,6 @@ export function SelectedItems({
                   )
                 }
               />
-              <button
-                type="button"
-                className="step-btn"
-                aria-label={`Sumar ${p.name}`}
-                disabled={disabled}
-                onClick={() => onChange(p.id, value + 1)}
-              >
-                +
-              </button>
               <button
                 type="button"
                 className="item-remove"

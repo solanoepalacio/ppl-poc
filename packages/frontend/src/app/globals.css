@@ -1087,50 +1087,36 @@ select {
   background: #f3ead6;
   color: #8a6a12;
 }
-.item-stepper {
+.item-qty {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex-shrink: 0;
 }
-.step-btn {
-  width: 40px;
-  height: 40px;
-  min-height: auto;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+/* Typed quantity field — looks like an input so it's clearly editable
+   (quantities are often large, so typing beats a +/- stepper). */
+.qty-input {
+  width: 84px;
+  height: 44px;
+  text-align: center;
   border: 1px solid #d7cdb9;
   border-radius: 10px;
   background: #fff;
-  color: var(--brand-slate);
-  font-size: 20px;
-  line-height: 1;
-  flex-shrink: 0;
-}
-.step-btn:not(:disabled):hover {
-  border-color: var(--brand-slate);
-}
-.step-value {
-  width: 52px;
-  text-align: center;
-  border: none;
-  background: transparent;
-  padding: 0;
+  padding: 0 10px;
   font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 17px;
+  font-weight: 700;
+  font-size: 18px;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
   -moz-appearance: textfield;
   appearance: textfield;
 }
-.step-value.zero {
-  color: #a9b0b4;
+.qty-input:focus {
+  outline: none;
+  border-color: var(--brand-amber);
 }
-.step-value::-webkit-outer-spin-button,
-.step-value::-webkit-inner-spin-button {
+.qty-input::-webkit-outer-spin-button,
+.qty-input::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
