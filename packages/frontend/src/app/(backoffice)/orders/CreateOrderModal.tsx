@@ -227,7 +227,7 @@ export function CreateOrderModal({
               <textarea
                 id="create-order-message"
                 rows={2}
-                placeholder="Ej. sin azúcar, retira a las 9hs…"
+                placeholder="Ingresa el mensaje que el usuario uso para hacerte el pedido. Sera usado para entrenar al agente que toma pedidos."
                 value={message}
                 disabled={pending}
                 onChange={(e) => setMessage(e.target.value)}
