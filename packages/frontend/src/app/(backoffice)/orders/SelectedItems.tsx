@@ -95,6 +95,14 @@ export function SelectedItems({
                     Math.max(1, Math.floor(Number(e.target.value) || 1)),
                   )
                 }
+                onKeyDown={(e) => {
+                  // Enter confirms the typed value and drops focus, rather than
+                  // leaving the field focused (which reads as still-editing).
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.currentTarget.blur();
+                  }
+                }}
               />
               <button
                 type="button"
