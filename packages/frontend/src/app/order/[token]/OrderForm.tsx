@@ -4,8 +4,7 @@ import { useMemo, useState } from 'react';
 import type { Product } from '@pannico/shared';
 import { ApiError, confirmOrder, continueOnWhatsapp } from '@/lib/api';
 import { trackEvent } from '@/lib/analytics';
-import { ProductCombobox } from '@/app/(backoffice)/orders/ProductCombobox';
-import { SelectedItems } from '@/app/(backoffice)/orders/SelectedItems';
+import { CatalogList } from './CatalogList';
 import { BrandHeader } from './BrandHeader';
 import { InvalidLinkNotice } from './InvalidLinkNotice';
 
@@ -13,7 +12,9 @@ type Outcome = 'open' | 'issued' | 'denied' | 'invalid';
 
 const COPY = {
   title: 'Tu pedido',
-  empty: 'Todavía no agregaste productos. Buscá uno arriba para empezar.',
+  filterLabel: 'Filtrar productos',
+  filterPlaceholder: 'Filtrá por nombre…',
+  clearFilter: 'Limpiar',
   confirm: 'Confirmar pedido',
   busy: 'Enviando…',
   whatsapp: 'Seguir por WhatsApp',
@@ -21,11 +22,11 @@ const COPY = {
 };
 
 /**
- * Frictionless picklist form: no login, no prices, no payment. The customer
- * searches the catalog, adds products one at a time, types each quantity, and
- * submits — or chooses the WhatsApp fallback. The same add-by-search UX as the
- * back-office order dialogs; only the products already added are shown.
- * Confirmation is immediate on success.
+ * Frictionless picklist form: no login, no prices, no payment. The whole
+ * catalog is listed alphabetically on load and the customer types a quantity
+ * on whichever products they want — a positive quantity is what puts a product
+ * on the order. The filter above the list narrows what is shown without ever
+ * touching the quantities already typed. Confirmation is immediate on success.
  */
 export function OrderForm({
   token,
@@ -35,9 +36,7 @@ export function OrderForm({
   catalog: Product[];
 }) {
   const [quantities, setQuantities] = useState<Record<string, number>>({});
-  const [justAdded, setJustAdded] = useState<{ id: string; n: number } | null>(
-    null,
-  );
+  const [filter, setFilter] = useState('');
   const [outcome, setOutcome] = useState<Outcome>('open');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -49,17 +48,9 @@ export function OrderForm({
         .map(([productId, quantity]) => ({ productId, quantity })),
     [quantities],
   );
-  const addedIds = items.map((i) => i.productId);
 
   function setQty(productId: string, value: number) {
     setQuantities((prev) => ({ ...prev, [productId]: Math.max(0, value) }));
-  }
-
-  function addProduct(productId: string) {
-    setQuantities((prev) =>
-      prev[productId] > 0 ? prev : { ...prev, [productId]: 1 },
-    );
-    setJustAdded((prev) => ({ id: productId, n: (prev?.n ?? 0) + 1 }));
   }
 
   /**
@@ -152,24 +143,35 @@ export function OrderForm({
       <h1>{COPY.title}</h1>
 
       <div className="order-search">
-        <ProductCombobox
-          id="order-product"
-          products={catalog}
-          addedIds={addedIds}
-          onAdd={addProduct}
-          showCategory={false}
-        />
+        <div className="filter-row">
+          <input
+            id="order-filter"
+            type="text"
+            className="filter-input"
+            aria-label={COPY.filterLabel}
+            placeholder={COPY.filterPlaceholder}
+            autoComplete="off"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+          />
+          <button
+            type="button"
+            className="filter-clear"
+            disabled={filter === ''}
+            onClick={() => setFilter('')}
+          >
+            {COPY.clearFilter}
+          </button>
+        </div>
       </div>
 
       <div className="customer-list">
-        <SelectedItems
+        <CatalogList
           products={catalog}
           quantities={quantities}
           onChange={setQty}
-          onRemove={(id) => setQty(id, 0)}
-          highlight={justAdded}
-          emptyText={COPY.empty}
-          showCategory={false}
+          filter={filter}
+          disabled={busy}
         />
       </div>
 
