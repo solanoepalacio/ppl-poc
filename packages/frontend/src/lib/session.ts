@@ -22,6 +22,29 @@ export const SESSION_COOKIE = 'pannico_session';
  */
 export const SESSION_MAX_AGE_SECONDS = 400 * 24 * 60 * 60;
 
+/**
+ * Whether the session cookie is marked `Secure`.
+ *
+ * Defaults to on, so a deployment that terminates TLS is protected without
+ * having to configure anything. Set `COOKIE_SECURE=false` when the app is
+ * served over plain HTTP on a real hostname: browsers discard a `Secure`
+ * cookie that arrives over a non-secure origin, so login would appear to
+ * succeed and then bounce straight back to /login forever — the cookie is
+ * dropped, the middleware sees no session, and redirects again.
+ *
+ * This is keyed off its own variable rather than `NODE_ENV` because the two
+ * questions are unrelated: `next start` always runs in production mode, but
+ * whether there is TLS in front of it is a property of the deployment. The
+ * homelab install (`ppl-poc.home`, plain HTTP, no reverse proxy) is production
+ * and has no TLS, which the `NODE_ENV` check had no way to express.
+ *
+ * `localhost` needs no opt-out — browsers treat it as a trustworthy origin and
+ * accept `Secure` cookies over HTTP there, so local development works either way.
+ */
+export function cookieSecure(): boolean {
+  return process.env.COOKIE_SECURE !== 'false';
+}
+
 function encoder(): TextEncoder {
   return new TextEncoder();
 }

@@ -68,10 +68,24 @@ process because the TV gets switched off.
   There is no cookie mechanism that outlives that cap; a re-login roughly once a
   year is the floor for this approach.
 
-- **Cookie flags: `HttpOnly`, `SameSite=Lax`, `Path=/`, and `Secure` in
-  production.** `HttpOnly` keeps it out of reach of scripts; `Lax` (not `Strict`)
-  is required so that following a link into the back office still sends the
-  cookie; `Secure` is conditional because local development is plain HTTP.
+- **Cookie flags: `HttpOnly`, `SameSite=Lax`, `Path=/`, and `Secure` unless
+  explicitly disabled.** `HttpOnly` keeps it out of reach of scripts; `Lax` (not
+  `Strict`) is required so that following a link into the back office still sends
+  the cookie.
+
+  `Secure` is keyed off its own `COOKIE_SECURE` variable (default on; set to
+  `"false"` to disable) rather than `NODE_ENV`. The first cut used
+  `NODE_ENV === 'production'`, assuming production implies TLS — but the two are
+  unrelated: `next start` always runs in production mode, while whether TLS sits
+  in front of it is a property of the deployment. The homelab install is
+  production *and* plain HTTP (`http://ppl-poc.home:3001`, no reverse proxy),
+  which that check had no way to express. Since browsers discard a `Secure`
+  cookie arriving over a non-secure origin, it would have made login impossible
+  there — cookie dropped, middleware sees no session, every attempt redirects
+  back to `/login`. `localhost` is exempt from that browser rule (treated as a
+  trustworthy origin), which is why local development never surfaced it. Logout
+  applies the same flag: a `Secure` clear sent over plain HTTP is discarded too,
+  silently leaving the session in place.
 
 - **A plain `<form method="post">` to a route handler, not a client-side fetch
   or a Server Action.** No JavaScript is involved in the critical path, which is
@@ -128,6 +142,10 @@ process because the TV gets switched off.
   acceptable for this threat model (a small bakery's internal tool); rotating
   the env var revokes access for everyone at once.
 - **[Trade-off]** No HTTPS enforcement is added by this change. The credential
-  travels in a form POST body and the cookie on every request, so deployment
-  must already terminate TLS; this design assumes that and does not re-check it
-  at the application layer.
+  travels in a form POST body and the cookie on every request, so a deployment
+  should terminate TLS in front of the app. This design does not re-check that
+  at the application layer — and, importantly, does not *assume* it either: the
+  homelab deployment runs plain HTTP today and opts out via `COOKIE_SECURE=false`.
+  That is a real exposure (credential and session cookie readable by anyone on
+  the LAN), accepted for now because the install is LAN-only on a small trusted
+  network. Putting TLS in front and dropping the opt-out is the follow-up.

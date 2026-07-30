@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { SESSION_COOKIE } from '@/lib/session';
+import { SESSION_COOKIE, cookieSecure } from '@/lib/session';
 
 /**
  * Ends the session: clears the cookie and returns to the login page. A POST (not
@@ -12,7 +12,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   res.cookies.set(SESSION_COOKIE, '', {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    // Must match how the cookie was issued: a `Secure` clear sent over plain
+    // HTTP is discarded too, which would leave the session cookie in place and
+    // make logout silently do nothing.
+    secure: cookieSecure(),
     path: '/',
     maxAge: 0,
   });

@@ -3,6 +3,7 @@ import {
   SESSION_COOKIE,
   SESSION_MAX_AGE_SECONDS,
   authConfig,
+  cookieSecure,
   credentialsMatch,
   issueSession,
   safeNext,
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     httpOnly: true,
     sameSite: 'lax',
     // Lax, not Strict: following a link into the back office must still send it.
-    secure: process.env.NODE_ENV === 'production',
+    secure: cookieSecure(),
     path: '/',
     maxAge: SESSION_MAX_AGE_SECONDS,
   });
