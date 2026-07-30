@@ -386,11 +386,11 @@ select {
 }
 
 /* ── Customer order: full-viewport app shell — pinned brand header, title and
-      search on top, the added-products list as the only scrolling region, and a
-      pinned action bar at the bottom (so it stays put whether the list is empty
-      or long). Shares SelectedItems / ProductCombobox with the back office;
-      styling here is scoped to the customer page, so the back office is
-      unaffected. ──────────────────────────────────────────────────────────── */
+      name filter on top, the full catalog list as the only scrolling region,
+      and a pinned action bar at the bottom (so it stays put whether the list is
+      filtered down or full). The list rows reuse the back office's
+      .item-field / .qty-input classes; styling here is scoped to the customer
+      page, so the back office is unaffected. ─────────────────────────────── */
 .customer-shell {
   display: flex;
   flex-direction: column;
@@ -411,8 +411,15 @@ select {
   flex-shrink: 0;
   margin: 0 0 1rem;
 }
-.order-search .combobox-control input {
-  width: 100%;
+/* Filter field + its clear button on one line; the field takes the slack. */
+.filter-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+.filter-input {
+  flex: 1;
+  min-width: 0;
   height: 48px;
   padding: 0 16px;
   border: 1px solid var(--line);
@@ -422,9 +429,25 @@ select {
   font-size: 16px;
   color: var(--ink);
 }
-.order-search .combobox-control input:focus {
+.filter-input:focus {
   outline: none;
   border-color: var(--brand-amber);
+}
+.filter-clear {
+  flex-shrink: 0;
+  /* 44px min touch target (customer a11y requirement); 48px matches the field. */
+  min-width: 76px;
+  height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--brand-slate);
+}
+.filter-clear:disabled {
+  opacity: 0.45;
 }
 /* The added-products list is the only scrolling region. */
 .customer-list {
@@ -450,9 +473,18 @@ select {
   width: 44px;
   height: 44px;
 }
+/* The clear control only renders on rows with a quantity, but its space is
+   reserved on every row (56px field + 8px gap + 2px button margin + 44px
+   button) so the quantity fields stay in one column down the whole catalog
+   instead of shifting on the rows that have none. */
+.customer-shell .item-qty {
+  min-width: 110px;
+  justify-content: flex-start;
+}
 .customer-shell .qty-input:focus-visible,
 .customer-shell .item-remove:focus-visible,
-.order-search .combobox-control input:focus-visible {
+.filter-input:focus-visible,
+.filter-clear:focus-visible {
   outline: 3px solid var(--brand-slate);
   outline-offset: 1px;
 }
