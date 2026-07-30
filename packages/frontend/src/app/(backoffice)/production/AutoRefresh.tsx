@@ -3,12 +3,17 @@
 import { useEffect, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 
-/** How often an open production view re-reads its totals. */
-const INTERVAL_MS = 30_000;
+/**
+ * How often an open production view re-reads its totals. Two minutes rather than
+ * something tighter because the view spends most of its time scrolling itself
+ * (see AutoScroll) — a refresh landing mid-scroll changes content under the
+ * reader's eye, and orders do not arrive fast enough to make that worth it.
+ */
+const INTERVAL_MS = 120_000;
 
 /**
- * Keeps an open production view current: re-runs the server render every 30s so
- * orders that arrive after the page was opened show up on their own — these
+ * Keeps an open production view current: re-runs the server render periodically
+ * so orders that arrive after the page was opened show up on their own — these
  * views sit on a screen in the production area, where nobody is going to press
  * reload. Renders nothing; it exists only for the timer, so it cannot affect the
  * table's layout. Uses the same client-island-refreshes-the-server-tree pattern
