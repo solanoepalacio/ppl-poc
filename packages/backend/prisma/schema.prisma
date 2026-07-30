@@ -1,0 +1,120 @@
+// Prisma schema for the Pannico order-intake PoC.
+// SQLite is used for PoC simplicity; status is a plain String column
+// constrained by the shared OrderStatus union and validated in the service layer
+// (SQLite + Prisma do not support native enums).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// Catalog product, populated by the seed. `active` lets us retire a product
+/// without hard-deleting it (historical OrderItems keep their reference).
+/// `category` is the production line (`sweet` | `salty`), stored as a plain
+/// String constrained by the shared ProductCategory union and validated in the
+/// service layer (SQLite + Prisma have no native enums). The default keeps the
+/// migration's ADD COLUMN valid on existing rows; the seed writes the real value.
+model Product {
+  id       String  @id @default(cuid())
+  name     String
+  active   Boolean @default(true)
+  category String  @default("salty")
+
+  orderItems OrderItem[]
+  existence  SlotExistence[]
+}
+
+/// A client an order can be attached to. The directory is a fixed preset list
+/// loaded via Prisma data migrations (no management UI); new clients are added
+/// with further data migrations. `name` is the UI-friendly display name and
+/// `slug` is a normalized, unique natural key used for dedup and idempotent
+/// data-migration upserts. `active` retires a client without hard-deleting it
+/// so historical orders keep their reference.
+model Client {
+  id     String  @id @default(cuid())
+  name   String
+  slug   String  @unique
+  active Boolean @default(true)
+
+  orders Order[]
+}
+
+/// A production bloque: the container orders are slotted into. Exactly one
+/// bloque is `open` at any time (enforced by app logic plus a partial unique
+/// index defined in the migration — Prisma's DSL can't express a partial index).
+/// Closing the open bloque atomically opens a fresh one. `seq` is a human-facing
+/// display number assigned as max(seq)+1 in the service (SQLite autoincrement is
+/// PK-only, and our PK is a cuid).
+model Slot {
+  id       String    @id @default(cuid())
+  seq      Int       @unique
+  status   String    @default("open")
+  openedAt DateTime  @default(now())
+  closedAt DateTime?
+
+  orders    Order[]
+  existence SlotExistence[]
+
+  @@index([status])
+}
+
+/// An order. The single-use token lives on the order (1:1) since a token is
+/// bound to exactly one order. Every order belongs to the bloque that was open
+/// when it was created. `consumedAt` is the single-use gate: a token is valid
+/// only while `consumedAt` is null (and its bloque is open). Both confirming an
+/// order and choosing the WhatsApp fallback consume the link.
+model Order {
+  id          String    @id @default(cuid())
+  clientId    String
+  token       String    @unique
+  slotId      String
+  createdAt   DateTime  @default(now())
+  confirmedAt DateTime?
+  consumedAt  DateTime?
+  /// Optional raw customer message (e.g. pasted WhatsApp text) captured when a
+  /// manager transcribes an order by hand. Null when no message was captured.
+  message     String?
+
+  items  OrderItem[]
+  slot   Slot        @relation(fields: [slotId], references: [id], onDelete: Restrict)
+  client Client      @relation(fields: [clientId], references: [id], onDelete: Restrict)
+
+  @@index([createdAt])
+  @@index([slotId])
+  @@index([clientId])
+}
+
+/// A line item recorded on an order at confirmation. References Product so
+/// out-of-catalog items are structurally impossible.
+model OrderItem {
+  id        String @id @default(cuid())
+  orderId   String
+  productId String
+  quantity  Int
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+}
+
+/// Manually-entered stock already on hand when a bloque started, per product.
+/// Subtracted from that bloque's production totals. A bloque with no row for a
+/// product has zero existence for it. Rows exist only for the bloque they belong
+/// to; a freshly opened bloque has none, so it starts at zero everywhere.
+model SlotExistence {
+  id        String @id @default(cuid())
+  slotId    String
+  productId String
+  quantity  Int
+
+  slot    Slot    @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([slotId, productId])
+  @@index([slotId])
+}

@@ -1,0 +1,14 @@
+{
+  "name": "pannico",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "yarn@4.9.2",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "yarn workspaces foreach -At run build",
+    "lint": "yarn workspaces foreach -At run lint",
+    "test": "yarn workspaces foreach -At run test"
+  }
+}

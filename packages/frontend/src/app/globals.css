@@ -1,0 +1,1514 @@
+:root {
+  --brand-slate: #365566;
+  --brand-slate-700: #2b4655; /* darker for active/press */
+  --brand-amber: #d39b23;
+  --brand-amber-600: #b8851a; /* hover/press */
+  --paper: #fbf8f3; /* warm off-white page bg */
+  --surface: #ffffff; /* cards */
+  --ink: #1f2a30; /* primary text */
+  --ink-muted: #5d6b72;
+  --line: #e7e1d6;
+  --radius: 14px;
+  --radius-pill: 999px;
+  --tap: 44px; /* min touch target */
+  --shadow-card: 0 2px 12px rgba(54, 85, 102, 0.08);
+  --maxw: 560px;
+  /* Production views are read from a distance, so their type is sized for the
+     room rather than for a desk. In `vh`, not px, so the physical size on the
+     panel is the same whether the TV's browser reports a 1280- or 1920-wide CSS
+     viewport. Tune these two and the row heights follow.
+     Rule of thumb: cap height ~= 0.7em, and signage stays legible to about 200x
+     its cap height — on a 397mm-tall 32" panel that puts 4vh at roughly 2.2 m,
+     chosen over a larger size to keep more products on screen at once. */
+  --prod-name-size: 4vh;
+  --prod-qty-size: 5vh;
+  --font-display: var(--font-oswald), system-ui, sans-serif;
+  --font-sans: var(--font-inter), system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: var(--paper);
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+main {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 1.25rem 1.25rem 2rem;
+}
+
+h1 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.6rem;
+  letter-spacing: 0.01em;
+  margin: 0.25rem 0;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  padding: 0.6rem 1rem;
+  min-height: var(--tap);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Visible keyboard focus for all interactive controls. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible {
+  outline: 3px solid var(--brand-slate);
+  outline-offset: 2px;
+}
+
+.btn-primary {
+  background: var(--brand-amber);
+  /* Dark ink on amber reaches WCAG AA (5.7:1); white on amber would not. */
+  color: var(--ink);
+  font-weight: 700;
+}
+.btn-primary:not(:disabled):hover {
+  filter: brightness(0.96);
+}
+.btn-primary:not(:disabled):active {
+  filter: brightness(0.92);
+}
+
+.btn-secondary {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--brand-slate);
+  font-weight: 600;
+}
+.btn-secondary:not(:disabled):hover {
+  background: rgba(54, 85, 102, 0.06);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  margin: 1rem 0;
+  box-shadow: var(--shadow-card);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+/* A row with no trailing divider (e.g. an order card's action buttons). */
+.row--no-divider {
+  border-bottom: none;
+}
+
+input,
+select {
+  font: inherit;
+  padding: 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.qty {
+  width: 4rem;
+}
+
+.muted {
+  color: var(--ink-muted);
+  font-size: 0.9rem;
+}
+
+/* ── Brand header ─────────────────────────────────────────── */
+.brand-header {
+  background: var(--brand-slate);
+  border-radius: var(--radius);
+  padding: 0.85rem 1.1rem;
+  margin-bottom: 1.25rem;
+  box-shadow: var(--shadow-card);
+}
+.brand-header img {
+  display: block;
+  height: 34px;
+  width: auto;
+}
+
+/* ── Login page: the only ungated screen. Centred card on the brand paper, a
+      plain form inside. Sized for a TV browser as much as a phone — large
+      targets, 16px inputs (so iOS does not zoom on focus), high contrast. ─── */
+.login-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+}
+.login-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  padding: 1.75rem 1.5rem;
+}
+.login-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 30px;
+  letter-spacing: 0.5px;
+  color: var(--brand-slate);
+}
+.login-subtitle {
+  margin: 0.15rem 0 1.5rem;
+  color: var(--ink-muted);
+  font-size: 14.5px;
+}
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.login-field > span {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 12.5px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.login-field input {
+  height: var(--tap);
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface);
+  /* 16px keeps iOS from zooming the page when the field is focused. */
+  font-size: 16px;
+  color: var(--ink);
+}
+.login-field input:focus {
+  outline: none;
+  border-color: var(--brand-amber);
+}
+.login-field input:focus-visible,
+.login-submit:focus-visible {
+  outline: 3px solid var(--brand-slate);
+  outline-offset: 1px;
+}
+.login-submit {
+  width: 100%;
+  margin-top: 0.35rem;
+}
+
+/* ── Back-office shell (full-viewport, escapes the narrow customer column) ── */
+.bo-shell {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  background: var(--paper);
+}
+.bo-sidebar {
+  width: 248px;
+  flex-shrink: 0;
+  background: var(--brand-slate);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  transition: width 0.2s ease;
+}
+.bo-shell.collapsed .bo-sidebar {
+  width: 76px;
+}
+.bo-sidebar-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 68px;
+  padding: 0 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+}
+.bo-hamburger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: auto;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+.bo-hamburger:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+.bo-brand {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: 0.5px;
+  color: #fff;
+  white-space: nowrap;
+}
+.bo-shell.collapsed .bo-brand,
+.bo-shell.collapsed .bo-nav-label {
+  display: none;
+}
+.bo-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 12px;
+}
+/* Sits at the foot of the sidebar, below the nav links. Its button reuses
+   .bo-nav-link so it reads as one of them and collapses with them. */
+.bo-logout {
+  margin-top: auto;
+  padding: 0 12px 16px;
+}
+.bo-logout .bo-nav-link {
+  width: 100%;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+.bo-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 11px;
+  color: #cdd8de;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 15px;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.bo-shell.collapsed .bo-nav-link {
+  justify-content: center;
+  padding: 0;
+}
+.bo-nav-link svg {
+  flex-shrink: 0;
+}
+.bo-nav-link:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+.bo-nav-link.active {
+  background: var(--brand-amber);
+  color: #3a2c05;
+}
+.bo-nav-link:focus-visible {
+  outline: 3px solid var(--brand-amber);
+  outline-offset: 2px;
+}
+
+/* Main column: scrolls independently of the sticky sidebar. */
+.bo-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+.bo-header {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 26px 36px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+}
+.bo-header h1 {
+  margin: 0;
+  font-size: 30px;
+  letter-spacing: 0.4px;
+}
+.bo-header .subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-muted);
+}
+.bo-content {
+  padding: 24px 36px 48px;
+}
+
+.subtitle {
+  color: var(--ink-muted);
+  margin: 0.25rem 0 1rem;
+}
+/* The production views are read from across the room, so their supporting line
+   is larger. Scoped here rather than on .subtitle, which the orders view shares. */
+.bo-header--production .subtitle {
+  font-size: 19px;
+  color: var(--ink);
+}
+
+/* ── Product list & rows ──────────────────────────────────── */
+.product-list {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  margin: 0 0 1rem;
+}
+
+.product-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--line);
+  border-left: 4px solid transparent;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.product-row:last-child {
+  border-bottom: none;
+}
+.product-row.selected {
+  background: rgba(211, 155, 35, 0.08);
+  border-left-color: var(--brand-amber);
+}
+.product-row .product-name {
+  font-weight: 500;
+}
+
+/* ── Quantity stepper ─────────────────────────────────────── */
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  padding: 0.15rem;
+}
+.stepper button {
+  min-width: var(--tap);
+  min-height: var(--tap);
+  width: var(--tap);
+  height: var(--tap);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--brand-slate);
+  font-size: 1.35rem;
+  line-height: 1;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.stepper button:not(:disabled):hover {
+  background: rgba(54, 85, 102, 0.08);
+}
+.stepper button:focus-visible {
+  outline: 3px solid var(--brand-slate);
+  outline-offset: 1px;
+}
+.stepper .value {
+  width: 2.5rem;
+  text-align: center;
+  border: none;
+  background: transparent;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  -moz-appearance: textfield;
+  appearance: textfield;
+  padding: 0;
+}
+.stepper .value::-webkit-outer-spin-button,
+.stepper .value::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* ── Pinned action bar (bottom of the customer app shell) ─────── */
+.action-bar {
+  flex-shrink: 0;
+  margin: 0 -1.25rem;
+  padding: 0.85rem 1.25rem calc(0.85rem + env(safe-area-inset-bottom));
+  background: var(--paper);
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -4px 16px rgba(54, 85, 102, 0.06);
+}
+.action-bar .summary {
+  font-weight: 600;
+  color: var(--brand-slate);
+  margin: 0 0 0.6rem;
+}
+.action-bar .btn-primary {
+  display: block;
+  width: 100%;
+}
+.action-bar .btn-secondary {
+  display: block;
+  width: 100%;
+  margin-top: 0.55rem;
+  background: transparent;
+  border: none;
+  color: var(--brand-slate);
+  text-decoration: underline;
+}
+
+/* ── Customer order: full-viewport app shell — pinned brand header, title and
+      name filter on top, the full catalog list as the only scrolling region,
+      and a pinned action bar at the bottom (so it stays put whether the list is
+      filtered down or full). The list rows reuse the back office's
+      .item-field / .qty-input classes; styling here is scoped to the customer
+      page, so the back office is unaffected. ─────────────────────────────── */
+.customer-shell {
+  display: flex;
+  flex-direction: column;
+  /* Fixed viewport height (not min-height) so the list — not the window — is the
+     scroll region: the header, search, and action bar stay pinned. */
+  height: 100vh;
+  height: 100dvh;
+  /* Cancel <main>'s padding so the shell spans the reading column edge-to-edge
+     and fills the viewport; the top/side insets are re-added here. */
+  margin: -1.25rem -1.25rem -2rem;
+  padding: 1.25rem 1.25rem 0;
+}
+.customer-shell > h1 {
+  flex-shrink: 0;
+  margin: 0.6rem 0 0.85rem;
+}
+.order-search {
+  flex-shrink: 0;
+  margin: 0 0 1rem;
+}
+/* Filter field + its clear button on one line; the field takes the slack. */
+.filter-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+.filter-input {
+  flex: 1;
+  min-width: 0;
+  height: 48px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  /* 16px keeps iOS from zooming the page when the field is focused. */
+  font-size: 16px;
+  color: var(--ink);
+}
+.filter-input:focus {
+  outline: none;
+  border-color: var(--brand-amber);
+}
+.filter-clear {
+  flex-shrink: 0;
+  /* 44px min touch target (customer a11y requirement); 48px matches the field. */
+  min-width: 76px;
+  height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--brand-slate);
+}
+.filter-clear:disabled {
+  opacity: 0.45;
+}
+/* The added-products list is the only scrolling region. */
+.customer-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0 0 1rem;
+}
+.customer-list .item-field:last-child {
+  border-bottom: none;
+}
+.customer-list .items-empty {
+  padding: 1.75rem 1rem;
+}
+/* Smaller quantity field than the back office — customer quantities are small,
+   and a narrow field leaves room for the product name. */
+.customer-shell .qty-input {
+  width: 56px;
+  font-size: 16px;
+}
+/* Touch-friendly + visible keyboard focus (customer a11y requirements). */
+.customer-shell .item-remove {
+  width: 44px;
+  height: 44px;
+}
+/* The clear control only renders on rows with a quantity, but its space is
+   reserved on every row (56px field + 8px gap + 2px button margin + 44px
+   button) so the quantity fields stay in one column down the whole catalog
+   instead of shifting on the rows that have none. */
+.customer-shell .item-qty {
+  min-width: 110px;
+  justify-content: flex-start;
+}
+.customer-shell .qty-input:focus-visible,
+.customer-shell .item-remove:focus-visible,
+.filter-input:focus-visible,
+.filter-clear:focus-visible {
+  outline: 3px solid var(--brand-slate);
+  outline-offset: 1px;
+}
+
+/* ── Outcome / error states ───────────────────────────────── */
+.outcome {
+  text-align: center;
+  padding: 2rem 1.5rem 2.5rem;
+}
+.outcome .emoji {
+  font-size: 2.75rem;
+  line-height: 1;
+  display: block;
+  margin-bottom: 0.75rem;
+}
+.outcome h1 {
+  margin-bottom: 0.5rem;
+}
+.outcome p {
+  color: var(--ink-muted);
+  margin: 0 auto;
+  max-width: 32ch;
+}
+
+.error {
+  color: #b42318;
+  font-weight: 500;
+}
+
+/* ── Bloque toolbar (slate bar atop the orders / production views) ─────── */
+.bo-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 20px;
+  margin-bottom: 22px;
+  background: var(--brand-slate);
+  border-radius: 14px;
+}
+.bo-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.bo-toolbar-label {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: #cdd8de;
+}
+.bo-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 11px 40px 11px 16px;
+  min-height: 44px;
+  max-width: 420px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  background-color: rgba(255, 255, 255, 0.06);
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2214%22 height=%2214%22 fill=%22none%22 stroke=%22%23cdd8de%22 stroke-width=%222%22 stroke-linecap=%22round%22><path d=%22M4 6l4 4 4-4%22/></svg>');
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+}
+/* Native options inherit white text otherwise → unreadable on the dropdown. */
+.bo-select option {
+  color: var(--ink);
+  background: #fff;
+}
+.bo-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 11px 16px;
+  min-height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 500;
+}
+.bo-toolbar-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 10px;
+}
+.bo-toolbar-note {
+  font-size: 13.5px;
+  color: #cdd8de;
+}
+.bo-closed-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.1);
+  color: #f0d9a4;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+/* Toolbar buttons: amber primary + translucent ghost, both with muted (not
+   just faded) disabled states matching the closed-bloque design. */
+.btn-toolbar-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 11px;
+  background: var(--brand-amber);
+  color: #3a2c05;
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.btn-toolbar-primary:not(:disabled):hover {
+  background: var(--brand-amber-600);
+}
+.btn-toolbar-primary:disabled {
+  opacity: 1;
+  background: rgba(211, 155, 35, 0.28);
+  color: rgba(58, 44, 5, 0.45);
+}
+.btn-toolbar-ghost {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.btn-toolbar-ghost:not(:disabled):hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.btn-toolbar-ghost:disabled {
+  opacity: 1;
+  border-color: rgba(255, 255, 255, 0.14);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.35);
+}
+/* Destructive toolbar action (Cerrar bloque): the app's red, on the slate bar. */
+.btn-toolbar-danger {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid #a3352a;
+  border-radius: 11px;
+  background: #a3352a;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.btn-toolbar-danger:not(:disabled):hover {
+  background: #8f2d23;
+  border-color: #8f2d23;
+}
+.btn-toolbar-danger:disabled {
+  opacity: 1;
+  border-color: rgba(255, 255, 255, 0.14);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+/* ── Orders table (CSS-grid "table" with expandable rows) ─────────────── */
+.otable {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.otable-head,
+.otable-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 210px 150px 56px;
+  align-items: center;
+}
+.otable-head {
+  background: #f6f1e8;
+}
+.otable-head > div {
+  padding: 14px 16px;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.otable-head .col-right {
+  text-align: right;
+}
+.otable-group {
+  border-top: 1px solid #eee6d8;
+}
+.otable-row {
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  border-radius: 0;
+  font: inherit;
+  color: inherit;
+}
+.otable-row:not(:disabled):hover {
+  background: #fcfaf5;
+}
+.otable-dot-cell {
+  padding: 16px 8px 16px 20px;
+  text-align: center;
+}
+.otable-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #d7cdb9;
+}
+.otable-row.expanded .otable-dot {
+  background: var(--brand-amber);
+}
+.otable-client {
+  padding: 16px;
+  font-size: 15.5px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.otable-date {
+  padding: 16px;
+  font-size: 14.5px;
+  color: var(--ink-muted);
+}
+.otable-total-cell {
+  padding: 16px;
+  text-align: right;
+}
+.otable-total {
+  display: inline-block;
+  min-width: 40px;
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  background: #f7edd4;
+  color: #8a6a12;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 15px;
+}
+.otable-chev-cell {
+  padding: 16px 20px 16px 8px;
+  text-align: right;
+}
+.otable-chev {
+  display: inline-flex;
+  color: var(--ink-muted);
+  transition: transform 0.18s ease;
+}
+.otable-row.expanded .otable-chev {
+  transform: rotate(180deg);
+}
+
+/* Expanded per-order detail band. */
+.otable-detail {
+  background: #fbf6ec;
+  border-top: 1px solid #eee6d8;
+  padding: 20px 24px 22px 64px;
+}
+.otable-detail-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+.otable-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 4px 28px;
+}
+.otable-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 9px 0;
+  border-bottom: 1px solid #ece3d3;
+}
+.otable-item-name {
+  font-size: 14.5px;
+  color: var(--ink);
+}
+.otable-item-qty {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 15px;
+  color: #8a6a12;
+  white-space: nowrap;
+}
+.otable-empty {
+  padding: 28px 16px;
+  text-align: center;
+}
+
+/* Row-level ghost buttons in the detail band. */
+.btn-row-edit,
+.btn-row-delete {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 14px;
+  font-weight: 600;
+}
+.btn-row-edit {
+  border: 1px solid #d7cdb9;
+  color: var(--brand-slate);
+}
+.btn-row-edit:not(:disabled):hover {
+  border-color: var(--brand-slate);
+}
+.btn-row-delete {
+  border: 1px solid #e3c4bf;
+  color: #a3352a;
+}
+.btn-row-delete:not(:disabled):hover {
+  background: #fbeeec;
+}
+
+/* ── Production totals table (read-only) ──────────────────────────────── */
+.ptable {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.ptable-head,
+.ptable-row {
+  display: grid;
+  /* Narrower numeric column than the old full-width table: each of the two
+     tables now gets half the screen. Sized off the quantity type so a big
+     number never crowds the product name. */
+  grid-template-columns: minmax(0, 1fr) minmax(
+      calc(var(--prod-qty-size) * 2.4),
+      calc(var(--prod-qty-size) * 3)
+    );
+  align-items: center;
+}
+.ptable-head {
+  background: #f6f1e8;
+}
+.ptable-head > div {
+  padding: 14px 24px;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.ptable-head .col-right,
+.ptable-qty-cell {
+  text-align: right;
+}
+.ptable-row {
+  border-top: 1px solid #eee6d8;
+}
+.ptable-name {
+  padding: 15px 24px;
+  font-size: 15.5px;
+  font-weight: 500;
+  color: var(--ink);
+}
+/* Sized for reading across the room, not at a desk. */
+.ptable-split .ptable-name {
+  padding: 14px 20px;
+  font-size: var(--prod-name-size);
+  font-weight: 600;
+  line-height: 1.15;
+}
+.ptable-split .ptable-qty {
+  min-width: 0;
+  padding: 6px 18px;
+  font-size: var(--prod-qty-size);
+  line-height: 1.1;
+}
+.ptable-split .ptable-head > div {
+  font-size: 15px;
+}
+.ptable-qty-cell {
+  padding: 15px 24px;
+}
+.ptable-qty {
+  display: inline-block;
+  min-width: 52px;
+  padding: 6px 16px;
+  border-radius: var(--radius-pill);
+  background: #f7edd4;
+  color: #8a6a12;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 17px;
+}
+/* "A producir" of zero: fully covered by existencia, nothing left to bake. */
+.ptable-qty--covered {
+  background: #eef0ee;
+  color: var(--ink-muted);
+}
+
+/* Two tables side by side, so roughly twice as many products fit before the
+   view scrolls — these are read off a screen in the production area, where
+   scrolling means walking over to it. Collapses to one column when there is no
+   room for two without squeezing the product names. */
+.ptable-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .ptable-split {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Each row takes one of two colour treatments — slate or ink — covering its
+   name, a soft tint of the same family as its background, and the quantity chip.
+   Tying the chip to the row colour makes the row read as one unit across the
+   full width, which is the point of alternating on a screen this wide. The
+   backgrounds stay soft so the numbers keep the attention. Purely a reading aid:
+   the colour says nothing about the product. */
+.ptable-row.alt-a {
+  background: #eef3f6;
+}
+.ptable-row.alt-b {
+  background: #f2f2f1;
+}
+.ptable-row.alt-a .ptable-name {
+  color: var(--brand-slate);
+}
+.ptable-row.alt-b .ptable-name {
+  color: var(--ink);
+}
+.ptable-row.alt-a .ptable-qty {
+  background: var(--brand-slate);
+  color: #fff;
+}
+.ptable-row.alt-b .ptable-qty {
+  background: var(--ink);
+  color: #fff;
+}
+
+
+/* ── Modal dialog ─────────────────────────────────────────── */
+/* One fixed frame shared by every dialog, so the UI never jumps between them:
+   a short modal and a tall one are the same window with different contents. */
+.modal {
+  border: none;
+  padding: 0;
+  /* Tall shared frame, but narrower than full-bleed so it reads as a dialog.
+     Still one fixed frame for every dialog, so the UI never jumps. */
+  width: 50vw;
+  max-width: 900px;
+  height: calc(100vh - 4rem);
+  max-height: none;
+  border-radius: 16px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 30px 70px rgba(31, 42, 48, 0.4);
+  overflow: hidden;
+}
+.modal::backdrop {
+  background: rgba(31, 42, 48, 0.55);
+}
+.modal-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.modal-header strong {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 22px;
+  letter-spacing: 0.4px;
+}
+.modal-close {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: auto;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 10px;
+  background: #f2ece1;
+  color: var(--ink-muted);
+}
+.modal-close:hover {
+  background: var(--line);
+  color: var(--ink);
+}
+/* Fixed region between header and the scrolling body (the pickers). */
+.modal-above {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 24px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid #eee6d8;
+  flex-shrink: 0;
+  z-index: 5;
+}
+/* The body is the only scrolling region; the frame itself never scrolls. */
+.modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 24px 20px;
+}
+/* Fixed region between the scrolling body and the footer (the order message). */
+.modal-below {
+  flex-shrink: 0;
+  padding: 14px 24px 16px;
+  background: var(--surface);
+  border-top: 1px solid #eee6d8;
+}
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.btn-modal-primary {
+  min-height: 46px;
+  padding: 0 22px;
+  border: none;
+  border-radius: 11px;
+  background: var(--brand-amber);
+  color: #3a2c05;
+  font-size: 15px;
+  font-weight: 700;
+}
+.btn-modal-primary:not(:disabled):hover {
+  background: var(--brand-amber-600);
+}
+.btn-modal-secondary {
+  min-height: 46px;
+  padding: 0 20px;
+  border: 1px solid #d7cdb9;
+  border-radius: 11px;
+  background: #fff;
+  color: var(--brand-slate);
+  font-size: 15px;
+  font-weight: 600;
+}
+.btn-modal-secondary:not(:disabled):hover {
+  border-color: var(--brand-slate);
+}
+
+/* Client picker inside the fixed region: matches the mock's larger input. */
+.modal-above .field {
+  margin-bottom: 0;
+}
+.modal-above .field label {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 12.5px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin-bottom: 8px;
+}
+.modal-above .combobox-control input,
+.product-add-bar .combobox-control input {
+  width: 100%;
+  height: 46px;
+  padding: 0 16px;
+  border: 1px solid #d7cdb9;
+  border-radius: 11px;
+}
+.modal-above .combobox-control input:focus,
+.product-add-bar .combobox-control input:focus {
+  border-color: var(--brand-amber);
+}
+/* Explanatory hint in the pinned top region (e.g. the stock dialog). */
+.modal-above-hint {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.4;
+}
+/* Section label in the pinned top region, titling the added-products list. */
+.modal-section-label {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 12.5px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+/* Fill the scrolling region so the add bar sits at the bottom even when the
+   list is short; a long list overflows and scrolls under the sticky bar. */
+.order-form-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+.order-form-body > .item-fields,
+.order-form-body > .items-empty {
+  flex: 1 0 auto;
+}
+/* Product search pinned at the bottom of the scrolling list, floating over it. */
+.product-add-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 6;
+  margin: 6px -24px 0;
+  padding: 12px 24px;
+  background: var(--paper);
+  border-top: 1px solid #eee6d8;
+}
+/* When a just-added row is scrolled into view, keep it clear of the sticky bar. */
+.item-fields--order .item-field {
+  scroll-margin-bottom: 84px;
+}
+.product-add-bar .field {
+  margin-bottom: 0;
+}
+/* Open the results above the input (the search sits at the bottom of the list). */
+.combobox-up .combobox-list {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+
+/* ── Item quantity fields: stepper rows shared by all three modals ─────── */
+.item-fields {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.item-fields-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  background: var(--paper);
+  padding: 10px 0 8px;
+  z-index: 1;
+}
+.item-fields-head span {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 12.5px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.item-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid #eee6d8;
+}
+/* Brief highlight when a product is just added, so the pick is easy to spot. */
+@keyframes item-added-flash {
+  0% {
+    background-color: #fbeaca;
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+.item-field.is-added {
+  animation: item-added-flash 1.1s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .item-field.is-added {
+    animation: none;
+  }
+}
+.item-field-name {
+  font-size: 14.5px;
+  color: var(--ink);
+  min-width: 0;
+}
+.cat-tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+.cat-tag.salty {
+  background: #e5eef0;
+  color: var(--brand-slate);
+}
+.cat-tag.sweet {
+  background: #f3ead6;
+  color: #8a6a12;
+}
+.item-qty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+/* Typed quantity field — looks like an input so it's clearly editable
+   (quantities are often large, so typing beats a +/- stepper). */
+.qty-input {
+  width: 84px;
+  height: 44px;
+  text-align: center;
+  border: 1px solid #d7cdb9;
+  border-radius: 10px;
+  background: #fff;
+  padding: 0 10px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.qty-input:focus {
+  outline: none;
+  border-color: var(--brand-amber);
+}
+.qty-input::-webkit-outer-spin-button,
+.qty-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Order message (Agregar pedido only) — pinned in the modal's bottom region. */
+.modal-message {
+  margin-top: 0;
+}
+/* Empty state when no products have been added to the order yet. */
+.items-empty {
+  padding: 32px 8px;
+  text-align: center;
+}
+/* Remove-from-order button on an added item row. */
+.item-remove {
+  width: 40px;
+  height: 40px;
+  min-height: auto;
+  padding: 0;
+  margin-left: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink-muted);
+  flex-shrink: 0;
+}
+.item-remove:not(:disabled):hover {
+  background: #f7e7e2;
+  color: #b4442f;
+}
+.modal-message label {
+  display: block;
+  margin-bottom: 8px;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 12.5px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.modal-message textarea {
+  width: 100%;
+  min-height: 52px;
+  resize: vertical;
+  padding: 12px 14px;
+  border: 1px solid #d7cdb9;
+  border-radius: 11px;
+  background: #fff;
+  font-family: var(--font-sans);
+  font-size: 14.5px;
+  color: var(--ink);
+  outline: none;
+}
+.modal-message textarea:focus {
+  border-color: var(--brand-amber);
+}
+
+/* Stacked label + full-width control (used inside modals). */
+.field {
+  margin-bottom: 0.75rem;
+}
+.field label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+.field input {
+  width: 100%;
+}
+
+/* Type-ahead client picker: a text input with a filtered dropdown of clients. */
+.combobox-control {
+  position: relative;
+}
+.combobox-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 10;
+  margin: 0;
+  padding: 0.25rem;
+  list-style: none;
+  max-height: 14rem;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow-card);
+}
+.combobox-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0.5rem 0.6rem;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.combobox-list li.is-active {
+  background: var(--brand-slate);
+  color: #fff;
+}
+.combobox-list .combobox-empty {
+  color: var(--ink-muted);
+  cursor: default;
+}
+
+code {
+  background: #f0f0f0;
+  padding: 0.15rem 0.35rem;
+  border-radius: 6px;
+  word-break: break-all;
+}
+
+/* Generated-link row: the URL and its copy button side by side. */
+.link-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0.6rem 0;
+}
+.link-row code {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+  word-break: normal;
+  padding: 0.5rem 0.7rem;
+}
+.copy-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+.copy-btn:hover {
+  background: rgba(54, 85, 102, 0.06);
+  color: var(--ink);
+}
+.copy-btn.is-copied {
+  color: #2e7d32;
+  border-color: #2e7d32;
+}

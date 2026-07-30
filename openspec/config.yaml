@@ -1,0 +1,37 @@
+schema: spec-driven
+
+context: |
+  Pannico — a PoC for taking bakery orders via a zero-friction tokenized form
+  instead of transcribing WhatsApp natural-language orders by hand.
+
+  Tech stack:
+  - Yarn v4 monorepo. Packages: NestJS backend, Next.js frontend, plus a shared
+    package for interfaces/types if needed.
+  - Datastore: SQLite, with Prisma for schema and migrations.
+  - Product catalog is a fixed preset list loaded via a Prisma data seed (no
+    management UI in the PoC); new seeds are added to change existing items.
+  - Order tokens are single-use, each tied to exactly one order.
+  - The `ignored` status (token expired while order still pending) is set by an
+    active mechanism (cron job or NestJS worker), not lazily, so usage metrics
+    (placed vs. ignored) stay reliable and queryable.
+  - Testing: Jest.
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours

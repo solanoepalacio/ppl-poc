@@ -1,0 +1,55 @@
+Codigo,Producto,Categoria
+1,Baguettin,PANADERIA
+2,Baguett Rustica,PANADERIA
+3,Pan Party,PANADERIA
+pani,Pan Panni,PANADERIA
+chip,Pan Chip,PANADERIA
+1115,Mini Pan Semilla,PANADERIA
+6,Ciabatta,PANADERIA
+45,Mini Ciabatta,PANADERIA
+7,Ciabatta Morada,PANADERIA
+46,Mini Ciabatta Morada,PANADERIA
+60,Hogaza de Campo,PANADERIA
+mini pre-pizza,Mini Pre-pizza,PANADERIA
+8,Pre-pizza,PANADERIA
+9,Torta de Nuez,DULCES
+13,Base Torta de Nuez,DULCES
+10,Torta de Almendras,DULCES
+14,Base Torta de Almendras,DULCES
+12,Tarta de Frutos Secos,DULCES
+11,Tarta Delicatessen de Chocolate,DULCES
+,Base Delicatessen de Chocolate,DULCES
+lemon,Tarta Lemon Pie,DULCES
+capitas,Torta capitas,DULCES
+bomba,Torta bomba,DULCES
+32,Torta 3 leches,DULCES
+35,Pavlova,DULCES
+22,Stollen,DULCES
+40,Budin de limon con arandanos,DULCES
+41,Budin carrot,DULCES
+,Rosca de Pascua,DULCES
+18,Mini tarta de Frutos secos,MINI DULCES
+23 / 1120,Mini tatan de manzana,MINI DULCES
+24,Mini torta de capitas,MINI DULCES
+15,Mini lemon pie,MINI DULCES
+1119,Mini 3 leches,MINI DULCES
+38,Mini Budin de limon con arandanos,MINI DULCES
+37,Mini Budin carrot,MINI DULCES
+stollen,Mini Stollen,MINI DULCES
+42,Biscotti,MINI DULCES
+16,Mini Delicatessen de Chocolate,MINI DULCES SIN HARINA
+17,Mini de Almendras,MINI DULCES SIN HARINA
+nuez,Mini Nuez,MINI DULCES SIN HARINA
+pavlova,Mini pavlova,MINI DULCES SIN HARINA
+27,Mini Quindim de Coco,MINI DULCES SIN HARINA
+47,Mini Bomba de chocolates con pistacho,MINI DULCES SIN HARINA
+36,Mini Budin de limon,MINI DULCES SIN HARINA
+merenguitos,Merenguitos,MINI DULCES SIN HARINA
+1109,Galletitas de almendras,MINI DULCES SIN HARINA
+1111,Galletitas de almendras chocolate,MINI DULCES SIN HARINA
+28,Alfajor de almendras,ALFAJORES SIN HARINA
+30,Alfajor de nuez,ALFAJORES SIN HARINA
+29,Alfajor de chocolate con almendras,ALFAJORES SIN HARINA
+ASA,Alfajor de almendras S/ AZUCAR,ALFAJORES SIN HARINA
+NSA,Alfajor de nuez S/ AZUCAR,ALFAJORES SIN HARINA
+CSA,Alfajor de chocolate S/ AZUCAR,ALFAJORES SIN HARINA

@@ -1,54 +1,53 @@
-<context>
-    <high_level_context>
-        We are building a system to planify and manage the production of a small to medium baking company.
-    </high_level_context>
-    <current_scope>
-        Our short term goal is to build a **PoC** that streamlines the client orders to the production team.
-    </current_scope>
-    <session_goal>
-        This session goal is to make progress in generating the specification files (/spec/*) for this PoC.
-    </session_goal>
-    <context_for_poc>
-    ### Overview
-    This PoC looks to optimize the process of receiving client orders and forwarding them to the production line. This process today works as follows:
-    1. A Client order is received in natural language (whatsapp or email)
-    2. A human processes the order:
-        - taking note of it for sales tracking (sales and income tracking are strictly outside of scope of this PoC).
-        - "translates" the natural language into the bakery internal product descriptors
-        - forwards the request to the production line via whatsapp
-    ### Production grouping and delivery date:
-    Production is grouped in time slots based on the delivery dates. Production of requests is scheduled to these slots based on availability, which determines the delivery date and when they will be prepared.
-    Production slots stop receiving orders some time before they are closed.
-    It's possible that the production won't meet the production required for a slot and the portion not produced needs to be carried over to the next slot.
-    It's possible that prioritary customers are scheduled to a slot that has already closed it's assignment.
-    </context_for_poc>
-    <goal_for_poc>
-    Fully automate orders taking process for orders comming throuh Whatsapp.
-    </goal_for_poc>
-    <output_requirements>
-    ## Output:
-    The main goal is to create two sets of documents:
-    - A set of documents with the technical specification of the application, located under `/spec/*`
-    - A development plan to get to get to such spec.
+# Pannico
 
-    ## Details:
-    ### Spec:
-    The spec is the technical specification of the system.
-    It's rich in technical details.
-    It has a main file `spec/spec.md` that contains a brief description of all the components and interactions in the system. In general avoid excessive details in the main spec file such as code, database schemas, flow diagrams, etc. Technical details specific to any of the components of the system are created as a separate file `spec/components` `spec/subsystems` etc... (names based on demand as we go). The mail spec file can and should reference the technical when relevant.
-    
-    ### Development Plan:
-    The development plan can only be started when the spec is mostly ready.
-    Some minor changes might still be made to the spec during the creation and refinement of the development plan.
-    The development plan is broken down into phases, where each phase has a clear deliverable that can be verified by a human.
-    Each phase is further broken down into tasks with sufficient context so that an agent can perform autonomously without reading the entire plan.
+Bakery order-intake app. A manager generates single-use customer links (shared over
+WhatsApp); customers confirm an order from a catalog; the back office manages orders,
+per-product production totals, and production **bloques**.
 
-    Similary to the spec, the plan has a main file (`plans/master-plan.md`) that must mention all phases at a high level. It must avoid technical details such as code snippets, etc.
-    The goal of the master-plan is to get an understanding how we'll progress through the different phases and what we'll be finished in each of them.
+Behavioral specs live in `openspec/` — read those for *what* the system does. This file
+is the *how*: stack, layout, commands, conventions.
 
-    </output_requirements>
-    <other_documents>
-    As we plan and refine the PoC, we'll also document the system architecture, stack and other technical details under `docs/design-decisions`, `docs/architecture`, etc...
-    These are usually documents explaning the rationale behind a decision, diagrams to help understand the architecture, and other **supporting** documents. The source of truth of the current system is `/spec`
-    </other_documents>
-</context>
+## Monorepo (Yarn 4 workspaces)
+
+- `packages/shared` — `@pannico/shared`. TypeScript DTOs + domain contracts (slot status,
+  request/response interfaces) imported by both backend and frontend. Source
+  of truth for the API contract. Must be built (`tsc`) before the others typecheck.
+- `packages/backend` — NestJS + Prisma over **SQLite**. REST API on `:3000`. Modules:
+  `orders/`, `links/`, `slots/`, `clients/`, `prisma/`, `config/`, `common/`.
+- `packages/frontend` — Next.js 14 **App Router**. Back office under
+  `src/app/(backoffice)/`, customer form under the order-token routes. Serves on `:3001`.
+
+## Commands
+
+Run per-workspace with `yarn workspace @pannico/<pkg> run <script>`, or all at once with
+`yarn workspaces foreach -At run <script>`.
+
+- Typecheck (this repo's "lint" **is** `tsc --noEmit`): `yarn workspace @pannico/backend run lint`
+- Test (backend only, Jest): `yarn workspace @pannico/backend run test`
+- Run dev: backend `yarn workspace @pannico/backend start:dev` (:3000), then
+  frontend `yarn workspace @pannico/frontend dev` (:3001). Open http://localhost:3001.
+- DB (from `packages/backend`): `yarn prisma migrate dev` (create/apply + regenerate),
+  `yarn prisma migrate deploy` (apply existing), `yarn prisma generate` (client),
+  `yarn db:setup` (deploy + generate + seed). Seed: `yarn prisma:seed`.
+- OpenSpec: `openspec validate --all`, `openspec list` (CLI v1.2.0).
+
+After changing `schema.prisma` you must `yarn prisma generate` before backend code
+referencing the new models will typecheck.
+
+## Architecture & conventions
+
+- **BFF proxy:** the browser never hits the backend directly. `next.config.js` rewrites
+  `/api/:path*` → `${BACKEND_INTERNAL_URL}/:path*` (default `http://localhost:3000`).
+  `lib/api.ts` uses relative `/api` in the browser and `BACKEND_INTERNAL_URL` on the server.
+- **Frontend data flow:** async **React Server Components** fetch via `lib/api.ts`
+  (`cache: 'no-store'`). Selected state (day/bloque) lives in the **URL** (`?slotId=`), not
+  client state. Client islands (`'use client'`) mutate via the API then `router.refresh()`.
+  No react-query, no external state lib, no component library — plain semantic HTML + CSS
+  classes (`.card`, `.row`, `.muted`) in `globals.css`.
+- **Contract:** cross-cutting types go in `@pannico/shared` and are consumed by both sides —
+  don't redeclare response shapes locally.
+- **Naming:** code identifiers are **English** (`Order`, `Slot`, `slotId`, route `/slots`),
+  user-facing text is **Spanish** (`Órdenes`, `Bloques`, "bloque de producción"). Match this.
+- **Enums as strings:** SQLite has no native enums, so `Slot.status` is a plain string
+  column validated in the service layer against a union in `@pannico/shared`
+  (`isSlotStatus`). `ProductCategory` follows the same pattern (`isProductCategory`).
