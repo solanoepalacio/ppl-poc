@@ -1,6 +1,7 @@
 import type { ProductCategory } from '@pannico/shared';
 import { getProductionTotals } from '@/lib/api';
 import { ViewHeader } from '../ViewHeader';
+import { AutoRefresh } from './AutoRefresh';
 
 /** Per-line copy for the header + toolbar. */
 const COPY: Record<ProductCategory, { title: string; subtitle: string }> = {
@@ -12,7 +13,7 @@ const COPY: Record<ProductCategory, { title: string; subtitle: string }> = {
  * Back-office production view for a single production line: the per-item quantity
  * to produce for the currently open (latest) bloque, summed across its orders and
  * scoped to `category`. Always shows the open bloque — there is no bloque
- * selector — reflecting the current totals each time it loads. Read-only.
+ * selector. Read-only, and kept current while open by <AutoRefresh />.
  */
 export async function ProductionView({
   category,
@@ -25,6 +26,7 @@ export async function ProductionView({
 
   return (
     <>
+      <AutoRefresh />
       <ViewHeader title={title} subtitle={subtitle} />
       <div className="bo-content">
         {production.items.length > 0 ? (
