@@ -13,6 +13,15 @@
   --tap: 44px; /* min touch target */
   --shadow-card: 0 2px 12px rgba(54, 85, 102, 0.08);
   --maxw: 560px;
+  /* Production views are read from a distance, so their type is sized for the
+     room rather than for a desk. In `vh`, not px, so the physical size on the
+     panel is the same whether the TV's browser reports a 1280- or 1920-wide CSS
+     viewport. Tune these two and the row heights follow.
+     Rule of thumb: cap height ~= 0.7em, and signage stays legible to about 200x
+     its cap height — on a 397mm-tall 32" panel that puts 4vh at roughly 2.2 m,
+     chosen over a larger size to keep more products on screen at once. */
+  --prod-name-size: 4vh;
+  --prod-qty-size: 5vh;
   --font-display: var(--font-oswald), system-ui, sans-serif;
   --font-sans: var(--font-inter), system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
@@ -361,6 +370,12 @@ select {
 .subtitle {
   color: var(--ink-muted);
   margin: 0.25rem 0 1rem;
+}
+/* The production views are read from across the room, so their supporting line
+   is larger. Scoped here rather than on .subtitle, which the orders view shares. */
+.bo-header--production .subtitle {
+  font-size: 19px;
+  color: var(--ink);
 }
 
 /* ── Product list & rows ──────────────────────────────────── */
@@ -928,10 +943,15 @@ select {
   overflow: hidden;
 }
 .ptable-head,
-.ptable-row,
-.ptable-foot {
+.ptable-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 220px;
+  /* Narrower numeric column than the old full-width table: each of the two
+     tables now gets half the screen. Sized off the quantity type so a big
+     number never crowds the product name. */
+  grid-template-columns: minmax(0, 1fr) minmax(
+      calc(var(--prod-qty-size) * 2.4),
+      calc(var(--prod-qty-size) * 3)
+    );
   align-items: center;
 }
 .ptable-head {
@@ -947,8 +967,7 @@ select {
   color: var(--ink-muted);
 }
 .ptable-head .col-right,
-.ptable-qty-cell,
-.ptable-foot-total {
+.ptable-qty-cell {
   text-align: right;
 }
 .ptable-row {
@@ -959,6 +978,22 @@ select {
   font-size: 15.5px;
   font-weight: 500;
   color: var(--ink);
+}
+/* Sized for reading across the room, not at a desk. */
+.ptable-split .ptable-name {
+  padding: 14px 20px;
+  font-size: var(--prod-name-size);
+  font-weight: 600;
+  line-height: 1.15;
+}
+.ptable-split .ptable-qty {
+  min-width: 0;
+  padding: 6px 18px;
+  font-size: var(--prod-qty-size);
+  line-height: 1.1;
+}
+.ptable-split .ptable-head > div {
+  font-size: 15px;
 }
 .ptable-qty-cell {
   padding: 15px 24px;
@@ -974,49 +1009,55 @@ select {
   font-weight: 700;
   font-size: 17px;
 }
-.ptable-foot {
-  border-top: 2px solid var(--line);
-  background: #faf5ec;
-}
-.ptable-foot-label {
-  padding: 16px 24px;
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 15px;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  color: var(--brand-slate);
-}
-.ptable-foot-total {
-  padding: 16px 24px;
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 20px;
-  color: var(--brand-slate);
-}
-
-/* Breakdown layout: product name + three numeric columns
-   (Necesario / Stock / A producir). */
-.ptable--breakdown .ptable-head,
-.ptable--breakdown .ptable-row,
-.ptable--breakdown .ptable-foot {
-  grid-template-columns: minmax(0, 1fr) repeat(3, minmax(84px, 128px));
-}
-.ptable-num {
-  padding: 15px 24px;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  font-size: 15.5px;
-  color: var(--ink-muted);
-}
 /* "A producir" of zero: fully covered by existencia, nothing left to bake. */
 .ptable-qty--covered {
   background: #eef0ee;
   color: var(--ink-muted);
 }
-.ptable--breakdown .ptable-foot-label {
-  grid-column: 1 / -2;
+
+/* Two tables side by side, so roughly twice as many products fit before the
+   view scrolls — these are read off a screen in the production area, where
+   scrolling means walking over to it. Collapses to one column when there is no
+   room for two without squeezing the product names. */
+.ptable-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
 }
+@media (max-width: 900px) {
+  .ptable-split {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Each row takes one of two colour treatments — slate or ink — covering its
+   name, a soft tint of the same family as its background, and the quantity chip.
+   Tying the chip to the row colour makes the row read as one unit across the
+   full width, which is the point of alternating on a screen this wide. The
+   backgrounds stay soft so the numbers keep the attention. Purely a reading aid:
+   the colour says nothing about the product. */
+.ptable-row.alt-a {
+  background: #eef3f6;
+}
+.ptable-row.alt-b {
+  background: #f2f2f1;
+}
+.ptable-row.alt-a .ptable-name {
+  color: var(--brand-slate);
+}
+.ptable-row.alt-b .ptable-name {
+  color: var(--ink);
+}
+.ptable-row.alt-a .ptable-qty {
+  background: var(--brand-slate);
+  color: #fff;
+}
+.ptable-row.alt-b .ptable-qty {
+  background: var(--ink);
+  color: #fff;
+}
+
 
 /* ── Modal dialog ─────────────────────────────────────────── */
 /* One fixed frame shared by every dialog, so the UI never jumps between them:
