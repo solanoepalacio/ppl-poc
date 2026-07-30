@@ -142,6 +142,81 @@ select {
   width: auto;
 }
 
+/* ── Login page: the only ungated screen. Centred card on the brand paper, a
+      plain form inside. Sized for a TV browser as much as a phone — large
+      targets, 16px inputs (so iOS does not zoom on focus), high contrast. ─── */
+.login-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+}
+.login-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  padding: 1.75rem 1.5rem;
+}
+.login-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 30px;
+  letter-spacing: 0.5px;
+  color: var(--brand-slate);
+}
+.login-subtitle {
+  margin: 0.15rem 0 1.5rem;
+  color: var(--ink-muted);
+  font-size: 14.5px;
+}
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.login-field > span {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 12.5px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.login-field input {
+  height: var(--tap);
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface);
+  /* 16px keeps iOS from zooming the page when the field is focused. */
+  font-size: 16px;
+  color: var(--ink);
+}
+.login-field input:focus {
+  outline: none;
+  border-color: var(--brand-amber);
+}
+.login-field input:focus-visible,
+.login-submit:focus-visible {
+  outline: 3px solid var(--brand-slate);
+  outline-offset: 1px;
+}
+.login-submit {
+  width: 100%;
+  margin-top: 0.35rem;
+}
+
 /* ── Back-office shell (full-viewport, escapes the narrow customer column) ── */
 .bo-shell {
   position: fixed;
@@ -205,6 +280,19 @@ select {
   flex-direction: column;
   gap: 6px;
   padding: 16px 12px;
+}
+/* Sits at the foot of the sidebar, below the nav links. Its button reuses
+   .bo-nav-link so it reads as one of them and collapses with them. */
+.bo-logout {
+  margin-top: auto;
+  padding: 0 12px 16px;
+}
+.bo-logout .bo-nav-link {
+  width: 100%;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
 }
 .bo-nav-link {
   display: flex;

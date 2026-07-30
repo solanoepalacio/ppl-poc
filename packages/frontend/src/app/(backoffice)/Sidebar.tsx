@@ -97,6 +97,28 @@ export function Sidebar({ children }: { children: ReactNode }) {
             );
           })}
         </nav>
+
+        {/* A plain form POST, so ending the session does not depend on client
+            JavaScript any more than logging in does. */}
+        <form method="post" action="/logout" className="bo-logout">
+          <button type="submit" className="bo-nav-link" title="Cerrar sesión">
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <path d="M16 17l5-5-5-5" />
+              <path d="M21 12H9" />
+            </svg>
+            <span className="bo-nav-label">Cerrar sesión</span>
+          </button>
+        </form>
       </aside>
 
       <div className="bo-main">{children}</div>
