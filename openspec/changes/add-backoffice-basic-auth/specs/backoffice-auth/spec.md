@@ -53,3 +53,27 @@ SHALL apply even when back-office credentials are configured and enforced.
 - **WHEN** a customer activates the WhatsApp fallback for a token, with no
   `Authorization` header
 - **THEN** the system processes the request without requiring credentials
+
+### Requirement: Missing credential configuration denies all back-office access
+When either configured credential — the username or the password — is absent or
+blank, the system MUST reject every request to a gated back-office route,
+whatever credentials the request presents. It MUST NOT fall back to comparing
+against an empty username and password, since that would leave the back office
+reachable with a trivially guessable credential whenever the configuration is
+missing. A deployment that forgets to configure the credentials therefore denies
+access rather than granting it.
+
+#### Scenario: No credentials configured at all
+- **WHEN** neither the username nor the password is configured and a request
+  presents an empty username and an empty password
+- **THEN** the system rejects the request
+
+#### Scenario: Only one of the two is configured
+- **WHEN** the username is configured but the password is absent or blank (or
+  the reverse) and any credentials are presented
+- **THEN** the system rejects the request
+
+#### Scenario: Unconfigured gate rejects every request
+- **WHEN** the credentials are not configured
+- **THEN** no combination of presented credentials is accepted for a gated route
+- **AND** the customer order-token flow remains reachable as always

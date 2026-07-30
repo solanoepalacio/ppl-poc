@@ -31,6 +31,10 @@ function unauthorized(): NextResponse {
 async function isAuthorized(header: string | null): Promise<boolean> {
   const expectedUser = process.env.BACKOFFICE_AUTH_USER ?? '';
   const expectedPassword = process.env.BACKOFFICE_AUTH_PASSWORD ?? '';
+  // Fail closed: with either value missing the expected credential would be
+  // ":" — i.e. an empty user and password would unlock the back office. A
+  // deployment that forgets to configure these must deny everything instead.
+  if (expectedUser === '' || expectedPassword === '') return false;
   if (!header?.startsWith('Basic ')) return false;
 
   let decoded: string;

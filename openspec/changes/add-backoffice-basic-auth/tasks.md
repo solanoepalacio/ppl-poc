@@ -37,3 +37,22 @@
   `/order/:token` → 200, confirming an order → 200, and the WhatsApp fallback
   on a second token → 200.)
 - [x] 3.4 `openspec validate add-backoffice-basic-auth --strict`
+
+## 4. Fail closed when the credentials are not configured
+
+Found while verifying the deployed-configuration path: with the env vars unset
+or blank, the middleware compared against `":"`, so a request presenting an
+empty username and empty password was accepted (verified: `curl -u ":"` → 200).
+An unconfigured deployment must deny access, not grant it behind a guessable
+credential.
+
+- [x] 4.1 `middleware.ts`: read the two env vars and, if either is missing or
+  blank, reject the request outright (401 challenge) without comparing the
+  supplied credentials at all.
+- [x] 4.2 Drive it: with both vars blank, confirm `-u ":"` is rejected along
+  with no-header and random credentials; with only one var set, confirm every
+  request is still rejected.
+- [x] 4.3 Drive it: with both vars properly set, confirm the correct credentials
+  still return 200 and the customer order-token flow still needs none.
+- [x] 4.4 Typecheck, then `openspec validate add-backoffice-basic-auth --strict`
+  and dry-run the archive against a throwaway copy of `openspec/`.
