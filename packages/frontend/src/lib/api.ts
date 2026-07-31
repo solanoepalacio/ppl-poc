@@ -71,7 +71,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
     throw new ApiError(res.status, message);
   }
-  // Some endpoints (confirm / whatsapp) return 200 with an empty body; `res.json()`
+  // Some endpoints (e.g. confirm) return 200 with an empty body; `res.json()`
   // would throw on that, so read text first and only parse when there is a body.
   const text = await res.text();
   return (text ? JSON.parse(text) : undefined) as T;
@@ -90,12 +90,6 @@ export function confirmOrder(
   return request(`/orders/by-token/${encodeURIComponent(token)}/confirm`, {
     method: 'POST',
     body: JSON.stringify({ items }),
-  });
-}
-
-export function continueOnWhatsapp(token: string): Promise<void> {
-  return request(`/orders/by-token/${encodeURIComponent(token)}/whatsapp`, {
-    method: 'POST',
   });
 }
 

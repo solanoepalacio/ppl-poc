@@ -141,27 +141,6 @@ describe('OrdersService', () => {
     });
   });
 
-  describe('denyForWhatsapp', () => {
-    it('consumes a valid order and records no items', async () => {
-      prisma.order.findUnique.mockResolvedValue({ ...pendingOrder });
-
-      await service.denyForWhatsapp('tok_valid');
-
-      expect(prisma.order.update).toHaveBeenCalledWith({
-        where: { id: 'order_1' },
-        data: { consumedAt: expect.any(Date) },
-      });
-      expect(prisma.orderItem.createMany).not.toHaveBeenCalled();
-    });
-
-    it('rejects an expired/consumed token', async () => {
-      prisma.order.findUnique.mockResolvedValue(null);
-      await expect(
-        service.denyForWhatsapp('nope'),
-      ).rejects.toBeInstanceOf(NotFoundException);
-    });
-  });
-
   describe('validateToken', () => {
     it('returns valid + client name + catalog for a pending unexpired token', async () => {
       prisma.order.findUnique.mockResolvedValue({ ...pendingOrder });

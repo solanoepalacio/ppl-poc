@@ -19,9 +19,8 @@ export class TokenService {
    * a token is valid only while its order has not yet been consumed AND the
    * production bloque it belongs to is still `open`. There is no time-based
    * expiry — a link lives exactly as long as its bloque stays open and it has
-   * not been used. Confirming an order and choosing the WhatsApp fallback both
-   * consume the link. Every endpoint reuses this predicate so the check can
-   * never drift between call sites.
+   * not been used. Confirming an order is what consumes the link. Every endpoint
+   * reuses this predicate so the check can never drift between call sites.
    */
   isValid(order: TokenValidatable | null): boolean {
     if (!order) {

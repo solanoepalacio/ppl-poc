@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the customer-facing order form: how it is gated by a valid token, kept frictionless (no login, no prices, no payment), how customers submit a structured order from a predefined catalog, and the WhatsApp fallback.
+Defines the customer-facing order form: how it is gated by a valid token, kept frictionless (no login, no prices, no payment), and how customers submit a structured order from a predefined catalog.
 ## Requirements
 ### Requirement: Order form is reachable only with a valid token
 The system SHALL render the customer order form when the tokenized URL carries a valid, unexpired token. When the token is invalid or expired, the system MUST NOT render the form and SHALL instead show an error message.
