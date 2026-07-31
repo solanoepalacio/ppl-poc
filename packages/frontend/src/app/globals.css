@@ -151,6 +151,23 @@ select {
   width: auto;
 }
 
+/* On the order-entry screen the header and title are overhead: the customer came
+   to work through a long list on a phone, and every pixel these take is one the
+   catalog and the order summary do not get. Trimmed here rather than on
+   .brand-header itself so the outcome screens — where the brand is the point and
+   there is no list to make room for — keep their full presence. */
+.customer-shell .brand-header {
+  padding: 0.5rem 0.9rem;
+  margin-bottom: 0.6rem;
+}
+.customer-shell .brand-header img {
+  height: 24px;
+}
+.customer-shell > h1 {
+  font-size: 1.15rem;
+  margin: 0 0 0.6rem;
+}
+
 /* ── Login page: the only ungated screen. Centred card on the brand paper, a
       plain form inside. Sized for a TV browser as much as a phone — large
       targets, 16px inputs (so iOS does not zoom on focus), high contrast. ─── */
@@ -469,23 +486,88 @@ select {
   border-top: 1px solid var(--line);
   box-shadow: 0 -4px 16px rgba(54, 85, 102, 0.06);
 }
+/* The count and the reveal control share a line, so opening the summary costs no
+   extra height beyond the summary itself. */
+.action-bar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 0 0.6rem;
+}
 .action-bar .summary {
   font-weight: 600;
   color: var(--brand-slate);
-  margin: 0 0 0.6rem;
+  margin: 0;
 }
 .action-bar .btn-primary {
   display: block;
   width: 100%;
 }
-.action-bar .btn-secondary {
+
+/* ── Itemised order summary, inside the pinned action bar ──────────────────
+   Collapsed by default. Expanding takes height from the catalog (which is the
+   flex-growing region) rather than from the confirm button, and the list caps
+   itself and scrolls, so a 30-product order still cannot push the button off
+   the screen. */
+.order-summary {
+  margin: 0 0 0.75rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--line);
+}
+.order-summary-title {
+  margin: 0 0 0.45rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1rem;
+  letter-spacing: 0.01em;
+  color: var(--brand-slate);
+}
+.order-summary-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 34vh;
+  overflow-y: auto;
+}
+/* One plain line per product — "Medialunas x 3" — rather than a name pushed left
+   and a badge pushed right. The summary is a re-reading of what was chosen, so it
+   should look like the rest of the page's text and not like a control. */
+.order-summary-row {
+  padding: 0.3rem 0;
+  border-bottom: 1px solid var(--line);
+  /* A long name wraps onto a second line; the divider keeps that from reading as
+     two separate products. */
+  overflow-wrap: anywhere;
+}
+.order-summary-row:last-child {
+  border-bottom: none;
+}
+/* Only weight sets the quantity apart — same size, same colour — so it stays
+   scannable without shouting. `nowrap` keeps "x 3" from breaking across lines. */
+.order-summary-qty {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* Shared by "Ver Pedido" and "Ocultar Resumen": a quiet text action that never
+   competes with Confirmar pedido. Padding and min-height are zeroed against the
+   global `button` rule so it sits on the count's line. */
+.summary-toggle {
+  flex-shrink: 0;
+  min-height: auto;
+  padding: 0.35rem 0;
+  border: none;
+  background: transparent;
+  color: var(--brand-slate);
+  font-weight: 600;
+  text-decoration: underline;
+}
+.order-summary .summary-toggle {
   display: block;
   width: 100%;
-  margin-top: 0.55rem;
-  background: transparent;
-  border: none;
-  color: var(--brand-slate);
-  text-decoration: underline;
+  margin-top: 0.35rem;
+  text-align: center;
 }
 
 /* ── Customer order: full-viewport app shell — pinned brand header, title and

@@ -29,7 +29,6 @@ The custom events below capture actions and conversions that page views can't.
 | Event | When it fires | Properties | Source |
 |-------|---------------|------------|--------|
 | `order_confirmed` | Customer successfully confirms an order via the form | `itemCount`, `totalQuantity` | `order/[token]/OrderForm.tsx` |
-| `whatsapp_fallback_selected` | Customer chooses to continue via WhatsApp | — | `order/[token]/OrderForm.tsx` |
 | `order_link_invalid` | The invalid / expired / already-used link page renders | — | `order/[token]/TrackInvalidLink.tsx` |
 | `order_link_generated` | Manager generates a shareable order link | — | `(backoffice)/orders/CreateOrderModal.tsx` |
 | `order_link_copied` | Manager copies a generated link to the clipboard | — | `(backoffice)/orders/CreateOrderModal.tsx` |

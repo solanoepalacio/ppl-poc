@@ -88,11 +88,4 @@ export class OrdersController {
     await this.ordersService.confirm(token, dto.items);
   }
 
-  /** Customer chose the WhatsApp fallback (consumes the link). */
-  @Post('by-token/:token/whatsapp')
-  @HttpCode(200)
-  @UseGuards(TokenGuard)
-  async whatsapp(@Param('token') token: string): Promise<void> {
-    await this.ordersService.denyForWhatsapp(token);
-  }
 }

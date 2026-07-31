@@ -2,13 +2,13 @@
 
 import { useMemo, useState } from 'react';
 import type { Product } from '@pannico/shared';
-import { ApiError, confirmOrder, continueOnWhatsapp } from '@/lib/api';
+import { ApiError, confirmOrder } from '@/lib/api';
 import { trackEvent } from '@/lib/analytics';
 import { CatalogList } from './CatalogList';
 import { BrandHeader } from './BrandHeader';
 import { InvalidLinkNotice } from './InvalidLinkNotice';
 
-type Outcome = 'open' | 'issued' | 'denied' | 'invalid';
+type Outcome = 'open' | 'issued' | 'invalid';
 
 const COPY = {
   title: 'Tu pedido',
@@ -17,7 +17,9 @@ const COPY = {
   clearFilter: 'Limpiar',
   confirm: 'Confirmar pedido',
   busy: 'Enviando…',
-  whatsapp: 'Seguir por WhatsApp',
+  summaryTitle: 'Resumen de su pedido',
+  showSummary: 'Ver Pedido',
+  hideSummary: 'Ocultar Resumen',
   genericError: 'Algo salió mal. Intentá de nuevo.',
 };
 
@@ -27,6 +29,13 @@ const COPY = {
  * on whichever products they want — a positive quantity is what puts a product
  * on the order. The filter above the list narrows what is shown without ever
  * touching the quantities already typed. Confirmation is immediate on success.
+ *
+ * Because the catalog is long and this is read on a phone, what was chosen at
+ * the top is off-screen by the time you reach the bottom. The action bar
+ * therefore carries an itemised summary as well as the count — collapsed by
+ * default, since it is a check performed once rather than something to keep
+ * open, and expanding it takes height from the catalog rather than from the
+ * confirm button.
  */
 export function OrderForm({
   token,
@@ -37,16 +46,32 @@ export function OrderForm({
 }) {
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [filter, setFilter] = useState('');
+  const [showSummary, setShowSummary] = useState(false);
   const [outcome, setOutcome] = useState<Outcome>('open');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  /**
+   * The chosen products, in the same alphabetical order the catalog is listed
+   * in, so the summary reads as a re-run of the list the customer just scrolled
+   * rather than in the order they happened to tap.
+   */
+  const chosen = useMemo(
+    () =>
+      [...catalog]
+        .sort((a, b) => a.name.localeCompare(b.name, 'es'))
+        .map((p) => ({ product: p, quantity: quantities[p.id] ?? 0 }))
+        .filter((row) => row.quantity > 0),
+    [catalog, quantities],
+  );
+
   const items = useMemo(
     () =>
-      Object.entries(quantities)
-        .filter(([, q]) => q > 0)
-        .map(([productId, quantity]) => ({ productId, quantity })),
-    [quantities],
+      chosen.map(({ product, quantity }) => ({
+        productId: product.id,
+        quantity,
+      })),
+    [chosen],
   );
 
   function setQty(productId: string, value: number) {
@@ -84,20 +109,6 @@ export function OrderForm({
     }
   }
 
-  async function whatsapp() {
-    setError(null);
-    setBusy(true);
-    try {
-      await continueOnWhatsapp(token);
-      trackEvent('whatsapp_fallback_selected');
-      setOutcome('denied');
-    } catch (e) {
-      handleActionError(e);
-    } finally {
-      setBusy(false);
-    }
-  }
-
   if (outcome === 'invalid') {
     return <InvalidLinkNotice />;
   }
@@ -117,25 +128,11 @@ export function OrderForm({
     );
   }
 
-  if (outcome === 'denied') {
-    return (
-      <>
-        <BrandHeader />
-        <section className="card outcome">
-          <span className="emoji" aria-hidden="true">
-            💬
-          </span>
-          <h1>Seguí por WhatsApp</h1>
-          <p>
-            Sin problema — continuá tu pedido por WhatsApp con la panadería.
-          </p>
-        </section>
-      </>
-    );
-  }
-
-  const summary =
-    items.length === 1 ? '1 producto' : `${items.length} productos`;
+  const count =
+    chosen.length === 1 ? '1 producto' : `${chosen.length} productos`;
+  // Nothing chosen means nothing to summarise, so the control would open an
+  // empty panel; the count already says zero.
+  const summaryOpen = showSummary && chosen.length > 0;
 
   return (
     <div className="customer-shell">
@@ -178,18 +175,52 @@ export function OrderForm({
       {error && <p className="error">{error}</p>}
 
       <div className="action-bar">
-        <p className="summary" aria-live="polite">
-          {summary}
-        </p>
+        {summaryOpen && (
+          <section className="order-summary" id="order-summary">
+            <h2 className="order-summary-title">{COPY.summaryTitle}</h2>
+            <ul className="order-summary-list">
+              {chosen.map(({ product, quantity }) => (
+                <li className="order-summary-row" key={product.id}>
+                  {product.name}{' '}
+                  <span className="order-summary-qty">x {quantity}</span>
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              className="summary-toggle"
+              aria-expanded
+              aria-controls="order-summary"
+              onClick={() => setShowSummary(false)}
+            >
+              {COPY.hideSummary}
+            </button>
+          </section>
+        )}
+
+        <div className="action-bar-head">
+          <p className="summary" aria-live="polite">
+            {count}
+          </p>
+          {chosen.length > 0 && !summaryOpen && (
+            <button
+              type="button"
+              className="summary-toggle"
+              aria-expanded={false}
+              aria-controls="order-summary"
+              onClick={() => setShowSummary(true)}
+            >
+              {COPY.showSummary}
+            </button>
+          )}
+        </div>
+
         <button
           className="btn-primary"
           disabled={busy || items.length === 0}
           onClick={submit}
         >
           {busy ? COPY.busy : COPY.confirm}
-        </button>
-        <button className="btn-secondary" disabled={busy} onClick={whatsapp}>
-          {COPY.whatsapp}
         </button>
       </div>
     </div>

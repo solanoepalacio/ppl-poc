@@ -11,7 +11,6 @@
 /** Every custom analytics event the app may emit. */
 export type AnalyticsEvent =
   | 'order_confirmed'
-  | 'whatsapp_fallback_selected'
   | 'order_link_invalid'
   | 'order_link_generated'
   | 'order_link_copied'

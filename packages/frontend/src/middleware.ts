@@ -32,8 +32,16 @@ export async function middleware(req: NextRequest) {
   return NextResponse.redirect(login);
 }
 
+/**
+ * `pannico-wordmark.png` is excluded alongside the `_next` internals, and it is
+ * not redundant with them: `_next/image` exempts the optimizer *route*, but the
+ * optimizer then fetches the source file back through this same server. Gate the
+ * source and the optimizer gets a redirect to the login page instead of an image
+ * and answers 400 — so the customer order page, which needs no session at all,
+ * renders with a broken logo.
+ */
 export const config = {
   matcher: [
-    '/((?!login|order/|api/orders/by-token/|_next/static|_next/image|favicon\\.ico).*)',
+    '/((?!login|order/|api/orders/by-token/|_next/static|_next/image|pannico-wordmark\\.png|favicon\\.ico).*)',
   ],
 };

@@ -102,22 +102,6 @@ export class OrdersService {
   }
 
   /**
-   * Records the customer's WhatsApp fallback: consumes the link (so it can no
-   * longer be used) and records no items. Rejects invalid/closed-bloque/
-   * already-used tokens.
-   */
-  async denyForWhatsapp(token: string): Promise<void> {
-    const order = await this.tokenService.resolveValidOrder(token);
-    if (!order) {
-      throw new NotFoundException('Invalid, expired, or already-used link.');
-    }
-    await this.prisma.order.update({
-      where: { id: order.id },
-      data: { consumedAt: new Date() },
-    });
-  }
-
-  /**
    * Back-office manual order creation: records an order received off-channel
    * (WhatsApp/in-person) directly, without generating a customer link.
    * Validates the client and items against the catalog and generates an unused
