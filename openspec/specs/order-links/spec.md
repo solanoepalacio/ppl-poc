@@ -5,7 +5,7 @@
 Defines how the bakery manager generates tokenized order links bound to a selected client, and the lifecycle of those tokens: validity scoped to the order's production bloque, validation to resolve the bound client, and single-use semantics tied to whether the link has been consumed.
 ## Requirements
 ### Requirement: Order tokens are single-use
-Each token SHALL be usable to act on its order at most once. A token MUST be treated as valid only while its order has not yet been consumed; once the order has been consumed — the customer confirming it or choosing the WhatsApp fallback — the token MUST be treated as invalid.
+Each token SHALL be usable to act on its order at most once. A token MUST be treated as valid only while its order has not yet been consumed; once the customer has confirmed the order, the token MUST be treated as invalid.
 
 #### Scenario: Token whose order has not been consumed
 - **WHEN** a token is validated and its order has not yet been consumed

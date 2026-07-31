@@ -44,23 +44,6 @@ safe to call from any client component regardless of environment.
   script blocked, or not yet loaded)
 - **THEN** the helper does nothing and does not throw
 
-### Requirement: Instrumented customer order events
-
-The customer-facing order flow SHALL emit custom events at its key outcomes.
-
-#### Scenario: Order confirmed via form
-- **WHEN** a customer successfully confirms an order through the form
-- **THEN** an `order_confirmed` event is emitted with the item count and total
-  quantity
-
-#### Scenario: WhatsApp fallback chosen
-- **WHEN** a customer chooses to continue the order via WhatsApp
-- **THEN** a `whatsapp_fallback_selected` event is emitted
-
-#### Scenario: Invalid order link opened
-- **WHEN** a customer opens an order link that is expired or already used
-- **THEN** an `order_link_invalid` event is emitted
-
 ### Requirement: Instrumented back-office events
 
 The back-office SHALL emit custom events for its primary management actions.
@@ -91,4 +74,17 @@ instrumented code.
 - **THEN** a docs file enumerates each event name, when it fires, and its
   properties
 - **AND** every custom event emitted by the code appears in that document
+
+### Requirement: Instrumented customer order outcomes
+
+The customer-facing order flow SHALL emit custom events at its key outcomes.
+
+#### Scenario: Order confirmed via form
+- **WHEN** a customer successfully confirms an order through the form
+- **THEN** an `order_confirmed` event is emitted with the item count and total
+  quantity
+
+#### Scenario: Invalid order link opened
+- **WHEN** a customer opens an order link that is expired or already used
+- **THEN** an `order_link_invalid` event is emitted
 

@@ -40,11 +40,3 @@ The system SHALL present a predefined catalog of products and let the customer c
 - **WHEN** a submission includes an item that is not in the predefined catalog
 - **THEN** the system rejects the submission and the link remains usable
 
-### Requirement: Customer can fall back to WhatsApp
-The order form SHALL include a control that lets the customer indicate they prefer to continue the order over WhatsApp instead of using the form.
-
-#### Scenario: Customer chooses to continue on WhatsApp
-- **WHEN** the customer activates the "continue on WhatsApp" control
-- **THEN** the system consumes the link bound to the token so it can no longer be used
-- **AND** records no order items
-

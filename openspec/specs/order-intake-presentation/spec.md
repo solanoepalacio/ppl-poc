@@ -5,7 +5,7 @@
 Defines the presentation layer of the customer-facing order page: how it carries the Pannico brand identity across all states, presents Spanish-language copy, lays out responsively for mobile-first use, lets the customer add products by search into an added-only list with typed quantities and an always-reachable selection summary and primary action, and renders branded, accessible confirmation, fallback, and error states. These requirements govern presentation only and do not change underlying order behavior.
 ## Requirements
 ### Requirement: Customer page carries the Pannico brand identity
-The customer order page SHALL present the Pannico brand identity on every state it can render (order entry, order-received confirmation, continue-on-WhatsApp, and invalid/expired link). The page MUST display the Pannico wordmark/logo and apply the brand palette (slate blue `#365566`, white, and golden-amber `#D39B23` accent). Brand typography SHALL use a condensed display style for headings/wordmark and a legible sans for body text.
+The customer order page SHALL present the Pannico brand identity on every state it can render (order entry, order-received confirmation, and invalid/expired link). The page MUST display the Pannico wordmark/logo and apply the brand palette (slate blue `#365566`, white, and golden-amber `#D39B23` accent). Brand typography SHALL use a condensed display style for headings/wordmark and a legible sans for body text.
 
 #### Scenario: Wordmark is present on the entry screen
 - **WHEN** a customer opens the order page with a valid token
@@ -13,18 +13,18 @@ The customer order page SHALL present the Pannico brand identity on every state 
 - **AND** the page uses the brand palette and typography
 
 #### Scenario: Brand persists across outcome and error screens
-- **WHEN** the page renders the order-received, continue-on-WhatsApp, or invalid-link state
+- **WHEN** the page renders the order-received or invalid-link state
 - **THEN** the Pannico wordmark/logo and brand palette are still present, consistent with the entry screen
 
 ### Requirement: Customer-facing copy is in Spanish
-All text the customer reads on the order page SHALL be written in Spanish, including the title, the primary and secondary action labels, the busy/submitting state, and the confirmation, WhatsApp-fallback, and invalid-link messages.
+All text the customer reads on the order page SHALL be written in Spanish, including the title, the primary action label, the busy/submitting state, the order-summary heading and its show/hide controls, and the confirmation and invalid-link messages.
 
 #### Scenario: Entry screen text is Spanish
 - **WHEN** the order entry screen is rendered
 - **THEN** the title and action labels are presented in Spanish
 
 #### Scenario: Outcome and error text is Spanish
-- **WHEN** any of the order-received, continue-on-WhatsApp, or invalid-link states is rendered
+- **WHEN** either the order-received or invalid-link state is rendered
 - **THEN** its heading and body message are presented in Spanish
 
 ### Requirement: Layout is mobile-first and responsive
@@ -37,45 +37,6 @@ The order page SHALL be designed for one-handed phone use as the primary case an
 #### Scenario: Constrained column on a wide viewport
 - **WHEN** the page is viewed on a wide desktop viewport
 - **THEN** the content is constrained to a centered reading column rather than spanning the full width
-
-### Requirement: A running selection summary and primary action are always reachable
-The order entry screen SHALL show a running summary of how many products are currently selected and SHALL keep the primary "confirm order" action reachable without requiring the customer to scroll the order to reach it. The primary action MUST be disabled while no products are selected and while a submission is in progress, and the WhatsApp fallback control SHALL be presented as a secondary, lower-emphasis action.
-
-#### Scenario: Summary reflects current selection
-- **WHEN** the customer has added one or more products
-- **THEN** the running summary reflects the number of selected products
-
-#### Scenario: Primary action reachable without scrolling the list
-- **WHEN** the added-products list is long enough to require scrolling
-- **THEN** the primary confirm action remains reachable (via a pinned action bar) without scrolling the list
-
-#### Scenario: Primary action disabled when nothing is selected
-- **WHEN** no product has been added to the order
-- **THEN** the confirm action is disabled
-
-#### Scenario: Actions disabled during submission
-- **WHEN** a confirm or WhatsApp action is in progress
-- **THEN** both actions are disabled and the primary action shows a busy/submitting label
-
-### Requirement: Confirmation and fallback states are branded and reassuring
-After a successful order confirmation the page SHALL display a branded, prominent success state confirming the order was received; after the WhatsApp fallback is chosen the page SHALL display a branded state directing the customer to continue over WhatsApp. The invalid-link state SHALL likewise be branded and explain that a fresh link is needed. The page SHALL reach the invalid-link state both when it is opened with an already-invalid token and when an in-progress confirmation or WhatsApp action is rejected because the link is no longer valid — for example, because the order's bloque was closed while the customer was filling out the form. None of these states changes order behavior; they re-present the existing outcomes.
-
-#### Scenario: Branded success state after confirmation
-- **WHEN** the order is confirmed successfully
-- **THEN** the page shows a branded success state confirming the order was received and indicating no further steps are needed
-
-#### Scenario: Branded WhatsApp fallback state
-- **WHEN** the customer chooses the WhatsApp fallback
-- **THEN** the page shows a branded state directing them to continue the order over WhatsApp
-
-#### Scenario: Branded invalid-link state on load
-- **WHEN** the page is opened with an invalid token
-- **THEN** it shows a branded state explaining the link is no longer valid and to request a fresh link
-
-#### Scenario: Link becomes invalid while the customer is on the form
-- **WHEN** the customer submits their order (or chooses the WhatsApp fallback) but the link is no longer valid — e.g. its bloque was closed after the form was opened but before the action completed
-- **THEN** the page transitions to the branded invalid-link state explaining a fresh link is needed
-- **AND** does not leave the customer on the form with no feedback
 
 ### Requirement: Controls are accessible and touch-friendly
 Interactive controls on the order page SHALL meet baseline accessibility and touch-usability expectations: every control MUST have an accessible name, interactive elements MUST have a visible keyboard focus indicator, touch targets SHALL be at least 44×44 CSS pixels, and text and essential UI MUST meet WCAG AA contrast against their background. Submission errors SHALL be conveyed as text (not by color alone).
@@ -162,4 +123,105 @@ every product to view.
 - **WHEN** the filter text matches no product
 - **THEN** the screen shows a message indicating no results, rather than an
   empty list with no explanation
+
+### Requirement: The order screen shows the order itself, with the primary action always reachable
+The order entry screen SHALL keep the primary "confirm order" action reachable
+without requiring the customer to scroll the catalog to reach it, and SHALL keep a
+running count of how many products are currently selected visible alongside it as
+a persistent indicator. The primary action MUST be disabled while no products are
+selected and while a submission is in progress.
+
+Beyond the count, the screen SHALL be able to show **the order itself**: a summary
+listing every product with a quantity above zero, each with its name and its
+quantity, under a heading naming it as the customer's order summary. Products with
+no quantity SHALL NOT appear.
+
+Because the screen is read on a phone, the summary SHALL be **collapsed by
+default** and revealed by an explicit control, so it costs no screen height until
+the customer asks for it. Once expanded it SHALL offer a control at the end of the
+list to collapse it again, so a long summary does not have to be scrolled back
+past to dismiss.
+
+#### Scenario: Running count reflects the current selection
+- **WHEN** the customer has one or more products selected
+- **THEN** a running count of selected products is visible without expanding the
+  summary
+
+#### Scenario: Primary action reachable without scrolling the catalog
+- **WHEN** the catalog is long enough to require scrolling
+- **THEN** the primary confirm action remains reachable via a pinned action bar
+
+#### Scenario: Primary action disabled when nothing is selected
+- **WHEN** no product has a quantity above zero
+- **THEN** the confirm action is disabled
+
+#### Scenario: Primary action disabled during submission
+- **WHEN** a confirmation is in progress
+- **THEN** the confirm action is disabled and shows a busy/submitting label
+
+#### Scenario: Summary is collapsed until asked for
+- **WHEN** the order screen is rendered
+- **THEN** the itemised summary is not shown
+- **AND** a control is offered to reveal it
+
+#### Scenario: Expanding shows each selected product and its quantity
+- **WHEN** the customer reveals the summary having selected 3 of product P and 1
+  of product Q
+- **THEN** the summary lists P with 3 and Q with 1 under its heading
+
+#### Scenario: Unselected products are absent from the summary
+- **WHEN** the summary is shown and product R has no quantity
+- **THEN** R does not appear in it
+
+#### Scenario: The summary can be collapsed from its end
+- **WHEN** the summary is expanded
+- **THEN** a control at the end of the list collapses it again
+
+#### Scenario: The summary tracks the selection while open
+- **WHEN** the summary is expanded and the customer changes a product's quantity
+- **THEN** the summary reflects the change without being closed and reopened
+
+#### Scenario: The count stays visible whether or not the summary is open
+- **WHEN** the summary is expanded or collapsed
+- **THEN** the running count remains visible in the action bar
+
+### Requirement: Confirmation and invalid-link states are branded and reassuring
+After a successful order confirmation the page SHALL display a branded, prominent
+success state confirming the order was received. The invalid-link state SHALL
+likewise be branded and explain that a fresh link is needed. The page SHALL reach
+the invalid-link state both when it is opened with an already-invalid token and
+when an in-progress confirmation is rejected because the link is no longer valid —
+for example, because the order's bloque was closed while the customer was filling
+out the form. Neither state changes order behavior; they re-present the existing
+outcomes.
+
+#### Scenario: Branded success state after confirmation
+- **WHEN** the order is confirmed successfully
+- **THEN** the page shows a branded success state confirming the order was
+  received and indicating no further steps are needed
+
+#### Scenario: Branded invalid-link state on load
+- **WHEN** the page is opened with an invalid token
+- **THEN** it shows a branded state explaining the link is no longer valid and to
+  request a fresh link
+
+#### Scenario: Link becomes invalid while the customer is on the form
+- **WHEN** the customer submits their order but the link is no longer valid — e.g.
+  its bloque was closed after the form was opened but before the action completed
+- **THEN** the page transitions to the branded invalid-link state explaining a
+  fresh link is needed
+- **AND** does not leave the customer on the form with no feedback
+
+### Requirement: The customer page header is compact
+The brand header and the order screen's title SHALL be sized so that they take a
+small share of a phone's viewport, leaving the height to the catalog and the order
+summary — the parts the customer actually works with. The brand identity SHALL
+remain present and legible; this trades ornament for working space, not the brand
+itself.
+
+#### Scenario: Header and title leave the screen to the list
+- **WHEN** the order screen is rendered on a phone-sized viewport
+- **THEN** the brand header and the title together occupy a small fraction of the
+  viewport height
+- **AND** the Pannico wordmark remains visible and legible
 
