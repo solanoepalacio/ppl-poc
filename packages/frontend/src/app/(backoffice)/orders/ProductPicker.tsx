@@ -21,6 +21,7 @@ export function ProductPicker({
   onChange,
   disabled,
   searchId,
+  emptyText,
 }: {
   products: Product[];
   quantities: Record<string, number>;
@@ -28,6 +29,8 @@ export function ProductPicker({
   disabled?: boolean;
   /** Unique id for the search input (aria wiring), e.g. "edit-items-product". */
   searchId: string;
+  /** Empty-state copy; the default speaks of adding products to an order. */
+  emptyText?: string;
 }) {
   const [justAdded, setJustAdded] = useState<{ id: string; n: number } | null>(
     null,
@@ -48,6 +51,7 @@ export function ProductPicker({
         onRemove={(id) => onChange(id, 0)}
         disabled={disabled}
         highlight={justAdded}
+        {...(emptyText ? { emptyText } : {})}
       />
       <div className="product-add-bar">
         <ProductCombobox

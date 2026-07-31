@@ -1091,11 +1091,6 @@ select {
   font-weight: 700;
   font-size: 17px;
 }
-/* "A producir" of zero: fully covered by existencia, nothing left to bake. */
-.ptable-qty--covered {
-  background: #eef0ee;
-  color: var(--ink-muted);
-}
 
 /* Two tables side by side, so roughly twice as many products fit before the
    view scrolls — these are read off a screen in the production area, where
@@ -1212,6 +1207,114 @@ select {
   border-bottom: 1px solid #eee6d8;
   flex-shrink: 0;
   z-index: 5;
+}
+/* The producción real history, pinned above the batch picker. Capped and
+   scrollable on its own: the pinned region must not grow without bound and push
+   the picker — where the manager actually works — off the screen. */
+.prod-hist {
+  max-height: 38vh;
+  overflow-y: auto;
+  margin: -4px -4px 0;
+  padding: 0 4px;
+}
+.prod-hist-empty {
+  margin: 0;
+  font-size: 14px;
+}
+.prod-hist-list,
+.prod-hist-entries {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.prod-hist-item + .prod-hist-item {
+  border-top: 1px solid var(--line);
+}
+.prod-hist-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+}
+.prod-hist-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+/* The accumulated figure is a sum, so it reads as a value and not as an input —
+   the entries below it are what can be changed. */
+.prod-hist-total {
+  min-width: 46px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--brand-slate);
+  color: #fff;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.prod-hist-toggle {
+  min-height: auto;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  font-size: 13px;
+  color: var(--ink);
+  flex-shrink: 0;
+}
+.prod-hist-toggle:not(:disabled):hover {
+  background: #f4efe4;
+}
+/* Icon button: the global `button` rule adds 1rem of side padding and a 44px
+   min-height, which would collapse a 32px-wide box's content to zero width and
+   leave the glyph invisible. Zeroed the same way .modal-close does. */
+.prod-hist-drop {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  min-height: auto;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #9a3412;
+  flex-shrink: 0;
+}
+.prod-hist-drop:not(:disabled):hover {
+  background: #fdeceb;
+}
+.prod-hist-entries {
+  padding: 2px 0 10px 12px;
+  border-left: 2px solid var(--line);
+  margin-left: 2px;
+}
+.prod-hist-entry {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+}
+.prod-hist-when {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.prod-hist-qty {
+  width: 74px;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 /* The body is the only scrolling region; the frame itself never scrolls. */
 .modal-body {

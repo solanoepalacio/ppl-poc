@@ -102,7 +102,8 @@ export interface SlotOrdersResponse {
 
 /**
  * A single product's production breakdown for a bloque: how many are needed, how
- * many are already in stock, and the difference still to bake.
+ * many are already in stock, how many have been baked so far, and the difference
+ * still to bake.
  */
 export interface ProductionTotalItem {
   productId: string;
@@ -112,8 +113,14 @@ export interface ProductionTotalItem {
   /** Recorded existencia (stock on hand) for the bloque; 0 when none recorded. */
   existence: number;
   /**
-   * Net units to produce: `max(0, demand − existence)`. Floored at zero — a
-   * product covered by existencia shows 0, never a negative surplus.
+   * Recorded producción real (units already baked during the bloque); 0 when
+   * none recorded.
+   */
+  produced: number;
+  /**
+   * Net units still to produce: `max(0, demand − existence − produced)`. Floored
+   * at zero — a product covered by existencia and what has already been baked
+   * shows 0, never a negative surplus.
    */
   toProduce: number;
 }
@@ -153,4 +160,68 @@ export interface SlotExistenceResponse {
  */
 export interface SetExistenceRequest {
   items: ExistenceItem[];
+}
+
+/**
+ * One recorded batch of producción real: how many units came out of the oven and
+ * when it was recorded. These are the history the manager reviews under a
+ * product's "Ver detalle" — a wrong batch is corrected or deleted here, at the
+ * entry, rather than by overwriting a total.
+ */
+export interface ProducedEntry {
+  id: string;
+  quantity: number;
+  /** ISO timestamp of when the batch was recorded. */
+  createdAt: string;
+}
+
+/**
+ * A product's producción real for a bloque: its entries and their sum. `total` is
+ * derived, never stored — the entries are the source of truth, so the only way to
+ * change the total is to change them.
+ */
+export interface ProducedProduct {
+  productId: string;
+  name: string;
+  /** Sum of `entries`, always above zero (a product with none is not reported). */
+  total: number;
+  /** Oldest first, so the history reads in the order the work happened. */
+  entries: ProducedEntry[];
+}
+
+/**
+ * `GET /slots/:id/produced` response: the bloque's producción real grouped by
+ * product, sorted by product name. Only products with at least one entry appear;
+ * a product with none has produced zero.
+ */
+export interface SlotProducedResponse {
+  slot: Slot;
+  items: ProducedProduct[];
+}
+
+/**
+ * One product's desired entries in a {@link SetProducedRequest}. An entry with an
+ * `id` is an existing one being kept — its quantity is updated and its
+ * `createdAt` preserved. An entry without an `id` is new and the server stamps
+ * it. Existing entries the client does not send are deleted, so omitting a
+ * product entirely (or sending it with no entries) clears its producción real.
+ */
+export interface SetProducedProduct {
+  productId: string;
+  entries: { id?: string; quantity: number }[];
+}
+
+/**
+ * `PUT /slots/:id/produced` request: the complete desired history for the bloque
+ * (replace-all over entries).
+ *
+ * Unlike existencia this is not idempotent, and that is a deliberate trade rather
+ * than an oversight: entries without an `id` are new, so replaying the same body
+ * appends the new ones twice. What makes that acceptable is the history itself —
+ * a duplicated batch is visible under the product's detail and removable with one
+ * control, where a silently doubled total would not be. The alternative,
+ * incrementing a single stored figure, offers neither.
+ */
+export interface SetProducedRequest {
+  items: SetProducedProduct[];
 }

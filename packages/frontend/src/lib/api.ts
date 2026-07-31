@@ -12,7 +12,9 @@ import type {
   ProductionTotalsResponse,
   ReplaceOrderItemsResponse,
   Slot,
+  SetProducedProduct,
   SlotExistenceResponse,
+  SlotProducedResponse,
   SlotListResponse,
   SlotOrdersResponse,
   TokenValidationResponse,
@@ -146,6 +148,30 @@ export function setSlotExistence(
 ): Promise<SlotExistenceResponse> {
   return request<SlotExistenceResponse>(
     `/slots/${encodeURIComponent(slotId)}/existence`,
+    { method: 'PUT', body: JSON.stringify({ items }) },
+  );
+}
+
+export function getSlotProduced(
+  slotId: string,
+): Promise<SlotProducedResponse> {
+  return request<SlotProducedResponse>(
+    `/slots/${encodeURIComponent(slotId)}/produced`,
+  );
+}
+
+/**
+ * Replaces the bloque's producción real history. `items` is the complete desired
+ * set of entries: an entry with an `id` is kept and its quantity updated, one
+ * without is created, and any existing entry omitted is deleted — which is how
+ * both "delete this batch" and "remove this product" are expressed.
+ */
+export function setSlotProduced(
+  slotId: string,
+  items: SetProducedProduct[],
+): Promise<SlotProducedResponse> {
+  return request<SlotProducedResponse>(
+    `/slots/${encodeURIComponent(slotId)}/produced`,
     { method: 'PUT', body: JSON.stringify({ items }) },
   );
 }

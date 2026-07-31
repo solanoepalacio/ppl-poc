@@ -36,13 +36,7 @@ function ProductionTable({ items }: { items: ProductionTotalItem[] }) {
         >
           <div className="ptable-name">{item.name}</div>
           <div className="ptable-qty-cell">
-            <span
-              className={
-                item.toProduce > 0 ? 'ptable-qty' : 'ptable-qty ptable-qty--covered'
-              }
-            >
-              {item.toProduce}
-            </span>
+            <span className="ptable-qty">{item.toProduce}</span>
           </div>
         </div>
       ))}
@@ -59,9 +53,17 @@ function ProductionTable({ items }: { items: ProductionTotalItem[] }) {
  * Laid out as two tables side by side with products alternating between them, so
  * roughly twice as many fit before anything scrolls — these views are read off a
  * screen in the production area, where scrolling means walking over. Only the
- * quantity to produce is shown; demand and existencia stay in the API response
- * (they are what `toProduce` is computed from) but are not figures the line acts
- * on, and no line total: a summed figure is not something the line acts on.
+ * quantity to produce is shown; demand, existencia and producción real stay in
+ * the API response (they are what `toProduce` is computed from) but are not
+ * figures the line acts on, and no line total: a summed figure is not something
+ * the line acts on either.
+ *
+ * A **work queue, not a manifest**: a product whose quantity to produce has
+ * reached zero is finished, and drops off the screen rather than occupying a row
+ * with a 0 in it. The filter is here rather than in the API on purpose — the
+ * totals keep reporting covered products so the figure stays available and
+ * auditable on the orders view; it is only this screen that has no use for them.
+ * When everything is done the view is empty, which is the signal.
  */
 export async function ProductionView({
   category,
@@ -69,10 +71,11 @@ export async function ProductionView({
   category: ProductCategory;
 }) {
   const production = await getProductionTotals(undefined, category);
+  const pending = production.items.filter((item) => item.toProduce > 0);
 
   // Zig-zag: the list reads across before it reads down.
-  const left = production.items.filter((_, i) => i % 2 === 0);
-  const right = production.items.filter((_, i) => i % 2 === 1);
+  const left = pending.filter((_, i) => i % 2 === 0);
+  const right = pending.filter((_, i) => i % 2 === 1);
 
   return (
     <>
@@ -84,7 +87,7 @@ export async function ProductionView({
         modifier="bo-header--production"
       />
       <div className="bo-content">
-        {production.items.length > 0 ? (
+        {pending.length > 0 ? (
           <div className="ptable-split">
             <ProductionTable items={left} />
             <ProductionTable items={right} />

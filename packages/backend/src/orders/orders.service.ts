@@ -259,8 +259,9 @@ export class OrdersService {
   /**
    * Per-item production totals for a bloque, defaulting to the currently open
    * bloque. For each product ordered in the bloque it reports the summed demand,
-   * the bloque's manually-entered existencia (stock on hand), and the net still
-   * to produce (`max(0, demand − existence)` — zero when covered, never negative).
+   * the bloque's manually-entered existencia (stock on hand), its manually-entered
+   * producción real (units already baked), and the net still to produce
+   * (`max(0, demand − existence − produced)` — zero when covered, never negative).
    * Returns one entry per product with demand, sorted by product name; only
    * products with no demand are absent. A mistaken order is excluded by deleting
    * it.
@@ -297,21 +298,29 @@ export class OrdersService {
       }
     }
 
-    // Report the bloque's manually-entered existencia (stock on hand) alongside
-    // demand, and the net still to produce. The net floors at zero: a product
-    // covered by existence shows 0 to produce, never a negative surplus, so the
-    // footer total stays meaningful. Every ordered product stays on the list —
+    // Report the bloque's two manually-entered deductions alongside demand —
+    // existencia (stock already on hand) and producción real (units baked so far)
+    // — and the net still to produce. Both are subtracted under a single floor at
+    // zero: a product covered by them shows 0 to produce, never a negative
+    // surplus, so surplus in one product is never charged against another. This
+    // is what makes the figure a countdown of what is *missing* rather than a
+    // static record of what was needed. Every ordered product stays on the list —
     // only products with no demand are absent.
-    const existence = await this.slotsService.getExistenceMap(slot.id);
+    const [existence, produced] = await Promise.all([
+      this.slotsService.getExistenceMap(slot.id),
+      this.slotsService.getProducedMap(slot.id),
+    ]);
     const items = [...totals.entries()]
       .map(([productId, { name, quantity }]) => {
         const inStock = existence.get(productId) ?? 0;
+        const alreadyMade = produced.get(productId) ?? 0;
         return {
           productId,
           name,
           demand: quantity,
           existence: inStock,
-          toProduce: Math.max(0, quantity - inStock),
+          produced: alreadyMade,
+          toProduce: Math.max(0, quantity - inStock - alreadyMade),
         };
       })
       .sort((a, b) => a.name.localeCompare(b.name));
