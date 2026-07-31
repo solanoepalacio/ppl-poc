@@ -10,9 +10,11 @@ import {
 import type {
   CloseSlotResponse,
   SetExistenceRequest,
+  SetProducedRequest,
   Slot,
   SlotExistenceResponse,
   SlotListResponse,
+  SlotProducedResponse,
 } from '@pannico/shared';
 import { SlotsService } from './slots.service';
 
@@ -53,5 +55,28 @@ export class SlotsController {
     @Body() body: SetExistenceRequest,
   ): Promise<SlotExistenceResponse> {
     return this.slotsService.setExistence(id, body.items ?? []);
+  }
+
+  /**
+   * The bloque's producción real: its recorded batches grouped by product, each
+   * with the entries behind its total.
+   */
+  @Get(':id/produced')
+  getProduced(@Param('id') id: string): Promise<SlotProducedResponse> {
+    return this.slotsService.getProduced(id);
+  }
+
+  /**
+   * Replaces a bloque's producción real history (open bloque only). The body is
+   * the complete desired set of entries: those carrying an id are kept and
+   * updated, those without are created, and any existing entry left out is
+   * deleted.
+   */
+  @Put(':id/produced')
+  setProduced(
+    @Param('id') id: string,
+    @Body() body: SetProducedRequest,
+  ): Promise<SlotProducedResponse> {
+    return this.slotsService.setProduced(id, body.items ?? []);
   }
 }

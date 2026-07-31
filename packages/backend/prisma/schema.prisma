@@ -26,6 +26,7 @@ model Product {
 
   orderItems OrderItem[]
   existence  SlotExistence[]
+  produced   SlotProduced[]
 }
 
 /// A client an order can be attached to. The directory is a fixed preset list
@@ -58,6 +59,7 @@ model Slot {
 
   orders    Order[]
   existence SlotExistence[]
+  produced  SlotProduced[]
 
   @@index([status])
 }
@@ -117,4 +119,36 @@ model SlotExistence {
 
   @@unique([slotId, productId])
   @@index([slotId])
+}
+
+/// One recorded batch of *producción real*: how many units of a product came out
+/// of the oven, entered by hand as the work progresses. Subtracted from that
+/// bloque's production totals alongside the existencia, so the figure the
+/// production views show is what is still missing rather than what was needed.
+///
+/// **One row per batch, not per product** — deliberately no unique constraint on
+/// `(slotId, productId)`. A product's producción real for a bloque is the SUM of
+/// its rows, and the rows themselves are the history the manager reviews: each
+/// carries `createdAt` so a wrong batch can be found and corrected or deleted
+/// where the mistake actually is. Deleting a product's last row clears its
+/// producción real. A freshly opened bloque has no rows at all.
+///
+/// Scoped to the bloque, never to the calendar: `createdAt` is for the manager to
+/// read, and totals are computed from `slotId` alone, so entries never leak
+/// across bloques however their timestamps fall.
+///
+/// Independent of SlotExistence: the two are separate figures on the same bloque
+/// and neither write touches the other.
+model SlotProduced {
+  id        String   @id @default(cuid())
+  slotId    String
+  productId String
+  quantity  Int
+  createdAt DateTime @default(now())
+
+  slot    Slot    @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([slotId])
+  @@index([slotId, productId])
 }

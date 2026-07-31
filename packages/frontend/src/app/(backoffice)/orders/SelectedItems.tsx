@@ -40,6 +40,23 @@ export function SelectedItems({
   const selectAllOnFocus = useSelectAllOnFocus();
   const listRef = useRef<HTMLUListElement>(null);
   const [flashId, setFlashId] = useState<string | null>(null);
+  /**
+   * The field being typed in, by product id: its raw text plus the quantity it
+   * held when editing started.
+   *
+   * `raw` exists because the quantity can never be empty (the row exists because
+   * it is at least 1) but the *field* has to be, or the value cannot be cleared:
+   * clearing sends '', which parses back to the committed quantity and is painted
+   * straight over, so typing 300 over a 1 yields 1300.
+   *
+   * `base` exists because clearing "300" passes through "30" and "3", each of
+   * which commits. Falling back to the last committed value would leave 3 — a
+   * number the manager only typed through on the way out. Blurring an empty or
+   * sub-1 field restores `base` instead.
+   */
+  const [draft, setDraft] = useState<
+    Record<string, { raw: string; base: number }>
+  >({});
 
   // Keep catalog order, but show only products actually on the order.
   const added = products.filter((p) => (quantities[p.id] ?? 0) > 0);
@@ -90,15 +107,39 @@ export function SelectedItems({
                 min={1}
                 inputMode="numeric"
                 aria-label={`Cantidad de ${p.name}`}
-                value={value}
+                value={draft[p.id]?.raw ?? String(value)}
                 disabled={disabled}
                 {...selectAllOnFocus}
-                onChange={(e) =>
-                  onChange(
-                    p.id,
-                    Math.max(1, Math.floor(Number(e.target.value) || 1)),
-                  )
-                }
+                onFocus={(e) => {
+                  selectAllOnFocus.onFocus(e);
+                  setDraft((d) => ({
+                    ...d,
+                    [p.id]: { raw: String(value), base: value },
+                  }));
+                }}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  setDraft((d) => ({
+                    ...d,
+                    [p.id]: { raw, base: d[p.id]?.base ?? value },
+                  }));
+                  // Only a usable quantity is committed upward, so the row's
+                  // quantity is never briefly empty or zero.
+                  const n = Math.floor(Number(raw));
+                  if (raw !== '' && Number.isFinite(n) && n >= 1) {
+                    onChange(p.id, n);
+                  }
+                }}
+                onBlur={() => {
+                  const leaving = draft[p.id];
+                  const n = Math.floor(Number(leaving?.raw));
+                  if (leaving && !(leaving.raw !== '' && n >= 1)) {
+                    // Left empty or below the minimum: put back what the field
+                    // started with, not the digits it passed through.
+                    onChange(p.id, leaving.base);
+                  }
+                  setDraft(({ [p.id]: _dropped, ...rest }) => rest);
+                }}
                 onKeyDown={(e) => {
                   // Enter confirms the typed value and drops focus, rather than
                   // leaving the field focused (which reads as still-editing).

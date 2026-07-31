@@ -64,6 +64,7 @@ describe('OrdersService', () => {
     getOpenSlotId: jest.Mock;
     resolveSlot: jest.Mock;
     getExistenceMap: jest.Mock;
+    getProducedMap: jest.Mock;
   };
   let clients: { assertActive: jest.Mock };
   let service: OrdersService;
@@ -74,6 +75,7 @@ describe('OrdersService', () => {
       getOpenSlotId: jest.fn().mockResolvedValue('slot_open'),
       resolveSlot: jest.fn().mockResolvedValue(openSlot),
       getExistenceMap: jest.fn().mockResolvedValue(new Map<string, number>()),
+      getProducedMap: jest.fn().mockResolvedValue(new Map<string, number>()),
     };
     clients = { assertActive: jest.fn().mockResolvedValue(undefined) };
     const tokenService = new TokenService(prisma as unknown as PrismaService);
@@ -431,7 +433,7 @@ describe('OrdersService', () => {
 
       expect(res.slot.id).toBe('slot_open');
       expect(res.items).toEqual([
-        { productId: 'p1', name: 'Croissant', demand: 5, existence: 0, toProduce: 5 },
+        { productId: 'p1', name: 'Croissant', demand: 5, existence: 0, produced: 0, toProduce: 5 },
       ]);
     });
 
@@ -445,7 +447,7 @@ describe('OrdersService', () => {
 
       expect(slots.getExistenceMap).toHaveBeenCalledWith('slot_open');
       expect(res.items).toEqual([
-        { productId: 'p1', name: 'Croissant', demand: 8, existence: 3, toProduce: 5 },
+        { productId: 'p1', name: 'Croissant', demand: 8, existence: 3, produced: 0, toProduce: 5 },
       ]);
     });
 
@@ -466,8 +468,65 @@ describe('OrdersService', () => {
       const res = await service.getProductionTotals('slot_open');
 
       expect(res.items).toEqual([
-        { productId: 'p2', name: 'Baguette', demand: 4, existence: 4, toProduce: 0 },
-        { productId: 'p1', name: 'Croissant', demand: 8, existence: 10, toProduce: 0 },
+        { productId: 'p2', name: 'Baguette', demand: 4, existence: 4, produced: 0, toProduce: 0 },
+        { productId: 'p1', name: 'Croissant', demand: 8, existence: 10, produced: 0, toProduce: 0 },
+      ]);
+    });
+
+    it('reports producción real and subtracts it from the net to produce', async () => {
+      prisma.order.findMany.mockResolvedValue([
+        orderWith([{ productId: 'p1', name: 'Croissant', quantity: 8 }]),
+      ]);
+      slots.getProducedMap.mockResolvedValue(new Map([['p1', 3]]));
+
+      const res = await service.getProductionTotals('slot_open');
+
+      expect(slots.getProducedMap).toHaveBeenCalledWith('slot_open');
+      expect(res.items).toEqual([
+        { productId: 'p1', name: 'Croissant', demand: 8, existence: 0, produced: 3, toProduce: 5 },
+      ]);
+    });
+
+    it('subtracts existencia and producción real together', async () => {
+      prisma.order.findMany.mockResolvedValue([
+        orderWith([{ productId: 'p1', name: 'Croissant', quantity: 10 }]),
+      ]);
+      slots.getExistenceMap.mockResolvedValue(new Map([['p1', 2]]));
+      slots.getProducedMap.mockResolvedValue(new Map([['p1', 6]]));
+
+      const res = await service.getProductionTotals('slot_open');
+
+      expect(res.items).toEqual([
+        { productId: 'p1', name: 'Croissant', demand: 10, existence: 2, produced: 6, toProduce: 2 },
+      ]);
+    });
+
+    it('floors the net at zero when both deductions together exceed demand', async () => {
+      prisma.order.findMany.mockResolvedValue([
+        orderWith([{ productId: 'p1', name: 'Croissant', quantity: 4 }]),
+      ]);
+      slots.getExistenceMap.mockResolvedValue(new Map([['p1', 3]]));
+      slots.getProducedMap.mockResolvedValue(new Map([['p1', 5]]));
+
+      const res = await service.getProductionTotals('slot_open');
+
+      // Overproduction shows 0, never a negative surplus, and the product stays
+      // on the list because it still has demand.
+      expect(res.items).toEqual([
+        { productId: 'p1', name: 'Croissant', demand: 4, existence: 3, produced: 5, toProduce: 0 },
+      ]);
+    });
+
+    it('keeps a fully produced product at zero rather than dropping it', async () => {
+      prisma.order.findMany.mockResolvedValue([
+        orderWith([{ productId: 'p1', name: 'Croissant', quantity: 12 }]),
+      ]);
+      slots.getProducedMap.mockResolvedValue(new Map([['p1', 12]]));
+
+      const res = await service.getProductionTotals('slot_open');
+
+      expect(res.items).toEqual([
+        { productId: 'p1', name: 'Croissant', demand: 12, existence: 0, produced: 12, toProduce: 0 },
       ]);
     });
 
@@ -538,7 +597,7 @@ describe('OrdersService', () => {
       const res = await service.getProductionTotals('slot_7', 'salty');
 
       expect(res.items).toEqual([
-        { productId: 'p1', name: 'Ciabatta', demand: 2, existence: 0, toProduce: 2 },
+        { productId: 'p1', name: 'Ciabatta', demand: 2, existence: 0, produced: 0, toProduce: 2 },
       ]);
     });
 
