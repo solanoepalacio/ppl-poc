@@ -225,3 +225,65 @@ export interface SetProducedProduct {
 export interface SetProducedRequest {
   items: SetProducedProduct[];
 }
+
+/**
+ * A product's stock position within a bloque. `initial` is the manually entered
+ * (or inherited) stock inicial; `current` is the derived stock actual.
+ *
+ * `current` is never stored — it is `initial + produced − demand`, recomputed on
+ * every read. That is what makes it read-only: there is nothing to write it to,
+ * and each of its three inputs has its own control. It MAY be negative, since
+ * real production is recorded after the orders arrive.
+ */
+export interface SlotStockItem {
+  productId: string;
+  name: string;
+  /** Stock inicial: typed by the manager or inherited from the previous bloque. */
+  initial: number;
+  /** Producción real summed over the bloque's recorded batches. */
+  produced: number;
+  /** Demand summed across the bloque's orders. */
+  demand: number;
+  /** `initial + produced − demand`. Negative means the product is in shortfall. */
+  current: number;
+}
+
+/**
+ * `GET /slots/:id/stock` response: the bloque's stock position per product,
+ * sorted by product name.
+ *
+ * Reports every product with any activity in the bloque — a stock inicial, a
+ * recorded batch, or demand. The three underlying sources each mention a
+ * different set of products, so the union is computed server-side; a product
+ * baked but never ordered nor counted is known to exactly one of them.
+ *
+ * Note this deliberately includes products in shortfall, which the stock control
+ * does not display. The control applies that filter itself, because a manager
+ * adding such a product to give it a stock inicial needs its real demand and
+ * production to see a truthful stock actual. A product absent here has no
+ * activity at all, so its produced and demand are both zero.
+ */
+export interface SlotStockResponse {
+  slot: Slot;
+  items: SlotStockItem[];
+}
+
+/** A product of the open bloque whose stock actual is below zero. */
+export interface SlotShortfallItem {
+  productId: string;
+  name: string;
+  /** How many units short — a positive number, the magnitude of the deficit. */
+  shortfall: number;
+}
+
+/**
+ * `GET /slots/close-preview` response: what closing the open bloque would discard.
+ *
+ * Advisory only. A shortfall cannot carry (stock inicial is never negative), so
+ * closing drops it; this lets the back office say so before it happens. The server
+ * clamps identically whether or not this was called.
+ */
+export interface CloseSlotPreviewResponse {
+  slot: Slot;
+  shortfalls: SlotShortfallItem[];
+}

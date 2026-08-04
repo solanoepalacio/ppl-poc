@@ -13,7 +13,9 @@ import type {
   ReplaceOrderItemsResponse,
   Slot,
   SetProducedProduct,
+  CloseSlotPreviewResponse,
   SlotExistenceResponse,
+  SlotStockResponse,
   SlotProducedResponse,
   SlotListResponse,
   SlotOrdersResponse,
@@ -150,6 +152,21 @@ export function setSlotExistence(
     `/slots/${encodeURIComponent(slotId)}/existence`,
     { method: 'PUT', body: JSON.stringify({ items }) },
   );
+}
+
+/**
+ * A bloque's stock position per product: stock inicial, producción real, demand
+ * and the derived stock actual. Only products with a positive initial or current.
+ */
+export function getSlotStock(slotId: string): Promise<SlotStockResponse> {
+  return request<SlotStockResponse>(
+    `/slots/${encodeURIComponent(slotId)}/stock`,
+  );
+}
+
+/** What closing the open bloque would discard: the products in shortfall. */
+export function getCloseSlotPreview(): Promise<CloseSlotPreviewResponse> {
+  return request<CloseSlotPreviewResponse>(`/slots/close-preview`);
 }
 
 export function getSlotProduced(

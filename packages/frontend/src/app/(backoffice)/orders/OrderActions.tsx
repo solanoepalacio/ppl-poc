@@ -17,10 +17,17 @@ export function OrderActions({
   orderId,
   items,
   products,
+  readOnly,
 }: {
   orderId: string;
   items: OrderItem[];
   products: Product[];
+  /**
+   * A closed bloque's orders can no longer be changed — its demand is baked into
+   * the stock inicial its successor inherited. The controls are withheld rather
+   * than shown and rejected, so the rule is visible before it is hit.
+   */
+  readOnly?: boolean;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -75,6 +82,10 @@ export function OrderActions({
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo eliminar la orden.');
     }
+  }
+
+  if (readOnly) {
+    return null;
   }
 
   return (

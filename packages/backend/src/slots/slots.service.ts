@@ -14,9 +14,19 @@ import type {
   SlotListItem,
   SlotListResponse,
   SlotProducedResponse,
+  SlotStockItem,
+  SlotStockResponse,
+  CloseSlotPreviewResponse,
 } from '@pannico/shared';
 import { Prisma, type Slot } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+
+/**
+ * The Prisma surface these reads need, satisfied both by the service and by the
+ * client handed to a `$transaction` callback — so the carry can read the same
+ * figures the stock view does, from inside the closing transaction.
+ */
+type PrismaLike = Prisma.TransactionClient;
 
 /**
  * Owns the production-bloque lifecycle. The core invariant — exactly one `open`
@@ -122,6 +132,18 @@ export class SlotsService implements OnModuleInit {
    * Closing a bloque is also the moment its unused order links die — but no
    * order state is written for that: a token is invalid once its bloque is
    * `closed`, so the closed status alone retires every unused link in it.
+   *
+   * Closing also **carries the stock forward**: each product's stock actual
+   * becomes the successor's stock inicial, so a count continues across bloques
+   * instead of restarting at zero. A stock actual of zero or below is not carried
+   * — stock inicial is a counted quantity and never negative, so a shortfall is
+   * discarded rather than becoming a debt the next bloque would bake without an
+   * order asking for it. `getClosePreview` exists so the manager can see that
+   * coming.
+   *
+   * The carry reads and writes inside the same transaction as the close, so a
+   * bloque is never left closed without its successor having received the stock,
+   * and a write landing mid-close cannot produce a carry matching neither bloque.
    */
   async closeSlot(id: string): Promise<CloseSlotResponse> {
     const { closed, open } = await this.prisma.$transaction(async (tx) => {
@@ -132,6 +154,8 @@ export class SlotsService implements OnModuleInit {
       if (slot.status !== 'open') {
         throw new BadRequestException(`Slot ${id} is already closed.`);
       }
+      // Read the closing bloque's position before anything changes.
+      const { all } = await this.stockOf(slot.id, tx);
       const closed = await tx.slot.update({
         where: { id },
         data: { status: 'closed', closedAt: new Date() },
@@ -140,6 +164,16 @@ export class SlotsService implements OnModuleInit {
       const open = await tx.slot.create({
         data: { seq: (max._max.seq ?? 0) + 1, status: 'open' },
       });
+      const carry = all.filter((r) => r.current > 0);
+      if (carry.length > 0) {
+        await tx.slotExistence.createMany({
+          data: carry.map((r) => ({
+            slotId: open.id,
+            productId: r.productId,
+            quantity: r.current,
+          })),
+        });
+      }
       return { closed, open };
     });
     return { closed: toDto(closed), open: toDto(open) };
@@ -297,6 +331,157 @@ export class SlotsService implements OnModuleInit {
       _sum: { quantity: true },
     });
     return new Map(rows.map((r) => [r.productId, r._sum.quantity ?? 0]));
+  }
+
+  /**
+   * The bloque's demand as a productId → `{ name, quantity }` map: the quantities
+   * of each product summed across every order in the bloque, optionally narrowed
+   * to one production line. There is no status filter — a mistaken order is
+   * excluded by deleting it.
+   *
+   * This lives here rather than in OrdersService, where it is also consumed,
+   * because closing a bloque needs it to compute what stock carries forward, and
+   * SlotsService cannot depend on OrdersService without closing a module cycle
+   * (OrdersModule already imports SlotsModule). Demand-per-bloque is in any case a
+   * fact about a bloque, computed from the orders in it.
+   */
+  async getDemandMap(
+    slotId: string,
+    category?: string,
+  ): Promise<Map<string, { name: string; quantity: number }>> {
+    return this.demandMapWith(this.prisma, slotId, category);
+  }
+
+  /**
+   * A bloque's stock position per product: the stock inicial, the producción real
+   * summed over its batches, the demand, and the derived stock actual
+   * (`initial + produced − demand`).
+   *
+   * The three sources disagree about which products they mention — production
+   * omits products with no batch, existencia omits products with no row, demand
+   * omits products with no order — so a product baked but never ordered nor
+   * counted appears in exactly one of them. The union is done here, once, rather
+   * than in a component.
+   *
+   * Reports every product with any activity, shortfalls included. The stock
+   * control hides those itself: a manager adding a product in order to give it a
+   * stock inicial needs its real demand and production, or the stock actual it
+   * shows would be a fiction.
+   */
+  async getStock(slotId?: string): Promise<SlotStockResponse> {
+    const slot = await this.resolveSlot(slotId);
+    const { all } = await this.stockOf(slot.id);
+    return { slot: toDto(slot), items: all };
+  }
+
+  /**
+   * Every product's stock position in the bloque, unfiltered — the shared core
+   * behind the stock view, the close preview and the carry, so the three can
+   * never compute it differently. `tx` lets the carry read inside the closing
+   * transaction.
+   */
+  private async stockOf(
+    slotId: string,
+    tx: PrismaLike = this.prisma,
+  ): Promise<{ all: SlotStockItem[]; items: SlotStockItem[] }> {
+    const [existenceRows, producedRows, demand] = await Promise.all([
+      tx.slotExistence.findMany({
+        where: { slotId },
+        select: { productId: true, quantity: true, product: { select: { name: true } } },
+      }),
+      tx.slotProduced.groupBy({
+        by: ['productId'],
+        where: { slotId },
+        _sum: { quantity: true },
+      }),
+      this.demandMapWith(tx, slotId),
+    ]);
+
+    const rows = new Map<string, SlotStockItem>();
+    const row = (productId: string, name: string): SlotStockItem => {
+      let r = rows.get(productId);
+      if (!r) {
+        r = { productId, name, initial: 0, produced: 0, demand: 0, current: 0 };
+        rows.set(productId, r);
+      }
+      return r;
+    };
+    for (const e of existenceRows) {
+      row(e.productId, e.product.name).initial = e.quantity;
+    }
+    for (const p of producedRows) {
+      // A product may be produced without ever having existencia or a name yet
+      // resolved here; the name is filled in by whichever source knows it.
+      row(p.productId, '').produced = p._sum.quantity ?? 0;
+    }
+    for (const [productId, d] of demand) {
+      const r = row(productId, d.name);
+      r.demand = d.quantity;
+      if (!r.name) r.name = d.name;
+    }
+
+    // Any product still missing a name was known only to the produced history,
+    // which does not join the product; fetch just those.
+    const unnamed = [...rows.values()].filter((r) => !r.name).map((r) => r.productId);
+    if (unnamed.length > 0) {
+      const products = await tx.product.findMany({
+        where: { id: { in: unnamed } },
+        select: { id: true, name: true },
+      });
+      for (const p of products) {
+        const r = rows.get(p.id);
+        if (r) r.name = p.name;
+      }
+    }
+
+    const all = [...rows.values()]
+      .map((r) => ({ ...r, current: r.initial + r.produced - r.demand }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    return { all, items: all.filter((r) => r.initial > 0 || r.current > 0) };
+  }
+
+  /** `getDemandMap` against an explicit client, so the carry can read in-transaction. */
+  private async demandMapWith(
+    tx: PrismaLike,
+    slotId: string,
+    category?: string,
+  ): Promise<Map<string, { name: string; quantity: number }>> {
+    const rows = await tx.orderItem.findMany({
+      where: {
+        order: { slotId },
+        ...(category ? { product: { category } } : {}),
+      },
+      select: { productId: true, quantity: true, product: { select: { name: true } } },
+    });
+    const demand = new Map<string, { name: string; quantity: number }>();
+    for (const r of rows) {
+      const entry = demand.get(r.productId);
+      if (entry) entry.quantity += r.quantity;
+      else demand.set(r.productId, { name: r.product.name, quantity: r.quantity });
+    }
+    return demand;
+  }
+
+  /**
+   * The products of a bloque that would lose a shortfall if it were closed now.
+   *
+   * Advisory: closing clamps a negative stock actual to zero whether or not this
+   * was called. It exists so the back office can say what is about to be dropped
+   * instead of dropping it silently.
+   */
+  async getClosePreview(slotId?: string): Promise<CloseSlotPreviewResponse> {
+    const slot = await this.resolveSlot(slotId);
+    const { all } = await this.stockOf(slot.id);
+    return {
+      slot: toDto(slot),
+      shortfalls: all
+        .filter((r) => r.current < 0)
+        .map((r) => ({
+          productId: r.productId,
+          name: r.name,
+          shortfall: -r.current,
+        })),
+    };
   }
 
   /**

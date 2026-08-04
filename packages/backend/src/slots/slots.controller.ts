@@ -15,6 +15,8 @@ import type {
   SlotExistenceResponse,
   SlotListResponse,
   SlotProducedResponse,
+  SlotStockResponse,
+  CloseSlotPreviewResponse,
 } from '@pannico/shared';
 import { SlotsService } from './slots.service';
 
@@ -40,6 +42,25 @@ export class SlotsController {
   async close(): Promise<CloseSlotResponse> {
     const openId = await this.slotsService.getOpenSlotId();
     return this.slotsService.closeSlot(openId);
+  }
+
+  /**
+   * What closing the open bloque would discard: the products whose stock actual
+   * is below zero. Advisory — closing clamps the same way whether or not this was
+   * called.
+   */
+  @Get('close-preview')
+  closePreview(): Promise<CloseSlotPreviewResponse> {
+    return this.slotsService.getClosePreview();
+  }
+
+  /**
+   * A bloque's stock position per product: stock inicial, producción real, demand
+   * and the derived stock actual.
+   */
+  @Get(':id/stock')
+  getStock(@Param('id') id: string): Promise<SlotStockResponse> {
+    return this.slotsService.getStock(id);
   }
 
   /** The manually-entered existencia recorded for a bloque. */

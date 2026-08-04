@@ -1208,6 +1208,107 @@ select {
   flex-shrink: 0;
   z-index: 5;
 }
+/* ── Stock dialog: two figures per product ─────────────────────────────────
+   The initial is an input; the current is text, because it is derived and there
+   is nothing to write it to. Same grid on the head row and the data rows so the
+   columns line up. */
+/* Fills the scrolling body so the search bar can sit at its foot rather than
+   trailing the last row. Without this the bar rides just under the rows near the
+   top of the dialog, and its drop-up list — which opens upward — has nothing to
+   open into and is clipped by the header. */
+.stock-list {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+/* Pushed down whatever the row count, including none. */
+.stock-list .product-add-bar {
+  margin-top: auto;
+}
+.stock-head,
+.stock-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px 76px;
+  align-items: center;
+  gap: 10px;
+}
+.stock-head {
+  padding: 0 0 6px;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.stock-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.stock-row {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+.stock-row:last-child {
+  border-bottom: none;
+}
+.stock-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.stock-initial {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.stock-current {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--brand-slate);
+}
+/* A shortfall is not listed here, but a row can fall below zero while its
+   initial is being edited down. Colour it so the manager sees it happen. */
+.stock-current--short {
+  color: #9a3412;
+}
+
+/* ── Close confirmation: what the close is about to discard ──────────────── */
+.close-warning {
+  margin: 0 0 12px;
+}
+.close-warning-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+.close-warning-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--line);
+}
+.close-warning-row:last-child {
+  border-bottom: none;
+}
+.close-warning-qty {
+  flex-shrink: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #9a3412;
+}
+
 /* The producción real history, pinned above the batch picker. Capped and
    scrollable on its own: the pinned region must not grow without bound and push
    the picker — where the manager actually works — off the screen. */

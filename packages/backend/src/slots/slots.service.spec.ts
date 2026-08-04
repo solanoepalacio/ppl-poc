@@ -41,6 +41,7 @@ type PrismaMock = {
   slotExistence: SlotExistenceMock;
   slotProduced: SlotProducedMock;
   product: ProductMock;
+  orderItem: { findMany: jest.Mock };
   $transaction: jest.Mock;
 };
 
@@ -54,7 +55,7 @@ function makePrisma(): PrismaMock {
     update: jest.fn(),
   };
   const slotExistence: SlotExistenceMock = {
-    findMany: jest.fn(),
+    findMany: jest.fn().mockResolvedValue([]),
     deleteMany: jest.fn(),
     createMany: jest.fn(),
   };
@@ -66,14 +67,16 @@ function makePrisma(): PrismaMock {
     groupBy: jest.fn().mockResolvedValue([]),
   };
   const product: ProductMock = { findMany: jest.fn() };
+  const orderItem = { findMany: jest.fn().mockResolvedValue([]) };
   return {
     slot,
     slotExistence,
     slotProduced,
     product,
+    orderItem,
     // Runs the callback with the same mocks as the transactional client.
     $transaction: jest.fn((cb: (tx: unknown) => unknown) =>
-      cb({ slot, slotExistence, slotProduced, product }),
+      cb({ slot, slotExistence, slotProduced, product, orderItem }),
     ),
   };
 }
@@ -676,4 +679,266 @@ describe('SlotsService', () => {
       });
     });
   });
+
+  // The demand sum moved here from OrdersService: closing a bloque needs it, and
+  // SlotsService cannot depend on OrdersService without closing a module cycle.
+  describe('getDemandMap', () => {
+    const item = (productId: string, quantity: number, name: string) => ({
+      productId,
+      quantity,
+      product: { name },
+    });
+
+    it('sums a product across every order item in the bloque', async () => {
+      prisma.orderItem.findMany.mockResolvedValue([
+        item('p1', 3, 'Croissant'),
+        item('p1', 2, 'Croissant'),
+        item('p2', 5, 'Baguette'),
+      ]);
+
+      const map = await service.getDemandMap('slot_open');
+
+      expect(map.get('p1')).toEqual({ name: 'Croissant', quantity: 5 });
+      expect(map.get('p2')).toEqual({ name: 'Baguette', quantity: 5 });
+    });
+
+    it('scopes to the bloque and applies no status filter', async () => {
+      await service.getDemandMap('slot_open');
+
+      const where = prisma.orderItem.findMany.mock.calls[0][0].where;
+      expect(where).toEqual({ order: { slotId: 'slot_open' } });
+    });
+
+    it('narrows to one production line when a category is given', async () => {
+      await service.getDemandMap('slot_open', 'salty');
+
+      const where = prisma.orderItem.findMany.mock.calls[0][0].where;
+      expect(where).toEqual({
+        order: { slotId: 'slot_open' },
+        product: { category: 'salty' },
+      });
+    });
+
+    it('returns an empty map for a bloque with no orders', async () => {
+      prisma.orderItem.findMany.mockResolvedValue([]);
+
+      const map = await service.getDemandMap('slot_open');
+
+      expect(map.size).toBe(0);
+    });
+  });
+
+
+  describe('getStock', () => {
+    const named = (id: string, name: string, quantity: number) => ({
+      productId: id,
+      quantity,
+      product: { name },
+    });
+
+    it('unions the three sources — a product known to only one still appears', async () => {
+      prisma.slot.findUnique.mockResolvedValue(openSlot);
+      prisma.slotExistence.findMany.mockResolvedValue([named('p1', 'Solo stock', 10)]);
+      prisma.slotProduced.groupBy.mockResolvedValue([
+        { productId: 'p2', _sum: { quantity: 7 } },
+      ]);
+      prisma.orderItem.findMany.mockResolvedValue([
+        { productId: 'p3', quantity: 4, product: { name: 'Solo pedido' } },
+      ]);
+      // p2 is known only to the produced history, which does not join the product.
+      prisma.product.findMany.mockResolvedValue([{ id: 'p2', name: 'Solo produccion' }]);
+
+      const res = await service.getStock('slot_open');
+      const byId = Object.fromEntries(res.items.map((i) => [i.productId, i]));
+
+      expect(byId.p1).toMatchObject({ initial: 10, produced: 0, demand: 0, current: 10 });
+      expect(byId.p2).toMatchObject({ name: 'Solo produccion', produced: 7, current: 7 });
+      // p3 has demand only; it is reported (in shortfall) for the control to
+      // hide, so that adding it later shows a truthful stock actual.
+      expect(byId.p3).toMatchObject({ name: 'Solo pedido', demand: 4, current: -4 });
+    });
+
+    it('computes the worked example: 100 initial, 300 produced, 200 demand', async () => {
+      prisma.slot.findUnique.mockResolvedValue(openSlot);
+      prisma.slotExistence.findMany.mockResolvedValue([named('p1', 'Alfajor', 100)]);
+      prisma.slotProduced.groupBy.mockResolvedValue([
+        { productId: 'p1', _sum: { quantity: 300 } },
+      ]);
+      prisma.orderItem.findMany.mockResolvedValue([
+        { productId: 'p1', quantity: 200, product: { name: 'Alfajor' } },
+      ]);
+
+      const res = await service.getStock('slot_open');
+
+      expect(res.items).toEqual([
+        {
+          productId: 'p1',
+          name: 'Alfajor',
+          initial: 100,
+          produced: 300,
+          demand: 200,
+          current: 200,
+        },
+      ]);
+    });
+
+    it('reports every product with activity, shortfalls included', async () => {
+      prisma.slot.findUnique.mockResolvedValue(openSlot);
+      prisma.slotExistence.findMany.mockResolvedValue([named('p2', 'Vendido', 50)]);
+      prisma.slotProduced.groupBy.mockResolvedValue([
+        { productId: 'p3', _sum: { quantity: 30 } },
+      ]);
+      prisma.orderItem.findMany.mockResolvedValue([
+        { productId: 'p1', quantity: 200, product: { name: 'Debiendo' } },
+        { productId: 'p2', quantity: 50, product: { name: 'Vendido' } },
+        { productId: 'p3', quantity: 30, product: { name: 'Empatado' } },
+      ]);
+
+      const res = await service.getStock('slot_open');
+      const byId = Object.fromEntries(res.items.map((i) => [i.productId, i]));
+
+      // All three are reported with their true figures; which of them the stock
+      // control shows is the control's decision, made from exactly this data.
+      expect(byId.p1).toMatchObject({ initial: 0, current: -200 });
+      expect(byId.p2).toMatchObject({ initial: 50, current: 0 });
+      expect(byId.p3).toMatchObject({ produced: 30, demand: 30, current: 0 });
+    });
+
+    it('sorts by product name', async () => {
+      prisma.slot.findUnique.mockResolvedValue(openSlot);
+      prisma.slotExistence.findMany.mockResolvedValue([
+        named('p1', 'Zapallo', 1),
+        named('p2', 'Alfajor', 1),
+      ]);
+
+      const res = await service.getStock('slot_open');
+
+      expect(res.items.map((i) => i.name)).toEqual(['Alfajor', 'Zapallo']);
+    });
+  });
+
+  describe('getClosePreview', () => {
+    it('reports only the products in shortfall, as positive magnitudes', async () => {
+      prisma.slot.findUnique.mockResolvedValue(openSlot);
+      prisma.slotExistence.findMany.mockResolvedValue([
+        { productId: 'p2', quantity: 500, product: { name: 'Sobrando' } },
+      ]);
+      prisma.orderItem.findMany.mockResolvedValue([
+        { productId: 'p1', quantity: 50, product: { name: 'Debiendo' } },
+        { productId: 'p2', quantity: 10, product: { name: 'Sobrando' } },
+      ]);
+
+      const res = await service.getClosePreview('slot_open');
+
+      expect(res.shortfalls).toEqual([
+        { productId: 'p1', name: 'Debiendo', shortfall: 50 },
+      ]);
+    });
+
+    it('reports nothing when no product is short', async () => {
+      prisma.slot.findUnique.mockResolvedValue(openSlot);
+
+      const res = await service.getClosePreview('slot_open');
+
+      expect(res.shortfalls).toEqual([]);
+    });
+  });
+
+  describe('closeSlot stock carry', () => {
+    const readyToClose = () => {
+      prisma.slot.findUnique.mockResolvedValue(openSlot);
+      prisma.slot.aggregate.mockResolvedValue({ _max: { seq: 2 } });
+      prisma.slot.update.mockResolvedValue({ ...openSlot, status: 'closed' });
+      prisma.slot.create.mockResolvedValue({
+        id: 'slot_next',
+        seq: 3,
+        status: 'open',
+        openedAt: new Date('2026-03-20T00:00:00.000Z'),
+        closedAt: null,
+      });
+    };
+
+    it('writes each positive stock actual as the successor stock inicial', async () => {
+      readyToClose();
+      prisma.slotExistence.findMany.mockResolvedValue([
+        { productId: 'p1', quantity: 100, product: { name: 'Alfajor' } },
+      ]);
+      prisma.slotProduced.groupBy.mockResolvedValue([
+        { productId: 'p1', _sum: { quantity: 300 } },
+      ]);
+      prisma.orderItem.findMany.mockResolvedValue([
+        { productId: 'p1', quantity: 200, product: { name: 'Alfajor' } },
+      ]);
+
+      await service.closeSlot('slot_open');
+
+      expect(prisma.slotExistence.createMany).toHaveBeenCalledWith({
+        data: [{ slotId: 'slot_next', productId: 'p1', quantity: 200 }],
+      });
+    });
+
+    it('does not carry a shortfall', async () => {
+      readyToClose();
+      prisma.orderItem.findMany.mockResolvedValue([
+        { productId: 'p1', quantity: 50, product: { name: 'Debiendo' } },
+      ]);
+
+      await service.closeSlot('slot_open');
+
+      // Nothing positive to carry, so no rows are written at all.
+      expect(prisma.slotExistence.createMany).not.toHaveBeenCalled();
+    });
+
+    it('does not carry a product that nets to exactly zero', async () => {
+      readyToClose();
+      prisma.slotExistence.findMany.mockResolvedValue([
+        { productId: 'p1', quantity: 50, product: { name: 'Justo' } },
+      ]);
+      prisma.orderItem.findMany.mockResolvedValue([
+        { productId: 'p1', quantity: 50, product: { name: 'Justo' } },
+      ]);
+
+      await service.closeSlot('slot_open');
+
+      expect(prisma.slotExistence.createMany).not.toHaveBeenCalled();
+    });
+
+    it('does not carry the produccion real history', async () => {
+      readyToClose();
+      prisma.slotProduced.groupBy.mockResolvedValue([
+        { productId: 'p1', _sum: { quantity: 40 } },
+      ]);
+      prisma.product.findMany.mockResolvedValue([{ id: 'p1', name: 'Alfajor' }]);
+
+      await service.closeSlot('slot_open');
+
+      expect(prisma.slotProduced.create).not.toHaveBeenCalled();
+      expect(prisma.slotProduced.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('reads the closing bloque figures, not the successor', async () => {
+      readyToClose();
+
+      await service.closeSlot('slot_open');
+
+      // Every read that feeds the carry is scoped to the bloque being closed.
+      expect(prisma.slotExistence.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { slotId: 'slot_open' } }),
+      );
+      expect(prisma.orderItem.findMany.mock.calls[0][0].where).toEqual({
+        order: { slotId: 'slot_open' },
+      });
+    });
+
+    it('rolls the whole close back when the carry fails', async () => {
+      readyToClose();
+      prisma.slotExistence.findMany.mockResolvedValue([
+        { productId: 'p1', quantity: 10, product: { name: 'Alfajor' } },
+      ]);
+      prisma.slotExistence.createMany.mockRejectedValue(new Error('disk full'));
+
+      await expect(service.closeSlot('slot_open')).rejects.toThrow('disk full');
+    });
+  });
+
 });

@@ -2,7 +2,7 @@ import {
   getClients,
   getOrdersBySlot,
   getProducts,
-  getSlotExistence,
+  getSlotStock,
   getSlotProduced,
   getSlots,
 } from '@/lib/api';
@@ -37,9 +37,9 @@ export default async function OrdersPage({
   // show grayed out and unclickable rather than disappearing. Existencia and
   // producción real are only fetched (and editable) for the open bloque.
   const isOpen = view.slot.status === 'open';
-  const [existence, produced] = isOpen
+  const [stock, produced] = isOpen
     ? await Promise.all([
-        getSlotExistence(view.slot.id),
+        getSlotStock(view.slot.id),
         getSlotProduced(view.slot.id),
       ])
     : [null, null];
@@ -62,7 +62,7 @@ export default async function OrdersPage({
               <ExistenceEditor
                 slotId={view.slot.id}
                 products={products}
-                current={existence?.items ?? []}
+                stock={stock?.items ?? []}
                 disabled={!isOpen}
               />
               <ProducedEditor
@@ -82,7 +82,11 @@ export default async function OrdersPage({
           }
         />
 
-        <OrdersTable orders={view.orders} products={products} />
+        <OrdersTable
+          orders={view.orders}
+          products={products}
+          readOnly={!isOpen}
+        />
       </div>
     </>
   );

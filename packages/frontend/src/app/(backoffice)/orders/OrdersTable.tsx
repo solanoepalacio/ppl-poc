@@ -14,9 +14,12 @@ import { OrderActions } from './OrderActions';
 export function OrdersTable({
   orders,
   products,
+  readOnly,
 }: {
   orders: SlotViewOrder[];
   products: Product[];
+  /** True for a closed bloque, whose orders can no longer be edited or deleted. */
+  readOnly?: boolean;
 }) {
   const productName = new Map(products.map((p) => [p.id, p.name]));
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -103,13 +106,16 @@ export function OrdersTable({
                 ) : (
                   <p className="muted">Sin artículos.</p>
                 )}
-                <div className="otable-detail-actions">
-                  <OrderActions
-                    orderId={order.id}
-                    items={order.items}
-                    products={products}
-                  />
-                </div>
+                {!readOnly && (
+                  <div className="otable-detail-actions">
+                    <OrderActions
+                      orderId={order.id}
+                      items={order.items}
+                      products={products}
+                      readOnly={readOnly}
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>

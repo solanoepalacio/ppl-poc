@@ -140,22 +140,16 @@ export class OrdersService {
 
   /**
    * Back-office item edit: replaces an order's entire item list with the
-   * submitted one, regardless of the order's status. An empty list clears the
-   * items. Validates every item against the catalog (rejecting and leaving the
-   * existing items untouched on failure) and never changes `status`. Rejects a
-   * missing order (404).
+   * submitted one. An empty list clears the items. Validates every item against
+   * the catalog, rejecting and leaving the existing items untouched on failure.
+   * Rejects a missing order (404) and one in a closed bloque (400) — see
+   * `assertOrderInOpenSlot`.
    */
   async replaceItems(
     orderId: string,
     items: ConfirmOrderItem[],
   ): Promise<ReplaceOrderItemsResponse> {
-    const exists = await this.prisma.order.findUnique({
-      where: { id: orderId },
-      select: { id: true },
-    });
-    if (!exists) {
-      throw new NotFoundException(`Order ${orderId} not found.`);
-    }
+    await this.assertOrderInOpenSlot(orderId);
     await this.validateItemsAgainstCatalog(items);
 
     // Replace the whole list atomically: drop the old rows, write the new ones.
@@ -185,18 +179,36 @@ export class OrdersService {
   /**
    * Back-office order deletion: removes the order and (via cascade) its items.
    * Intended for corrections such as duplicates, and the way to drop a mistaken
-   * order from production totals. Rejects a missing order (404).
+   * order from production totals. Rejects a missing order (404) and one in a
+   * closed bloque (400) — see `assertOrderInOpenSlot`.
    */
   async deleteOrder(orderId: string): Promise<DeleteOrderResponse> {
-    const exists = await this.prisma.order.findUnique({
-      where: { id: orderId },
-      select: { id: true },
-    });
-    if (!exists) {
-      throw new NotFoundException(`Order ${orderId} not found.`);
-    }
+    await this.assertOrderInOpenSlot(orderId);
     await this.prisma.order.delete({ where: { id: orderId } });
     return { id: orderId };
+  }
+
+  /**
+   * Rejects a missing order (404) or one whose bloque is already closed (400).
+   *
+   * A closed bloque's demand was used to compute the stock inicial its successor
+   * inherited, so letting that demand change afterwards would leave the two
+   * disagreeing with nothing able to detect it. Corrections go forward, on the
+   * new bloque's editable stock, not backward on the old bloque's orders.
+   */
+  private async assertOrderInOpenSlot(orderId: string): Promise<void> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true, slot: { select: { status: true } } },
+    });
+    if (!order) {
+      throw new NotFoundException(`Order ${orderId} not found.`);
+    }
+    if (order.slot.status !== 'open') {
+      throw new BadRequestException(
+        `Order ${orderId} belongs to a closed bloque and can no longer be changed.`,
+      );
+    }
   }
 
   /**
@@ -274,29 +286,11 @@ export class OrdersService {
     category?: ProductCategory,
   ): Promise<ProductionTotalsResponse> {
     const slot = await this.slotsService.resolveSlot(slotId);
-    const orders = await this.prisma.order.findMany({
-      where: { slotId: slot.id },
-      include: { items: { include: { product: true } } },
-    });
-
-    // Sum quantities per product, carrying the product name for display.
-    const totals = new Map<string, { name: string; quantity: number }>();
-    for (const order of orders) {
-      for (const item of order.items) {
-        if (category && item.product.category !== category) {
-          continue;
-        }
-        const entry = totals.get(item.productId);
-        if (entry) {
-          entry.quantity += item.quantity;
-        } else {
-          totals.set(item.productId, {
-            name: item.product.name,
-            quantity: item.quantity,
-          });
-        }
-      }
-    }
+    // The demand sum lives in SlotsService because closing a bloque needs it too,
+    // and SlotsService cannot reach back into this one without closing a module
+    // cycle. Summing it in both places would be two implementations of the same
+    // rule waiting to drift apart.
+    const totals = await this.slotsService.getDemandMap(slot.id, category);
 
     // Report the bloque's two manually-entered deductions alongside demand —
     // existencia (stock already on hand) and producción real (units baked so far)

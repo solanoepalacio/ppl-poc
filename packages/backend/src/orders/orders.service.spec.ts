@@ -65,6 +65,7 @@ describe('OrdersService', () => {
     resolveSlot: jest.Mock;
     getExistenceMap: jest.Mock;
     getProducedMap: jest.Mock;
+    getDemandMap: jest.Mock;
   };
   let clients: { assertActive: jest.Mock };
   let service: OrdersService;
@@ -76,6 +77,9 @@ describe('OrdersService', () => {
       resolveSlot: jest.fn().mockResolvedValue(openSlot),
       getExistenceMap: jest.fn().mockResolvedValue(new Map<string, number>()),
       getProducedMap: jest.fn().mockResolvedValue(new Map<string, number>()),
+      getDemandMap: jest
+        .fn()
+        .mockResolvedValue(new Map<string, { name: string; quantity: number }>()),
     };
     clients = { assertActive: jest.fn().mockResolvedValue(undefined) };
     const tokenService = new TokenService(prisma as unknown as PrismaService);
@@ -259,7 +263,7 @@ describe('OrdersService', () => {
   describe('replaceItems', () => {
     it('replaces the item list without touching the order row', async () => {
       prisma.order.findUnique
-        .mockResolvedValueOnce({ id: 'order_1' })
+        .mockResolvedValueOnce({ id: 'order_1', slot: { status: 'open' } })
         .mockResolvedValueOnce({
           id: 'order_1',
           items: [{ id: 'oi_1', orderId: 'order_1', productId: 'p1', quantity: 4 }],
@@ -281,7 +285,7 @@ describe('OrdersService', () => {
 
     it('clears items when given an empty list', async () => {
       prisma.order.findUnique
-        .mockResolvedValueOnce({ id: 'order_1' })
+        .mockResolvedValueOnce({ id: 'order_1', slot: { status: 'open' } })
         .mockResolvedValueOnce({ id: 'order_1', items: [] });
 
       const res = await service.replaceItems('order_1', []);
@@ -293,8 +297,26 @@ describe('OrdersService', () => {
       expect(res.items).toEqual([]);
     });
 
+    it('rejects an edit to an order in a closed bloque', async () => {
+      prisma.order.findUnique.mockResolvedValue({
+        id: 'order_1',
+        slot: { status: 'closed' },
+      });
+
+      await expect(
+        service.replaceItems('order_1', [{ productId: 'p1', quantity: 1 }]),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      // The bloque's demand is baked into the stock its successor inherited, so
+      // nothing may change after the close.
+      expect(prisma.orderItem.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.orderItem.createMany).not.toHaveBeenCalled();
+    });
+
     it('rejects an out-of-catalog item and leaves existing items unchanged', async () => {
-      prisma.order.findUnique.mockResolvedValue({ id: 'order_1' });
+      prisma.order.findUnique.mockResolvedValue({
+        id: 'order_1',
+        slot: { status: 'open' },
+      });
       prisma.product.findMany.mockResolvedValue([]); // p9 missing
 
       await expect(
@@ -316,7 +338,10 @@ describe('OrdersService', () => {
 
   describe('deleteOrder', () => {
     it('removes the order (items cascade) and returns its id', async () => {
-      prisma.order.findUnique.mockResolvedValue({ id: 'order_1' });
+      prisma.order.findUnique.mockResolvedValue({
+        id: 'order_1',
+        slot: { status: 'open' },
+      });
 
       const res = await service.deleteOrder('order_1');
 
@@ -331,6 +356,18 @@ describe('OrdersService', () => {
 
       await expect(service.deleteOrder('nope')).rejects.toBeInstanceOf(
         NotFoundException,
+      );
+      expect(prisma.order.delete).not.toHaveBeenCalled();
+    });
+
+    it('rejects deleting an order in a closed bloque', async () => {
+      prisma.order.findUnique.mockResolvedValue({
+        id: 'order_1',
+        slot: { status: 'closed' },
+      });
+
+      await expect(service.deleteOrder('order_1')).rejects.toBeInstanceOf(
+        BadRequestException,
       );
       expect(prisma.order.delete).not.toHaveBeenCalled();
     });
@@ -384,8 +421,10 @@ describe('OrdersService', () => {
   });
 
   describe('getProductionTotals', () => {
-    // Builds an order with items shaped as the include returns (product nested).
-    let seq = 0;
+    // Demand is summed by SlotsService now, so these tests stub that rather than
+    // the raw order rows. They still exercise everything this service is
+    // responsible for — the two deductions, the floor at zero, the sort and the
+    // category pass-through; the summing itself is covered in slots.service.spec.
     const orderWith = (
       items: {
         productId: string;
@@ -393,17 +432,28 @@ describe('OrdersService', () => {
         quantity: number;
         category?: 'sweet' | 'salty';
       }[],
-    ) => ({
-      items: items.map((i, idx) => ({
-        id: `oi_${seq++}_${idx}`,
-        productId: i.productId,
-        quantity: i.quantity,
-        product: { id: i.productId, name: i.name, category: i.category ?? 'salty' },
-      })),
-    });
+    ) => items.map((i) => ({ ...i, category: i.category ?? 'salty' }));
+
+    /** Stubs getDemandMap over the given "orders", summing and honouring category. */
+    const stubDemand = (
+      orders: { productId: string; name: string; quantity: number; category: string }[][],
+    ) => {
+      slots.getDemandMap.mockImplementation((_slotId: string, category?: string) => {
+        const demand = new Map<string, { name: string; quantity: number }>();
+        for (const items of orders) {
+          for (const i of items) {
+            if (category && i.category !== category) continue;
+            const cur = demand.get(i.productId);
+            if (cur) cur.quantity += i.quantity;
+            else demand.set(i.productId, { name: i.name, quantity: i.quantity });
+          }
+        }
+        return Promise.resolve(demand);
+      });
+    };
 
     it('sums the same product across orders and carries the product name', async () => {
-      prisma.order.findMany.mockResolvedValue([
+      stubDemand([
         orderWith([{ productId: 'p1', name: 'Croissant', quantity: 3 }]),
         orderWith([{ productId: 'p1', name: 'Croissant', quantity: 2 }]),
       ]);
@@ -417,7 +467,7 @@ describe('OrdersService', () => {
     });
 
     it('reports demand, existencia, and the net to produce', async () => {
-      prisma.order.findMany.mockResolvedValue([
+      stubDemand([
         orderWith([{ productId: 'p1', name: 'Croissant', quantity: 8 }]),
       ]);
       slots.getExistenceMap.mockResolvedValue(new Map([['p1', 3]]));
@@ -431,7 +481,7 @@ describe('OrdersService', () => {
     });
 
     it('keeps a covered product, flooring the net to produce at zero', async () => {
-      prisma.order.findMany.mockResolvedValue([
+      stubDemand([
         orderWith([
           { productId: 'p1', name: 'Croissant', quantity: 8 },
           { productId: 'p2', name: 'Baguette', quantity: 4 },
@@ -453,7 +503,7 @@ describe('OrdersService', () => {
     });
 
     it('reports producción real and subtracts it from the net to produce', async () => {
-      prisma.order.findMany.mockResolvedValue([
+      stubDemand([
         orderWith([{ productId: 'p1', name: 'Croissant', quantity: 8 }]),
       ]);
       slots.getProducedMap.mockResolvedValue(new Map([['p1', 3]]));
@@ -467,7 +517,7 @@ describe('OrdersService', () => {
     });
 
     it('subtracts existencia and producción real together', async () => {
-      prisma.order.findMany.mockResolvedValue([
+      stubDemand([
         orderWith([{ productId: 'p1', name: 'Croissant', quantity: 10 }]),
       ]);
       slots.getExistenceMap.mockResolvedValue(new Map([['p1', 2]]));
@@ -481,7 +531,7 @@ describe('OrdersService', () => {
     });
 
     it('floors the net at zero when both deductions together exceed demand', async () => {
-      prisma.order.findMany.mockResolvedValue([
+      stubDemand([
         orderWith([{ productId: 'p1', name: 'Croissant', quantity: 4 }]),
       ]);
       slots.getExistenceMap.mockResolvedValue(new Map([['p1', 3]]));
@@ -497,7 +547,7 @@ describe('OrdersService', () => {
     });
 
     it('keeps a fully produced product at zero rather than dropping it', async () => {
-      prisma.order.findMany.mockResolvedValue([
+      stubDemand([
         orderWith([{ productId: 'p1', name: 'Croissant', quantity: 12 }]),
       ]);
       slots.getProducedMap.mockResolvedValue(new Map([['p1', 12]]));
@@ -510,7 +560,7 @@ describe('OrdersService', () => {
     });
 
     it('omits products with no demand (only ordered products appear)', async () => {
-      prisma.order.findMany.mockResolvedValue([
+      stubDemand([
         orderWith([{ productId: 'p1', name: 'Croissant', quantity: 1 }]),
       ]);
 
@@ -520,7 +570,7 @@ describe('OrdersService', () => {
     });
 
     it('sorts entries by product name', async () => {
-      prisma.order.findMany.mockResolvedValue([
+      stubDemand([
         orderWith([
           { productId: 'p2', name: 'Baguette', quantity: 1 },
           { productId: 'p1', name: 'Croissant', quantity: 1 },
@@ -532,41 +582,38 @@ describe('OrdersService', () => {
       expect(res.items.map((i) => i.name)).toEqual(['Baguette', 'Croissant']);
     });
 
-    it('sums every order in the bloque (no status filter)', async () => {
-      prisma.order.findMany.mockResolvedValue([]);
+    it('asks for the demand of the resolved bloque, unscoped by category', async () => {
+      stubDemand([]);
 
       await service.getProductionTotals('2026-03-15');
 
-      const where = prisma.order.findMany.mock.calls[0][0].where;
-      expect(where).toEqual({ slotId: 'slot_open' });
+      expect(slots.getDemandMap).toHaveBeenCalledWith('slot_open', undefined);
     });
 
     it('filters to the requested bloque', async () => {
       const requested = { ...openSlot, id: 'slot_7', seq: 7, status: 'closed' as const };
       slots.resolveSlot.mockResolvedValue(requested);
-      prisma.order.findMany.mockResolvedValue([]);
+      stubDemand([]);
 
       const res = await service.getProductionTotals('slot_7');
 
       expect(slots.resolveSlot).toHaveBeenCalledWith('slot_7');
       expect(res.slot.id).toBe('slot_7');
-      const where = prisma.order.findMany.mock.calls[0][0].where;
-      expect(where.slotId).toBe('slot_7');
+      expect(slots.getDemandMap).toHaveBeenCalledWith('slot_7', undefined);
     });
 
     it('defaults to the open bloque when no slotId is given', async () => {
-      prisma.order.findMany.mockResolvedValue([]);
+      stubDemand([]);
 
       const res = await service.getProductionTotals();
 
       expect(slots.resolveSlot).toHaveBeenCalledWith(undefined);
       expect(res.slot.id).toBe('slot_open');
-      const where = prisma.order.findMany.mock.calls[0][0].where;
-      expect(where.slotId).toBe('slot_open');
+      expect(slots.getDemandMap).toHaveBeenCalledWith('slot_open', undefined);
     });
 
     it('scopes totals to the requested category, excluding the other line', async () => {
-      prisma.order.findMany.mockResolvedValue([
+      stubDemand([
         orderWith([
           { productId: 'p1', name: 'Ciabatta', quantity: 2, category: 'salty' },
           { productId: 'p2', name: 'Pavlova', quantity: 5, category: 'sweet' },
@@ -581,7 +628,7 @@ describe('OrdersService', () => {
     });
 
     it('includes both categories when none is specified', async () => {
-      prisma.order.findMany.mockResolvedValue([
+      stubDemand([
         orderWith([
           { productId: 'p1', name: 'Ciabatta', quantity: 2, category: 'salty' },
           { productId: 'p2', name: 'Pavlova', quantity: 5, category: 'sweet' },

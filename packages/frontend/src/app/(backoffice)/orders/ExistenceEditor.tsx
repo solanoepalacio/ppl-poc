@@ -1,61 +1,127 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import type { ExistenceItem, Product } from '@pannico/shared';
+import type { Product, SlotStockItem } from '@pannico/shared';
 import { setSlotExistence } from '@/lib/api';
-import { ProductPicker, itemsFromQuantities } from './ProductPicker';
+import { ProductCombobox } from './ProductCombobox';
 import { Modal } from './Modal';
 
+/** A product's position as the dialog holds it while the initial is being edited. */
+type Row = {
+  productId: string;
+  name: string;
+  initial: number;
+  produced: number;
+  demand: number;
+  current: number;
+};
+
 /**
- * Open-bloque control to record existencia (stock already on hand), which the
- * production views subtract from their totals. Edits the whole per-product map
- * in a modal (replace-all, prefilled from current existence) and refreshes the
- * server-rendered list on success. Existencia is only editable on the open
- * bloque, so the trigger is grayed out and unclickable when `disabled`.
+ * Open-bloque control for the bloque's stock. Each product shows two figures:
+ * the **stock inicial**, typed by the manager or inherited from the previous
+ * bloque, which is editable; and the **stock actual**
+ * (`inicial + producción real − pedidos`), which is not — it is a reading of
+ * three numbers that each have their own control, so there is nothing here to
+ * write it to. Editing the initial recomputes it on the spot.
+ *
+ * Deliberately not built on `ProductPicker`/`SelectedItems`: those are built
+ * around "only ever shows what is already on the order", with a remove control
+ * that would be meaningless on a row present because of a figure they know
+ * nothing about — and they are shared by three other dialogs.
+ *
+ * Lists a product when its initial or its current is above zero. A shortfall is
+ * left out on purpose: it is real, but it is acted on from the production views,
+ * not from here. The payload still carries those products so that adding one
+ * from the search shows its true stock actual rather than a fiction.
+ *
+ * Saving is replace-all over the stock inicial only.
  */
 export function ExistenceEditor({
   slotId,
   products,
-  current,
+  stock,
   disabled,
 }: {
   slotId: string;
   products: Product[];
-  current: ExistenceItem[];
+  stock: SlotStockItem[];
   /** Grayed-out and unclickable when the selected bloque is not the open one. */
   disabled?: boolean;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
-  const [quantities, setQuantities] = useState<Record<string, number>>(() =>
-    Object.fromEntries(current.map((i) => [i.productId, i.quantity])),
-  );
+  /** Edited stock inicial by product; seeded from the server on every open. */
+  const [initials, setInitials] = useState<Record<string, number>>({});
+  /** Products pulled in from the search that the list would not show by itself. */
+  const [added, setAdded] = useState<string[]>([]);
+  /** Raw text of the field being typed in, plus what it held when editing began. */
+  const [typing, setTyping] = useState<
+    Record<string, { raw: string; base: number }>
+  >({});
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  function setQuantity(productId: string, quantity: number) {
-    setQuantities((q) => ({ ...q, [productId]: quantity }));
-  }
+  const byId = useMemo(
+    () => new Map(stock.map((s) => [s.productId, s])),
+    [stock],
+  );
+
+  /**
+   * The rows to show: everything the bloque knows about whose initial or current
+   * is above zero, plus anything explicitly added. A product with no activity at
+   * all is absent from `stock`, so its produced and demand are zero.
+   */
+  const rows: Row[] = useMemo(() => {
+    const ids = new Set<string>(added);
+    for (const s of stock) {
+      const initial = initials[s.productId] ?? s.initial;
+      if (initial > 0 || initial + s.produced - s.demand > 0) {
+        ids.add(s.productId);
+      }
+    }
+    return [...ids]
+      .map((productId) => {
+        const s = byId.get(productId);
+        const name =
+          s?.name ?? products.find((p) => p.id === productId)?.name ?? productId;
+        const initial = initials[productId] ?? s?.initial ?? 0;
+        const produced = s?.produced ?? 0;
+        const demand = s?.demand ?? 0;
+        return {
+          productId,
+          name,
+          initial,
+          produced,
+          demand,
+          current: initial + produced - demand,
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name, 'es'));
+  }, [stock, initials, added, byId, products]);
 
   function startEditing() {
-    // Reset to the bloque's current existence each time we open the editor.
-    setQuantities(
-      Object.fromEntries(current.map((i) => [i.productId, i.quantity])),
-    );
+    setInitials({});
+    setAdded([]);
+    setTyping({});
     setError(null);
     setEditing(true);
   }
 
   async function save() {
     setError(null);
+    // Replace-all over the stock inicial. Every row is sent so clearing one to
+    // zero actually clears it; zeros are dropped server-side.
+    const items = rows
+      .filter((r) => r.initial > 0)
+      .map((r) => ({ productId: r.productId, quantity: r.initial }));
     try {
-      await setSlotExistence(slotId, itemsFromQuantities(quantities));
+      await setSlotExistence(slotId, items);
       setEditing(false);
       startTransition(() => router.refresh());
     } catch (e) {
       setError(
-        e instanceof Error ? e.message : 'No se pudo guardar la existencia.',
+        e instanceof Error ? e.message : 'No se pudo guardar el stock.',
       );
     }
   }
@@ -72,15 +138,12 @@ export function ExistenceEditor({
       <Modal
         open={editing}
         onClose={() => setEditing(false)}
-        title="Editar stock"
+        title="Stock del bloque"
         aboveBody={
-          <>
-            <p className="muted modal-above-hint">
-              Lo que ya hay en existencia se descuenta de los totales de
-              producción.
-            </p>
-            <span className="modal-section-label">Productos en stock</span>
-          </>
+          <p className="muted modal-above-hint">
+            El stock actual es el inicial más la producción real menos los
+            pedidos. Se recalcula solo; lo único que se edita es el inicial.
+          </p>
         }
         footer={
           <>
@@ -96,18 +159,102 @@ export function ExistenceEditor({
               onClick={() => void save()}
               disabled={pending}
             >
-              Guardar existencia
+              Guardar stock
             </button>
           </>
         }
       >
-        <ProductPicker
-          products={products}
-          quantities={quantities}
-          onChange={setQuantity}
-          disabled={pending}
-          searchId="stock-product"
-        />
+        <div className="stock-list">
+          <div className="stock-head" role="row">
+            <span>Producto</span>
+            <span className="col-right">Inicial</span>
+            <span className="col-right">Actual</span>
+          </div>
+          {rows.length === 0 ? (
+            <p className="muted items-empty">
+              No hay stock registrado en este bloque. Buscá un producto abajo
+              para cargarle un stock inicial.
+            </p>
+          ) : (
+            <ul className="stock-rows">
+              {rows.map((r) => (
+                <li className="stock-row" key={r.productId}>
+                  <span className="stock-name">{r.name}</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    className="stock-initial"
+                    aria-label={`Stock inicial de ${r.name}`}
+                    value={typing[r.productId]?.raw ?? String(r.initial)}
+                    disabled={pending}
+                    onFocus={() =>
+                      setTyping((t) => ({
+                        ...t,
+                        [r.productId]: {
+                          raw: String(r.initial),
+                          base: r.initial,
+                        },
+                      }))
+                    }
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      setTyping((t) => ({
+                        ...t,
+                        [r.productId]: {
+                          raw,
+                          base: t[r.productId]?.base ?? r.initial,
+                        },
+                      }));
+                      const n = Math.floor(Number(raw));
+                      if (raw !== '' && Number.isFinite(n) && n >= 0) {
+                        setInitials((q) => ({ ...q, [r.productId]: n }));
+                      }
+                    }}
+                    onBlur={() => {
+                      // An emptied field falls back to what it held on focus, not
+                      // to a digit it passed through on the way out.
+                      const leaving = typing[r.productId];
+                      const n = Math.floor(Number(leaving?.raw));
+                      if (leaving && !(leaving.raw !== '' && n >= 0)) {
+                        setInitials((q) => ({
+                          ...q,
+                          [r.productId]: leaving.base,
+                        }));
+                      }
+                      setTyping(({ [r.productId]: _drop, ...rest }) => rest);
+                    }}
+                  />
+                  <span
+                    className={
+                      r.current < 0
+                        ? 'stock-current stock-current--short'
+                        : 'stock-current'
+                    }
+                  >
+                    {r.current}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="product-add-bar">
+            <ProductCombobox
+              id="stock-product"
+              products={products}
+              addedIds={rows.map((r) => r.productId)}
+              onAdd={(productId) => {
+                setAdded((a) => (a.includes(productId) ? a : [...a, productId]));
+                setInitials((q) => ({
+                  ...q,
+                  [productId]: q[productId] ?? byId.get(productId)?.initial ?? 0,
+                }));
+              }}
+              disabled={pending}
+              dropUp
+            />
+          </div>
+        </div>
         {error && <p className="error">{error}</p>}
       </Modal>
     </>
