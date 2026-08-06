@@ -18,7 +18,18 @@ export interface Client {
   id: string;
   name: string;
   slug: string;
+  /** Digits only, or null when the client has no number on file. */
+  phone: string | null;
   active: boolean;
+}
+
+/**
+ * A client as the management view needs it: the record plus how many orders
+ * reference it, which is what decides whether removing it deletes it outright or
+ * only retires it — and lets the control say which before it is pressed.
+ */
+export interface ManagedClient extends Client {
+  orderCount: number;
 }
 
 /** An item recorded on an order once the customer confirms. */

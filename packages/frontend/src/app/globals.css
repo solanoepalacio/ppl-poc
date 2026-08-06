@@ -1812,3 +1812,121 @@ code {
   color: #2e7d32;
   border-color: #2e7d32;
 }
+
+/* ── Clientes view ────────────────────────────────────────────────────────
+   The add form pinned above the directory, then one row per client. Built from
+   the same tokens as the rest of the back office rather than a new visual
+   language: a card for the form, hairline-separated rows below it. */
+.client-add {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px 20px 18px;
+  margin-bottom: 24px;
+  box-shadow: var(--shadow-card);
+}
+/* Name takes the slack, phone a fixed share, the action its own width. Wraps to
+   stacked fields on a narrow window rather than crushing the inputs. */
+.client-add-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.client-input {
+  flex: 1 1 200px;
+  min-width: 0;
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid #d7cdb9;
+  border-radius: 11px;
+  background: #fff;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  color: var(--ink);
+}
+.client-input:focus {
+  outline: none;
+  border-color: var(--brand-amber);
+}
+.client-add-row .client-input[type='tel'] {
+  flex: 0 1 200px;
+}
+.client-add-row .btn-modal-primary {
+  flex-shrink: 0;
+}
+
+.client-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.client-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--line);
+}
+.client-row:last-child {
+  border-bottom: none;
+}
+/* Retired clients are dimmed, but the state is carried by the `inactivo` tag in
+   the markup — opacity alone would not survive a colour-blind reader or a
+   greyscale screen. */
+.client-row.is-inactive {
+  opacity: 0.62;
+}
+.client-name {
+  flex: 1 1 240px;
+  min-width: 0;
+  font-weight: 600;
+  color: var(--brand-slate);
+  overflow-wrap: anywhere;
+}
+.client-tag {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: #eee6d8;
+  color: var(--ink-muted);
+  font-family: var(--font-display);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
+.client-phone {
+  flex: 0 1 170px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.client-orders {
+  flex: 0 1 110px;
+  font-size: 13.5px;
+}
+.client-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+/* The edit row replaces the whole line, so it spans it. */
+.client-edit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+.client-edit .client-input[type='tel'] {
+  flex: 0 1 180px;
+}
+/* A failure belongs to its row, on its own line under it. */
+.client-row-error {
+  flex-basis: 100%;
+  margin: 4px 0 0;
+}

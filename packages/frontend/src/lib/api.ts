@@ -1,5 +1,9 @@
 import type {
   Client,
+  CreateClientRequest,
+  DeleteClientResponse,
+  ManagedClient,
+  UpdateClientRequest,
   CloseSlotResponse,
   ConfirmOrderItem,
   CreateLinkResponse,
@@ -106,6 +110,39 @@ export function createLink(clientId: string): Promise<CreateLinkResponse> {
 
 export function getClients(): Promise<Client[]> {
   return request<Client[]>(`/clients`);
+}
+
+/**
+ * The whole directory for the Clientes view — retired clients included, each
+ * with its order count. Deliberately a different call from `getClients`, which
+ * feeds the order pickers and must keep returning active clients only.
+ */
+export function getManagedClients(): Promise<ManagedClient[]> {
+  return request<ManagedClient[]>(`/clients?includeInactive=true`);
+}
+
+export function createClient(body: CreateClientRequest): Promise<Client> {
+  return request<Client>(`/clients`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateClient(
+  id: string,
+  body: UpdateClientRequest,
+): Promise<Client> {
+  return request<Client>(`/clients/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+/** Deletes the client, or retires it when orders reference it; says which. */
+export function deleteClient(id: string): Promise<DeleteClientResponse> {
+  return request<DeleteClientResponse>(`/clients/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
 }
 
 export function getOrdersBySlot(slotId?: string): Promise<SlotOrdersResponse> {

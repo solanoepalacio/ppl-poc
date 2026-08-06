@@ -287,3 +287,33 @@ export interface CloseSlotPreviewResponse {
   slot: Slot;
   shortfalls: SlotShortfallItem[];
 }
+
+/** `POST /clients` body. The slug is derived from `name`, never supplied. */
+export interface CreateClientRequest {
+  name: string;
+  /** Free-form as typed; stored as digits. Absent or blank means no phone. */
+  phone?: string | null;
+}
+
+/**
+ * `PATCH /clients/:id` body — every field optional, so a caller can change one
+ * without restating the others. The slug is absent on purpose: it is the natural
+ * key data migrations upsert on, so renaming a client leaves its identity intact.
+ */
+export interface UpdateClientRequest {
+  name?: string;
+  phone?: string | null;
+  /** `false` retires the client, `true` reinstates it. */
+  active?: boolean;
+}
+
+/**
+ * `DELETE /clients/:id` response. Removal is two operations depending on whether
+ * any order references the client, and the caller should not have to re-query to
+ * find out which one happened.
+ */
+export interface DeleteClientResponse {
+  id: string;
+  /** `deleted` — no orders referenced it. `deactivated` — some did, so it was retired. */
+  outcome: 'deleted' | 'deactivated';
+}

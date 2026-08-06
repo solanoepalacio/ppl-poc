@@ -29,6 +29,17 @@ const LINKS: { href: string; label: string; icon: ReactNode }[] = [
       </>
     ),
   },
+  {
+    href: '/clientes',
+    label: 'Clientes',
+    icon: (
+      <>
+        <path d="M9 11a4 4 0 100-8 4 4 0 000 8z" />
+        <path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" />
+        <path d="M17 11h4M19 9v4" />
+      </>
+    ),
+  },
 ];
 
 /**

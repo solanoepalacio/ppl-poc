@@ -29,16 +29,22 @@ model Product {
   produced   SlotProduced[]
 }
 
-/// A client an order can be attached to. The directory is a fixed preset list
-/// loaded via Prisma data migrations (no management UI); new clients are added
-/// with further data migrations. `name` is the UI-friendly display name and
-/// `slug` is a normalized, unique natural key used for dedup and idempotent
-/// data-migration upserts. `active` retires a client without hard-deleting it
-/// so historical orders keep their reference.
+/// A client an order can be attached to. Seeded by Prisma data migrations and
+/// maintained from the back office's Clientes view. `name` is the UI-friendly
+/// display name, unique so the directory has no two rows the manager cannot tell
+/// apart. `slug` is a normalized natural key derived from the name at creation
+/// and never edited afterwards — data migrations upsert on it, so changing it
+/// would make a later migration insert a duplicate instead of matching.
+/// `active` retires a client without hard-deleting it so historical orders keep
+/// their reference; a client with no orders is deleted outright instead.
+/// `phone` is optional and, when present, unique: it is what an inbound
+/// WhatsApp message is resolved against, so it must name at most one client.
+/// Stored as digits only, so one number is one value however it was typed.
 model Client {
   id     String  @id @default(cuid())
-  name   String
+  name   String  @unique
   slug   String  @unique
+  phone  String? @unique
   active Boolean @default(true)
 
   orders Order[]
