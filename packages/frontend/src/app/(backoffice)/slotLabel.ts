@@ -12,12 +12,12 @@ export function slotLabel(slot: {
   openedAt: string;
   closedAt: string | null;
 }): string {
-  const opened = new Date(slot.openedAt).toLocaleDateString();
+  const opened = new Date(slot.openedAt).toLocaleDateString('es-AR');
   if (slot.status === 'open') {
     return `Bloque #${slot.seq} · desde ${opened} (abierto)`;
   }
   const closed = slot.closedAt
-    ? new Date(slot.closedAt).toLocaleDateString()
+    ? new Date(slot.closedAt).toLocaleDateString('es-AR')
     : '';
   return `Bloque #${slot.seq} · ${opened} – ${closed}`;
 }

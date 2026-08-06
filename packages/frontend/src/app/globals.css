@@ -1930,3 +1930,34 @@ code {
   flex-basis: 100%;
   margin: 4px 0 0;
 }
+
+/* States how the form works — quantities are individual items — for a customer
+   used to buying by the tray. Loud on purpose: getting this wrong costs the
+   bakery a remade order, so it is the one thing on the entry screen allowed to
+   shout. On white rather than a tint because #ff4d11 is a light colour and every
+   background darker than white costs it contrast. */
+.unit-notice {
+  flex-shrink: 0;
+  margin: 0 0 0.7rem;
+  padding: 0.45rem 0.7rem;
+  border: 1.5px solid #ff4d11;
+  border-radius: 10px;
+  background: #fff;
+  color: #ff4d11;
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  line-height: 1.35;
+  text-align: center;
+}
+/* Below ~360px the notice wraps to three lines and costs 8% of the viewport
+   instead of 5%. Tightening the type keeps it at two lines on the narrowest
+   phones without touching its size where there is room. */
+@media (max-width: 360px) {
+  .unit-notice {
+    padding: 0.4rem 0.5rem;
+    font-size: 11px;
+    letter-spacing: 0.1px;
+  }
+}
