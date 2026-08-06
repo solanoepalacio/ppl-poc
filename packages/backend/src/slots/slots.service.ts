@@ -188,6 +188,11 @@ export class SlotsService implements OnModuleInit {
     const slot = await this.resolveSlot(slotId);
     const rows = await this.prisma.slotExistence.findMany({
       where: { slotId: slot.id },
+      // Same order `stockOf` reads this table in, so the two existencia reads
+      // cannot disagree about the same bloque. Entry order is a contract now
+      // (the stock dialog's order has to survive a save), and leaving one of the
+      // two readers unordered is how they drift apart.
+      orderBy: { id: 'asc' },
       select: { productId: true, quantity: true },
     });
     return {

@@ -446,6 +446,20 @@ describe('OrdersService', () => {
         clientName: 'Il Postino',
       });
     });
+
+    it('reads each order items in stored order', async () => {
+      // This is the read the back office actually renders: OrderActions saves and
+      // then router.refresh()es, which comes back through here — so the item
+      // order the manager sees is this include, not replaceItems' response.
+      // Without pinning it, dropping the orderBy would break the edit dialog
+      // silently and no test would notice.
+      prisma.order.findMany.mockResolvedValue([]);
+
+      await service.getOrdersBySlot();
+
+      const include = prisma.order.findMany.mock.calls[0][0].include;
+      expect(include.items).toEqual({ orderBy: { id: 'asc' } });
+    });
   });
 
   describe('getProductionTotals', () => {

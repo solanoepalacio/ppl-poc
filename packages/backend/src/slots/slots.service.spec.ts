@@ -231,8 +231,11 @@ describe('SlotsService', () => {
 
       const res = await service.getExistence('slot_open');
 
+      // Same orderBy `stockOf` uses, so the two readers of this table cannot
+      // report different orders for one bloque.
       expect(prisma.slotExistence.findMany).toHaveBeenCalledWith({
         where: { slotId: 'slot_open' },
+        orderBy: { id: 'asc' },
         select: { productId: true, quantity: true },
       });
       expect(res.slot.id).toBe('slot_open');
