@@ -1348,14 +1348,20 @@ select {
   color: #9a3412;
 }
 
-/* The producción real history, pinned above the batch picker. Capped and
-   scrollable on its own: the pinned region must not grow without bound and push
-   the picker — where the manager actually works — off the screen. */
+/* The producción real history, at the head of the picker's own list so the two
+   read as one section: the records the bloque already had, a rule, then the ones
+   being added now. Each keeps its own row treatment — a read-only total with its
+   batches behind "Ver detalle" above, a stepper below — which is what tells the
+   two apart now that no heading sits between them.
+   It had a capped scroll area of its own until that left two scrollers stacked in
+   one dialog and the upper one only a few rows tall, which is awkward to move
+   through; and before that it sat in the modal's pinned region, which starved the
+   body and clipped the search's drop-up — 1 option of 54 on a 640px-tall window.
+   A single scrolling list is what avoids both. */
 .prod-hist {
-  max-height: 38vh;
-  overflow-y: auto;
-  margin: -4px -4px 0;
-  padding: 0 4px;
+  margin: -4px -4px 14px;
+  padding: 0 4px 14px;
+  border-bottom: 1px solid var(--line);
 }
 .prod-hist-empty {
   margin: 0;
@@ -1572,6 +1578,13 @@ select {
 .combobox-up .combobox-list {
   top: auto;
   bottom: calc(100% + 4px);
+  /* Never taller than the room there is to open into, so a short window shows a
+     shorter list instead of a list clipped at the body's top edge. The bound is
+     measured, not guessed: the gap between the top of the modal body and the top
+     of this bar came out at exactly `100vh − 375px` at every viewport from 480 to
+     800px (above that the modal reaches its own max-height and the gap only grows,
+     so the 14rem cap is what binds). */
+  max-height: min(14rem, calc(100vh - 375px));
 }
 
 /* ── Item quantity fields: stepper rows shared by all three modals ─────── */

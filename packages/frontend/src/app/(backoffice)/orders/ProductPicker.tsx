@@ -22,6 +22,7 @@ export function ProductPicker({
   disabled,
   searchId,
   emptyText,
+  before,
 }: {
   products: Product[];
   quantities: Record<string, number>;
@@ -31,6 +32,14 @@ export function ProductPicker({
   searchId: string;
   /** Empty-state copy; the default speaks of adding products to an order. */
   emptyText?: string;
+  /**
+   * Content to sit above the added-products list **inside the same scrolling
+   * region**, for a dialog that shows existing records before the ones being
+   * added. Kept here rather than in the modal's pinned region so the two lists
+   * scroll as one: two scroll areas stacked in a short dialog leave the upper
+   * one a few rows tall and awkward to move through.
+   */
+  before?: React.ReactNode;
 }) {
   const [justAdded, setJustAdded] = useState<{ id: string; n: number } | null>(
     null,
@@ -44,6 +53,7 @@ export function ProductPicker({
 
   return (
     <div className="order-form-body">
+      {before}
       <SelectedItems
         products={products}
         quantities={quantities}

@@ -172,10 +172,45 @@ export function ProducedEditor({
         onClose={() => setEditing(false)}
         title="Producción real"
         aboveBody={
+          <p className="muted modal-above-hint">
+            Producción Real por bloque de cada producto con detalle histórico
+          </p>
+        }
+        footer={
           <>
-            <p className="muted modal-above-hint">
-              Producción Real por bloque de cada producto con detalle histórico
-            </p>
+            <button
+              className="btn-modal-secondary"
+              onClick={() => setEditing(false)}
+              disabled={pending}
+            >
+              Cancelar
+            </button>
+            <button
+              className="btn-modal-primary"
+              onClick={() => void save()}
+              disabled={pending}
+            >
+              Guardar producción
+            </button>
+          </>
+        }
+      >
+        <ProductPicker
+          products={products}
+          quantities={batch}
+          onChange={(id, quantity) =>
+            // Zero drops the key so the batch list keeps entry order and a
+            // re-added product appends (see SelectedItems).
+            setBatch((q) => {
+              if (quantity > 0) return { ...q, [id]: quantity };
+              const { [id]: _dropped, ...rest } = q;
+              return rest;
+            })
+          }
+          disabled={pending}
+          searchId="produced-product"
+          emptyText="Buscá un producto abajo para sumar lo que se produjo ahora."
+          before={
             <div className="prod-hist">
               {listed.length === 0 ? (
                 <p className="muted prod-hist-empty">
@@ -283,43 +318,7 @@ export function ProducedEditor({
                 </ul>
               )}
             </div>
-          </>
-        }
-        footer={
-          <>
-            <button
-              className="btn-modal-secondary"
-              onClick={() => setEditing(false)}
-              disabled={pending}
-            >
-              Cancelar
-            </button>
-            <button
-              className="btn-modal-primary"
-              onClick={() => void save()}
-              disabled={pending}
-            >
-              Guardar producción
-            </button>
-          </>
-        }
-      >
-        <span className="modal-section-label">Agregar producción</span>
-        <ProductPicker
-          products={products}
-          quantities={batch}
-          onChange={(id, quantity) =>
-            // Zero drops the key so the batch list keeps entry order and a
-            // re-added product appends (see SelectedItems).
-            setBatch((q) => {
-              if (quantity > 0) return { ...q, [id]: quantity };
-              const { [id]: _dropped, ...rest } = q;
-              return rest;
-            })
           }
-          disabled={pending}
-          searchId="produced-product"
-          emptyText="Buscá un producto abajo para sumar lo que se produjo ahora."
         />
         {error && <p className="error">{error}</p>}
       </Modal>

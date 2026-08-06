@@ -74,12 +74,24 @@ export function ExistenceEditor({
    *
    * Order is entry order, not alphabetical: the server's rows come back in the
    * order they were entered (the save writes them in display order, so it holds
-   * across sessions) and just-added products append after them. The Set keeps
-   * first insertion, so adding a product the list already shows moves nothing.
+   * across sessions) and just-added products append after them, holding that
+   * position for the rest of the session however their initial is edited.
+   *
+   * One case does not survive a reload in place: a row shown only because its
+   * current is above zero — produced, never given an initial — is not persisted,
+   * since the save carries initials only. The next read returns it after the
+   * existence rows rather than where it sat here.
    */
   const rows: Row[] = useMemo(() => {
     const ids = new Set<string>();
+    const addedIds = new Set(added);
     for (const s of stock) {
+      // A product pulled in from the search is placed by the loop below, not
+      // here. Letting it qualify on the edited initial would re-rank it
+      // mid-keystroke: the first digit that makes it pass would have the Set
+      // take it at its server position, ahead of everything added before it —
+      // and the save, which writes display order, would persist that.
+      if (addedIds.has(s.productId)) continue;
       const initial = initials[s.productId] ?? s.initial;
       if (initial > 0 || initial + s.produced - s.demand > 0) {
         ids.add(s.productId);

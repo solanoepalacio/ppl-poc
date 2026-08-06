@@ -5,7 +5,7 @@ The orders view SHALL present a control (**Stock**) to record per-product stock 
 
 The control SHALL list a product when its stock inicial is above zero **or** its stock actual is above zero, so a product that was never given an initial count still appears once it has been produced. For each listed product it SHALL show the stock inicial as an editable quantity and the stock actual as a figure that cannot be edited. Editing a product's stock inicial SHALL update the stock actual shown for it without needing to save first, since one is computed from the other.
 
-Products SHALL be listed in the order they were entered — earliest first — and MUST NOT be re-sorted alphabetically or by any other property of the product: the manager types counts off a physical list, and the on-screen list has to read back in that same sequence to be checkable against it. Adding a product SHALL append it at the end, and the order SHALL survive saving and reopening the control. Products that appear without having been entered here (a product listed only because it has been produced) SHALL come after the entered ones. Stock inherited from the previous bloque at close SHALL keep the order it had there, and products entered afterwards append after it.
+Products SHALL be listed in the order they were entered — earliest first — and MUST NOT be re-sorted alphabetically or by any other property of the product: the manager types counts off a physical list, and the on-screen list has to read back in that same sequence to be checkable against it. Adding a product SHALL append it at the end, and the order SHALL survive saving and reopening the control. A product added from the search SHALL hold that position for as long as the control stays open, whatever is typed into its stock inicial — a row MUST NOT move while it is being filled in, including when the same product was listed elsewhere earlier in the session. Products that appear without having been entered here (a product listed only because it has been produced) SHALL come after the entered ones. Stock inherited from the previous bloque at close SHALL keep the order it had there, and products entered afterwards append after it.
 
 Products whose stock inicial and stock actual are both zero or below SHALL NOT be listed. A shortfall is visible where it can be acted on — the production views and the orders list — rather than here.
 
@@ -46,6 +46,15 @@ Products whose stock inicial and stock actual are both zero or below SHALL NOT b
 #### Scenario: A newly added product appends to the end
 - **WHEN** the control already lists products and the manager adds another from the search
 - **THEN** the new product appears at the end of the list
+
+#### Scenario: An added product does not move while its initial is typed
+- **WHEN** the manager adds a product from the search and then types a stock inicial into it
+- **THEN** it stays where it was added
+- **AND** does not jump to a position it held earlier in the session
+
+#### Scenario: A product zeroed and added again stays at the end
+- **WHEN** the manager sets a listed product's stock inicial to zero, which removes it from the list, adds it again from the search, and types a new initial
+- **THEN** it stays at the end of the list rather than returning to its former position
 
 #### Scenario: Inherited stock keeps the previous bloque's order
 - **WHEN** a bloque is closed and its positive stock actual carries to the successor

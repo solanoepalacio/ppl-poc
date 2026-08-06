@@ -62,3 +62,25 @@
   back to its pre-test state.
 - [x] 4.5 Confirm the production views and totals are unaffected — they sort on
   their own and never did read this order.
+
+## 5. Fix found by adversarial review
+
+- [x] 5.1 `ExistenceEditor`: the rows memo decided a row's **position** from the
+  session-edited initial, because the `stock` loop's visibility filter reads
+  `initials[id] ?? s.initial` and the Set keeps first insertion. A search-added
+  row therefore re-qualified through that loop on the first digit typed and was
+  reinserted at its server position, ahead of everything added before it — the
+  row jumped out from under the cursor mid-keystroke, and the save, which writes
+  display order, persisted the wrong order. Skip ids already in `added` during
+  the stock loop, so an added row is placed only by the `added` loop and session
+  edits change visibility but never placement.
+- [x] 5.2 Reproduced both reported sequences in the browser and confirmed they
+  fail without the fix and pass with it: (a) a row zeroed, re-added and retyped
+  stayed at the end instead of snapping back to position 1; (b) a demand-only
+  hidden row added after a catalog-absent product stopped overtaking it once
+  given an initial. Driven with no save, so the bloque's stock was untouched.
+- [x] 5.3 Record the limitation the review raised that is **not** fixed: a row
+  shown only because its stock actual is above zero (produced, never given an
+  initial) is not persisted by the save, which carries initials only, so the next
+  read returns it after the existence rows rather than where it sat. Documented
+  in the component's doc comment instead of being papered over.
