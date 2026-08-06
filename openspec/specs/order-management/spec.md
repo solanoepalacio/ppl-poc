@@ -28,7 +28,7 @@ The back office SHALL present orders grouped by the production bloque they belon
 - **AND** no separate view or submit action is required to render them
 
 ### Requirement: Manager can create an order manually
-From the back office, the manager SHALL be able to create an order by selecting a client, an optional list of catalog items with quantities, and an optional free-text `message` capturing the originating customer message (e.g. the pasted WhatsApp text), without generating or sending a customer link. The system MUST persist the created order in the currently open bloque so it appears in that bloque's back-office view, MUST record the supplied items, MUST persist the supplied `message` when present and store no message when it is absent or blank, MUST reject any item that is not in the active catalog, and MUST reject a missing or inactive client, persisting nothing on rejection. Because a manual order always lands in the open bloque, the order-creation control (**Agregar pedido**) on the orders view SHALL always be present but SHALL be disabled (visibly grayed and unclickable) unless the open bloque is selected.
+From the back office, the manager SHALL be able to create an order by selecting a client and an optional list of catalog items with quantities, without generating or sending a customer link. The creation API SHALL additionally accept an optional free-text `message` capturing the originating customer message (e.g. the pasted WhatsApp text); it is part of the contract and is persisted, but the back office SHALL NOT offer the manager a field for supplying one — the message is for automated intake that has the customer's own text to hand, not for a manager to retype. The system MUST persist the created order in the currently open bloque so it appears in that bloque's back-office view, MUST record the supplied items, MUST persist the supplied `message` when present and store no message when it is absent or blank, MUST reject any item that is not in the active catalog, and MUST reject a missing or inactive client, persisting nothing on rejection. Because a manual order always lands in the open bloque, the order-creation control (**Agregar pedido**) on the orders view SHALL always be present but SHALL be disabled (visibly grayed and unclickable) unless the open bloque is selected.
 
 #### Scenario: Order creation is disabled off the open bloque
 - **WHEN** the manager selects a closed bloque in the orders view
@@ -60,6 +60,11 @@ From the back office, the manager SHALL be able to create an order by selecting 
 - **WHEN** a manual order creation specifies a missing or inactive client
 - **THEN** the system rejects the creation
 - **AND** persists no order
+
+#### Scenario: The creation modal offers no message field
+- **WHEN** the manager opens the order-creation modal
+- **THEN** it presents no field for the originating message
+- **AND** the order it creates carries no message
 
 ### Requirement: Manager can edit an order's items
 From the back office, the manager SHALL be able to replace the list of items on any persisted order **belonging to the open bloque**. The submitted list MAY add products, remove products, and change quantities; submitting an empty list clears the order's items. The system MUST validate every submitted item against the active catalog, MUST reject the edit if any item is not in the catalog (leaving the order's existing items unchanged), and MUST otherwise persist the new item list as the order's complete set of items.
@@ -114,4 +119,20 @@ The system MUST reject deleting an order in a closed bloque, leaving it in place
 #### Scenario: The delete control is not offered on a closed bloque
 - **WHEN** the manager views the orders of a closed bloque
 - **THEN** no control to delete an order is available
+
+### Requirement: An order's items keep their submitted order
+The system SHALL store an order's items in the order they were submitted — by the
+customer form or by the back office alike — and SHALL return them in that same
+order wherever the order's items are read. Replacing an order's items SHALL
+replace the order too: the new list's order is the submitted order of the
+replacement. No separate sort key or timestamp is stored; the persisted sequence
+itself is the order.
+
+#### Scenario: Items come back in the order they were submitted
+- **WHEN** an order is created with items for products Z, then A, then M
+- **THEN** reading that order returns its items as Z, then A, then M
+
+#### Scenario: Replacing items establishes the new order
+- **WHEN** an order's items are replaced with a list ordered M, then Z
+- **THEN** reading the order returns M, then Z
 

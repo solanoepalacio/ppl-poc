@@ -92,6 +92,8 @@ The orders view SHALL present a control (**Stock**) to record per-product stock 
 
 The control SHALL list a product when its stock inicial is above zero **or** its stock actual is above zero, so a product that was never given an initial count still appears once it has been produced. For each listed product it SHALL show the stock inicial as an editable quantity and the stock actual as a figure that cannot be edited. Editing a product's stock inicial SHALL update the stock actual shown for it without needing to save first, since one is computed from the other.
 
+Products SHALL be listed in the order they were entered — earliest first — and MUST NOT be re-sorted alphabetically or by any other property of the product: the manager types counts off a physical list, and the on-screen list has to read back in that same sequence to be checkable against it. Adding a product SHALL append it at the end, and the order SHALL survive saving and reopening the control. A product added from the search SHALL hold that position for as long as the control stays open, whatever is typed into its stock inicial — a row MUST NOT move while it is being filled in, including when the same product was listed elsewhere earlier in the session. Products that appear without having been entered here (a product listed only because it has been produced) SHALL come after the entered ones. Stock inherited from the previous bloque at close SHALL keep the order it had there, and products entered afterwards append after it.
+
 Products whose stock inicial and stock actual are both zero or below SHALL NOT be listed. A shortfall is visible where it can be acted on — the production views and the orders list — rather than here.
 
 #### Scenario: Manager edits existencia for the open bloque
@@ -118,6 +120,32 @@ Products whose stock inicial and stock actual are both zero or below SHALL NOT b
 #### Scenario: A product in shortfall is not listed
 - **WHEN** product Q has no stock inicial and its stock actual is below zero
 - **THEN** Q is not listed in the stock control
+
+#### Scenario: Products are listed in the order they were entered
+- **WHEN** the manager adds product Z, then product A, then product M to the stock control and saves
+- **THEN** the control lists Z first, then A, then M
+- **AND** does not reorder them alphabetically
+
+#### Scenario: The entry order survives saving and reopening
+- **WHEN** the manager saves the stock control and opens it again
+- **THEN** the products are listed in the same order they were before saving
+
+#### Scenario: A newly added product appends to the end
+- **WHEN** the control already lists products and the manager adds another from the search
+- **THEN** the new product appears at the end of the list
+
+#### Scenario: An added product does not move while its initial is typed
+- **WHEN** the manager adds a product from the search and then types a stock inicial into it
+- **THEN** it stays where it was added
+- **AND** does not jump to a position it held earlier in the session
+
+#### Scenario: A product zeroed and added again stays at the end
+- **WHEN** the manager sets a listed product's stock inicial to zero, which removes it from the list, adds it again from the search, and types a new initial
+- **THEN** it stays at the end of the list rather than returning to its former position
+
+#### Scenario: Inherited stock keeps the previous bloque's order
+- **WHEN** a bloque is closed and its positive stock actual carries to the successor
+- **THEN** the successor's stock control lists the inherited products in the order the closed bloque listed them
 
 ### Requirement: A bloque carries a real-production history per product
 The system SHALL let the manager record *producción real* — how much of a product
@@ -186,6 +214,12 @@ The control SHALL list every product with real production recorded in the bloque
 — that is, an accumulated quantity above zero — showing the product's name and
 its accumulated quantity. **The accumulated quantity SHALL NOT be editable**: it
 is a sum, and the way to change it is to change the entries it is a sum of.
+
+Products SHALL be listed in the order production was first recorded for them in
+the bloque — earliest first — and MUST NOT be re-sorted alphabetically: the list
+reads as a log of the bloque's baking. A product whose history is removed and
+recorded again later re-enters at the end, since its earlier entries no longer
+exist.
 
 Each listed product SHALL offer a way to expand its history (**Ver detalle**),
 revealing that product's entries with, for each one, the date and time it was
@@ -259,6 +293,19 @@ quantity entered there is unambiguously an addition and never a total.
   having seen Q
 - **THEN** P is saved as shown
 - **AND** Q's history is left untouched rather than deleted
+
+#### Scenario: Products are listed by first recorded batch
+- **WHEN** production is recorded for product Z, then for product A, then for product M
+- **THEN** the control lists Z first, then A, then M
+- **AND** does not reorder them alphabetically
+
+#### Scenario: Later batches do not move a product
+- **WHEN** products Z and A are listed in that order and a new batch is recorded for Z
+- **THEN** Z keeps its position at the top of the list
+
+#### Scenario: A product recorded again after removal re-enters at the end
+- **WHEN** product Z's whole history is removed and production is later recorded for Z again
+- **THEN** Z appears at the end of the list rather than at its former position
 
 ### Requirement: A bloque carries a stock inicial, typed or inherited
 The system SHALL let the manager record, per product, the **stock inicial** (the
