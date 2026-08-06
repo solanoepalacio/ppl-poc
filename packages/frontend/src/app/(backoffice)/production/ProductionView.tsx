@@ -1,8 +1,8 @@
 import type { ProductCategory, ProductionTotalItem } from '@pannico/shared';
 import { getProductionTotals } from '@/lib/api';
 import { ViewHeader } from '../ViewHeader';
-import { AutoRefresh } from './AutoRefresh';
-import { AutoScroll } from './AutoScroll';
+import { AutoRefresh } from '../AutoRefresh';
+import { AutoScroll } from '../AutoScroll';
 
 /** Per-line title. The supporting line is the same on both views. */
 const TITLE: Record<ProductCategory, string> = {

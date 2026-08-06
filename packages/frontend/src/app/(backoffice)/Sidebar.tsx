@@ -40,6 +40,17 @@ const LINKS: { href: string; label: string; icon: ReactNode }[] = [
       </>
     ),
   },
+  {
+    href: '/revisar-pedidos',
+    label: 'Revisar Pedidos',
+    icon: (
+      <>
+        <path d="M5 4h11l4 4v12a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1z" />
+        <path d="M15 4v5h5" />
+        <path d="M8 13l2 2 4-4" />
+      </>
+    ),
+  },
 ];
 
 /**

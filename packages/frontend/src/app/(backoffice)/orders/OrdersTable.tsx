@@ -65,7 +65,7 @@ export function OrdersTable({
               </span>
               <span className="otable-client">{order.clientName}</span>
               <span className="otable-date">
-                {new Date(order.createdAt).toLocaleString()}
+                {new Date(order.createdAt).toLocaleString('es-AR')}
               </span>
               <span className="otable-total-cell">
                 <span className="otable-total">{total}</span>

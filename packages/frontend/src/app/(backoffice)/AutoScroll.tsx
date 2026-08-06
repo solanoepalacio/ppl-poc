@@ -13,10 +13,11 @@ const DWELL_MS = 15_000;
 const SPEED_PX_PER_S = 45;
 
 /**
- * Cycles a production view through a list too long to fit: hold, glide to the
+ * Cycles an unattended view through a list too long to fit: hold, glide to the
  * bottom, hold, glide back to the top, hold, repeat. These views sit on a screen
  * in the production area that nobody touches, so a list that overflows would
- * otherwise have its tail permanently unread.
+ * otherwise have its tail permanently unread. Shared by the two production views
+ * and Revisar Pedidos.
  *
  * Renders nothing — it only drives the scroll — and does nothing at all when the
  * content already fits, since movement with no purpose is a distraction on a

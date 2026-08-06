@@ -12,6 +12,7 @@ type Outcome = 'open' | 'issued' | 'invalid';
 
 const COPY = {
   title: 'Tu pedido',
+  unitNotice: 'IMPORTANTE: LOS PEDIDOS SE TOMAN POR UNIDAD, NO POR PAQUETE',
   filterLabel: 'Filtrar productos',
   filterPlaceholder: 'Filtrá por nombre…',
   clearFilter: 'Limpiar',
@@ -222,6 +223,9 @@ export function OrderForm({
     <div className="customer-shell">
       <BrandHeader />
       <h1>{COPY.title}</h1>
+      {/* Here rather than in BrandHeader, which the success and invalid-link
+          screens also render — neither has a quantity left to misread. */}
+      <p className="unit-notice">{COPY.unitNotice}</p>
 
       <div className="order-search">
         <div className="filter-row">

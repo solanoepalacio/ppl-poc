@@ -22,6 +22,14 @@
      chosen over a larger size to keep more products on screen at once. */
   --prod-name-size: 4vh;
   --prod-qty-size: 5vh;
+  /* Revisar Pedidos is read off the same factory screens, so it is sized in vh
+     for the same reason. Smaller than the production tokens because this view
+     puts three products across where those put one: at 4vh a product name would
+     wrap three times inside a third of the screen and cost more height than the
+     larger type buys back in legibility. */
+  --review-name-size: 2.8vh;
+  --review-qty-size: 3.4vh;
+  --review-client-size: 3.4vh;
   --font-display: var(--font-oswald), system-ui, sans-serif;
   --font-sans: var(--font-inter), system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
@@ -388,9 +396,11 @@ select {
   color: var(--ink-muted);
   margin: 0.25rem 0 1rem;
 }
-/* The production views are read from across the room, so their supporting line
-   is larger. Scoped here rather than on .subtitle, which the orders view shares. */
-.bo-header--production .subtitle {
+/* The views read from across the room — the two production lines and Revisar
+   Pedidos — get a larger supporting line. Scoped here rather than on .subtitle,
+   which the orders view shares. */
+.bo-header--production .subtitle,
+.bo-header--review .subtitle {
   font-size: 19px;
   color: var(--ink);
 }
@@ -1959,5 +1969,114 @@ code {
     padding: 0.4rem 0.5rem;
     font-size: 11px;
     letter-spacing: 0.1px;
+  }
+}
+
+/* ── Revisar Pedidos ──────────────────────────────────────────────────────
+   One card per client, their products in a fixed three-column grid. Fixed, not
+   auto-fit: a client with four products must leave the fourth in the first
+   column of a second row rather than stretching three across the width, so the
+   columns line up down the page and can be scanned vertically. */
+.review-list {
+  list-style: none;
+  margin: 20px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.review-client {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 18px 16px;
+  box-shadow: var(--shadow-card);
+}
+.review-client-name {
+  margin: 0 0 12px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--review-client-size);
+  line-height: 1.15;
+  letter-spacing: 0.01em;
+  color: var(--brand-slate);
+}
+/* The band is the row, so the row is an element. Rounded and clipped here so the
+   first and last bands take the corners without either needing to know it is
+   first or last. */
+.review-products {
+  border-radius: 9px;
+  overflow: hidden;
+}
+/* Alternating bands: from across the room the colour is what tells you which
+   products belong to the same line. A reading aid only — it says nothing about
+   the product, so the names and quantities keep one treatment throughout. */
+.review-row {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+/* A hairline between bands as well as the colour change. The two do different
+   jobs at different distances: the colour separates the rows from across the
+   room, the line separates them up close, where two soft tints are easy to read
+   as one block. Slate at partial alpha so it reads on both tints without becoming
+   a third colour — 0.32 rather than something lighter because at 0.18 it measured
+   1.31:1 against its band and vanished at the distance this view is read from. */
+.review-row + .review-row {
+  border-top: 1px solid rgba(54, 85, 102, 0.32);
+}
+.review-row:nth-child(odd) {
+  background: #eef3f6;
+}
+.review-row:nth-child(even) {
+  background: #f2f2f1;
+}
+/* Text flow, not flexbox. In a flex row a name that wraps to two lines takes the
+   whole line box, which throws the quantity back out to the right edge — the
+   exact gap this closes for names that happen to fit. Laid out as running text,
+   the quantity follows the last word wherever the name ends. */
+.review-product {
+  display: block;
+  min-width: 0;
+  padding: 0.7vh 14px;
+  line-height: 1.35;
+}
+.review-product-name {
+  overflow-wrap: anywhere;
+  font-size: var(--review-name-size);
+  font-weight: 500;
+  color: var(--ink);
+}
+.review-product-qty {
+  margin-left: 0.35em;
+  font-size: var(--review-qty-size);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--brand-slate);
+  white-space: nowrap;
+}
+
+/* Three columns of "Producto x 200" do not fit a phone, and this view is read on
+   one as often as on the office screen. A band then holds two lines instead of
+   one, which is fine: it is still one band of one colour. */
+@media (max-width: 900px) {
+  .review-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .review-client-name {
+    font-size: 19px;
+  }
+  .review-product-name {
+    font-size: 15px;
+  }
+  .review-product-qty {
+    font-size: 16px;
+  }
+}
+@media (max-width: 560px) {
+  .review-row {
+    grid-template-columns: 1fr;
   }
 }
