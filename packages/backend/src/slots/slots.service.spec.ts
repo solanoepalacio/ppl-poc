@@ -576,7 +576,7 @@ describe('SlotsService', () => {
   });
 
   describe('getProduced', () => {
-    it('groups entries by product, sums them, and sorts by product name', async () => {
+    it('groups entries by product, sums them, listing products by first batch', async () => {
       prisma.slot.findUnique.mockResolvedValue(openSlot);
       prisma.slotProduced.findMany.mockResolvedValue([
         {
@@ -604,8 +604,11 @@ describe('SlotsService', () => {
 
       const res = await service.getProduced('slot_open');
 
-      expect(res.items.map((i) => i.name)).toEqual(['Alfajor', 'Zapallo']);
-      const zapallo = res.items[1];
+      // Zapallo's first batch (10:00) predates Alfajor's (11:00), so it leads
+      // even though the alphabet says otherwise; Zapallo's later batch at 12:00
+      // does not move it.
+      expect(res.items.map((i) => i.name)).toEqual(['Zapallo', 'Alfajor']);
+      const zapallo = res.items[0];
       expect(zapallo.total).toBe(50);
       expect(zapallo.entries).toEqual([
         { id: 'e1', quantity: 20, createdAt: '2026-07-30T10:00:00.000Z' },
@@ -628,9 +631,39 @@ describe('SlotsService', () => {
 
       await service.getProduced('slot_open');
 
+      // The id breaks ties between entries created in the same millisecond by
+      // one save; cuids are time-ordered, so id order is creation order.
       expect(prisma.slotProduced.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ orderBy: { createdAt: 'asc' } }),
+        expect.objectContaining({
+          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        }),
       );
+    });
+
+    it('a product recorded again after deletion re-enters at the end', async () => {
+      prisma.slot.findUnique.mockResolvedValue(openSlot);
+      // Alfajor's original batch was deleted; its only remaining entry (12:00)
+      // is newer than Zapallo's (10:00), so Alfajor now lists last.
+      prisma.slotProduced.findMany.mockResolvedValue([
+        {
+          id: 'e1',
+          productId: 'p2',
+          quantity: 20,
+          createdAt: new Date('2026-07-30T10:00:00.000Z'),
+          product: { name: 'Zapallo' },
+        },
+        {
+          id: 'e9',
+          productId: 'p1',
+          quantity: 5,
+          createdAt: new Date('2026-07-30T12:00:00.000Z'),
+          product: { name: 'Alfajor' },
+        },
+      ]);
+
+      const res = await service.getProduced('slot_open');
+
+      expect(res.items.map((i) => i.name)).toEqual(['Zapallo', 'Alfajor']);
     });
   });
 
@@ -804,8 +837,10 @@ describe('SlotsService', () => {
       expect(byId.p3).toMatchObject({ produced: 30, demand: 30, current: 0 });
     });
 
-    it('sorts by product name', async () => {
+    it('keeps the rows in entry order instead of sorting by name', async () => {
       prisma.slot.findUnique.mockResolvedValue(openSlot);
+      // The rows arrive in insertion (id) order — Zapallo was entered first —
+      // and that order is the response order, alphabet notwithstanding.
       prisma.slotExistence.findMany.mockResolvedValue([
         named('p1', 'Zapallo', 1),
         named('p2', 'Alfajor', 1),
@@ -813,7 +848,31 @@ describe('SlotsService', () => {
 
       const res = await service.getStock('slot_open');
 
-      expect(res.items.map((i) => i.name)).toEqual(['Alfajor', 'Zapallo']);
+      expect(res.items.map((i) => i.name)).toEqual(['Zapallo', 'Alfajor']);
+      expect(prisma.slotExistence.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ orderBy: { id: 'asc' } }),
+      );
+    });
+
+    it('appends produced-only products after the entered ones, by first batch', async () => {
+      prisma.slot.findUnique.mockResolvedValue(openSlot);
+      prisma.slotExistence.findMany.mockResolvedValue([
+        named('p1', 'Zapallo', 10),
+      ]);
+      // Two produced-only products, deliberately returned in neither name nor
+      // first-batch order: p3's first entry (e2) predates p2's (e5).
+      prisma.slotProduced.groupBy.mockResolvedValue([
+        { productId: 'p2', _sum: { quantity: 7 }, _min: { id: 'e5' } },
+        { productId: 'p3', _sum: { quantity: 3 }, _min: { id: 'e2' } },
+      ]);
+      prisma.product.findMany.mockResolvedValue([
+        { id: 'p2', name: 'Alfajor' },
+        { id: 'p3', name: 'Pan' },
+      ]);
+
+      const res = await service.getStock('slot_open');
+
+      expect(res.items.map((i) => i.name)).toEqual(['Zapallo', 'Pan', 'Alfajor']);
     });
   });
 

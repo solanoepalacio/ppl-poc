@@ -7,8 +7,8 @@ import { useEffect, useRef, type ReactNode } from 'react';
  * trapping, and top-layer rendering (centered over the viewport, never clipped
  * by the card it's declared in) come for free. Every dialog shares one fixed
  * near-full-screen frame so the UI never jumps between dialogs; only the body
- * scrolls, while the header, footer, and optional `aboveBody` / `belowBody`
- * regions stay pinned.
+ * scrolls, while the header, footer, and an optional `aboveBody` region stay
+ * pinned.
  */
 export function Modal({
   open,
@@ -17,7 +17,6 @@ export function Modal({
   children,
   footer,
   aboveBody,
-  belowBody,
 }: {
   open: boolean;
   onClose: () => void;
@@ -26,8 +25,6 @@ export function Modal({
   footer?: ReactNode;
   /** A pinned region between the header and the scrolling body (e.g. a picker). */
   aboveBody?: ReactNode;
-  /** A pinned region between the scrolling body and the footer (e.g. a message). */
-  belowBody?: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
 
@@ -78,7 +75,6 @@ export function Modal({
         </div>
         {aboveBody && <div className="modal-above">{aboveBody}</div>}
         <div className="modal-body">{children}</div>
-        {belowBody && <div className="modal-below">{belowBody}</div>}
         {footer && <div className="modal-footer">{footer}</div>}
       </div>
     </dialog>

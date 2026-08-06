@@ -14,8 +14,13 @@ import { ProductPicker, itemsFromQuantities } from './ProductPicker';
  * manager selects a client (filtering by name) and records the order's contents
  * directly ("Agregar pedido"). Products are added one at a time from a search
  * box, so the body lists only what is on the order; the client picker stays
- * pinned above and the optional message pinned below. Issuing a shareable
+ * pinned above and the list gets everything below it. Issuing a shareable
  * customer link lives in its own toolbar trigger ("Generar link"), not here.
+ *
+ * No field for the order's originating message: `POST /orders` still accepts one
+ * and stores it, but nothing in the back office ever read it back, so asking the
+ * manager to retype the customer's text cost dialog height for nothing. Its
+ * consumer is automated intake, which has the customer's own words to hand.
  */
 export function CreateOrderModal({
   products,
@@ -32,7 +37,6 @@ export function CreateOrderModal({
 
   const [clientId, setClientId] = useState<string | null>(null);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
-  const [message, setMessage] = useState('');
 
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -42,7 +46,6 @@ export function CreateOrderModal({
   function reset() {
     setClientId(null);
     setQuantities({});
-    setMessage('');
     setError(null);
   }
 
@@ -57,7 +60,14 @@ export function CreateOrderModal({
   }
 
   function setQuantity(productId: string, quantity: number) {
-    setQuantities((q) => ({ ...q, [productId]: quantity }));
+    // Zero drops the key rather than storing it: the map's key order is the
+    // entry order the list displays, and a kept key would pin a re-added
+    // product to its old position instead of appending it as a new entry.
+    setQuantities((q) => {
+      if (quantity > 0) return { ...q, [productId]: quantity };
+      const { [productId]: _dropped, ...rest } = q;
+      return rest;
+    });
   }
 
   async function submitContent() {
@@ -67,7 +77,6 @@ export function CreateOrderModal({
       await createOrder({
         clientId: clientId!,
         items: orderItems,
-        message,
       });
       trackEvent('order_created_direct', {
         itemCount: orderItems.length,
@@ -123,21 +132,6 @@ export function CreateOrderModal({
             />
             <span className="modal-section-label">Productos en el pedido</span>
           </>
-        }
-        belowBody={
-          <div className="modal-message">
-            <label htmlFor="create-order-message">
-              Mensaje del pedido (opcional)
-            </label>
-            <textarea
-              id="create-order-message"
-              rows={2}
-              placeholder="Ingresa el mensaje que el usuario uso para hacerte el pedido. Sera usado para entrenar al agente que toma pedidos."
-              value={message}
-              disabled={pending}
-              onChange={(e) => setMessage(e.target.value)}
-            />
-          </div>
         }
       >
         <ProductPicker

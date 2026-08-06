@@ -283,6 +283,34 @@ describe('OrdersService', () => {
       expect(res.items).toHaveLength(1);
     });
 
+    it('writes and re-reads the items in submitted order', async () => {
+      prisma.order.findUnique
+        .mockResolvedValueOnce({ id: 'order_1', slot: { status: 'open' } })
+        .mockResolvedValueOnce({ id: 'order_1', items: [] });
+      prisma.product.findMany.mockResolvedValue([{ id: 'p9' }, { id: 'p1' }]);
+
+      await service.replaceItems('order_1', [
+        { productId: 'p9', quantity: 2 },
+        { productId: 'p1', quantity: 5 },
+      ]);
+
+      // The write preserves the submitted order (cuids are minted in creation
+      // order, so id order is this order)…
+      expect(prisma.orderItem.createMany).toHaveBeenCalledWith({
+        data: [
+          { orderId: 'order_1', productId: 'p9', quantity: 2 },
+          { orderId: 'order_1', productId: 'p1', quantity: 5 },
+        ],
+      });
+      // …and the re-read asks for it back by id rather than trusting the
+      // engine's emission order.
+      expect(prisma.order.findUnique).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          include: { items: { orderBy: { id: 'asc' } } },
+        }),
+      );
+    });
+
     it('clears items when given an empty list', async () => {
       prisma.order.findUnique
         .mockResolvedValueOnce({ id: 'order_1', slot: { status: 'open' } })

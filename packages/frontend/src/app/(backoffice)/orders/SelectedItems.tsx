@@ -58,8 +58,15 @@ export function SelectedItems({
     Record<string, { raw: string; base: number }>
   >({});
 
-  // Keep catalog order, but show only products actually on the order.
-  const added = products.filter((p) => (quantities[p.id] ?? 0) > 0);
+  // The quantity map's own key order IS the entry order: parents append a key
+  // when a product is added and delete it when removed (so re-adding appends),
+  // and the map is seeded from the API's stored order when editing. Iterating
+  // the catalog here instead is what used to impose alphabetical order.
+  const byId = new Map(products.map((p) => [p.id, p]));
+  const added = Object.keys(quantities)
+    .filter((id) => (quantities[id] ?? 0) > 0)
+    .map((id) => byId.get(id))
+    .filter((p): p is Product => p !== undefined);
 
   const highlightId = highlight?.id;
   const highlightN = highlight?.n;

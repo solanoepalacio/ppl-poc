@@ -281,13 +281,17 @@ export class SlotsService implements OnModuleInit {
   /**
    * The bloque's producción real grouped by product, defaulting to the open
    * bloque. Each product carries its entries (oldest first) and their sum; a
-   * product with no entries is absent rather than reported as zero.
+   * product with no entries is absent rather than reported as zero. Products are
+   * ordered by their first entry — the list reads as a log of the bloque's
+   * baking — which falls out of building the groups from rows read oldest-first.
    */
   async getProduced(slotId?: string): Promise<SlotProducedResponse> {
     const slot = await this.resolveSlot(slotId);
     const rows = await this.prisma.slotProduced.findMany({
       where: { slotId: slot.id },
-      orderBy: { createdAt: 'asc' },
+      // One save writes several entries in the same millisecond; the id (cuid,
+      // time-ordered) breaks the tie in creation order.
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       include: { product: { select: { name: true } } },
     });
 
@@ -313,9 +317,7 @@ export class SlotsService implements OnModuleInit {
 
     return {
       slot: toDto(slot),
-      items: [...byProduct.values()].sort((a, b) =>
-        a.name.localeCompare(b.name),
-      ),
+      items: [...byProduct.values()],
     };
   }
 
@@ -385,14 +387,21 @@ export class SlotsService implements OnModuleInit {
     tx: PrismaLike = this.prisma,
   ): Promise<{ all: SlotStockItem[]; items: SlotStockItem[] }> {
     const [existenceRows, producedRows, demand] = await Promise.all([
+      // Insertion order: cuid ids embed a timestamp+counter, so ascending id is
+      // the order the rows were written — which is the order the manager entered
+      // them, because the dialog submits in display order and the replace-all
+      // save rewrites the rows in exactly that order.
       tx.slotExistence.findMany({
         where: { slotId },
+        orderBy: { id: 'asc' },
         select: { productId: true, quantity: true, product: { select: { name: true } } },
       }),
       tx.slotProduced.groupBy({
         by: ['productId'],
         where: { slotId },
         _sum: { quantity: true },
+        // The first entry's id orders produced-only products by first batch.
+        _min: { id: true },
       }),
       this.demandMapWith(tx, slotId),
     ]);
@@ -406,15 +415,22 @@ export class SlotsService implements OnModuleInit {
       }
       return r;
     };
+    // The map's insertion order is the response order: entered products first
+    // (in entry order), then produced-only products by first batch, then
+    // demand-only rows — hidden by the dialog — by name for determinism.
     for (const e of existenceRows) {
       row(e.productId, e.product.name).initial = e.quantity;
     }
-    for (const p of producedRows) {
+    for (const p of [...producedRows].sort((a, b) =>
+      (a._min?.id ?? '') < (b._min?.id ?? '') ? -1 : 1,
+    )) {
       // A product may be produced without ever having existencia or a name yet
       // resolved here; the name is filled in by whichever source knows it.
       row(p.productId, '').produced = p._sum.quantity ?? 0;
     }
-    for (const [productId, d] of demand) {
+    for (const [productId, d] of [...demand.entries()].sort((a, b) =>
+      a[1].name.localeCompare(b[1].name),
+    )) {
       const r = row(productId, d.name);
       r.demand = d.quantity;
       if (!r.name) r.name = d.name;
@@ -434,9 +450,10 @@ export class SlotsService implements OnModuleInit {
       }
     }
 
-    const all = [...rows.values()]
-      .map((r) => ({ ...r, current: r.initial + r.produced - r.demand }))
-      .sort((a, b) => a.name.localeCompare(b.name));
+    const all = [...rows.values()].map((r) => ({
+      ...r,
+      current: r.initial + r.produced - r.demand,
+    }));
     return { all, items: all.filter((r) => r.initial > 0 || r.current > 0) };
   }
 

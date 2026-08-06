@@ -1463,13 +1463,6 @@ select {
   overflow-y: auto;
   padding: 8px 24px 20px;
 }
-/* Fixed region between the scrolling body and the footer (the order message). */
-.modal-below {
-  flex-shrink: 0;
-  padding: 14px 24px 16px;
-  background: var(--surface);
-  border-top: 1px solid #eee6d8;
-}
 .modal-footer {
   display: flex;
   align-items: center;
@@ -1687,10 +1680,6 @@ select {
   margin: 0;
 }
 
-/* Order message (Agregar pedido only) — pinned in the modal's bottom region. */
-.modal-message {
-  margin-top: 0;
-}
 /* Empty state when no products have been added to the order yet. */
 .items-empty {
   padding: 32px 8px;
@@ -1716,33 +1705,6 @@ select {
   background: #f7e7e2;
   color: #b4442f;
 }
-.modal-message label {
-  display: block;
-  margin-bottom: 8px;
-  font-family: var(--font-display);
-  font-weight: 500;
-  font-size: 12.5px;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--ink-muted);
-}
-.modal-message textarea {
-  width: 100%;
-  min-height: 52px;
-  resize: vertical;
-  padding: 12px 14px;
-  border: 1px solid #d7cdb9;
-  border-radius: 11px;
-  background: #fff;
-  font-family: var(--font-sans);
-  font-size: 14.5px;
-  color: var(--ink);
-  outline: none;
-}
-.modal-message textarea:focus {
-  border-color: var(--brand-amber);
-}
-
 /* Stacked label + full-width control (used inside modals). */
 .field {
   margin-bottom: 0.75rem;

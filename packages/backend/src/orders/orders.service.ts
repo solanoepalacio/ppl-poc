@@ -171,7 +171,9 @@ export class OrdersService {
 
     const updated = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { items: true },
+      // Items in stored (entry) order: cuids are time-ordered and the
+      // replace writes them in payload order.
+      include: { items: { orderBy: { id: 'asc' } } },
     });
     return { id: orderId, items: updated!.items };
   }
@@ -254,7 +256,7 @@ export class OrdersService {
     const orders = await this.prisma.order.findMany({
       where: { slotId: slot.id },
       orderBy: { createdAt: 'desc' },
-      include: { items: true, client: true },
+      include: { items: { orderBy: { id: 'asc' } }, client: true },
     });
     return {
       slot: toSlotDto(slot),

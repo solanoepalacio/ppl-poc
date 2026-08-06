@@ -38,7 +38,14 @@ export function OrderActions({
   const [pending, startTransition] = useTransition();
 
   function setQuantity(productId: string, quantity: number) {
-    setQuantities((q) => ({ ...q, [productId]: quantity }));
+    // Zero drops the key rather than storing it: the map's key order is the
+    // entry order the list displays, and a kept key would pin a re-added
+    // product to its old position instead of appending it as a new entry.
+    setQuantities((q) => {
+      if (quantity > 0) return { ...q, [productId]: quantity };
+      const { [productId]: _dropped, ...rest } = q;
+      return rest;
+    });
   }
 
   function startEditing() {

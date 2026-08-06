@@ -151,10 +151,12 @@ export function ProducedEditor({
     products.find((p) => p.id === productId)?.name ??
     productId;
 
-  // Only products that still have entries staged are listed.
-  const listed = Object.entries(draft)
-    .filter(([, entries]) => entries.some((e) => e.quantity > 0))
-    .sort((a, b) => nameOf(a[0]).localeCompare(nameOf(b[0]), 'es'));
+  // Only products that still have entries staged are listed, in the draft's own
+  // key order — which is the server's order: by each product's first recorded
+  // batch. The list reads as a log of the bloque's baking, not as a catalog.
+  const listed = Object.entries(draft).filter(([, entries]) =>
+    entries.some((e) => e.quantity > 0),
+  );
 
   return (
     <>
@@ -307,7 +309,13 @@ export function ProducedEditor({
           products={products}
           quantities={batch}
           onChange={(id, quantity) =>
-            setBatch((q) => ({ ...q, [id]: quantity }))
+            // Zero drops the key so the batch list keeps entry order and a
+            // re-added product appends (see SelectedItems).
+            setBatch((q) => {
+              if (quantity > 0) return { ...q, [id]: quantity };
+              const { [id]: _dropped, ...rest } = q;
+              return rest;
+            })
           }
           disabled={pending}
           searchId="produced-product"

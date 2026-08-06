@@ -71,33 +71,37 @@ export function ExistenceEditor({
    * The rows to show: everything the bloque knows about whose initial or current
    * is above zero, plus anything explicitly added. A product with no activity at
    * all is absent from `stock`, so its produced and demand are zero.
+   *
+   * Order is entry order, not alphabetical: the server's rows come back in the
+   * order they were entered (the save writes them in display order, so it holds
+   * across sessions) and just-added products append after them. The Set keeps
+   * first insertion, so adding a product the list already shows moves nothing.
    */
   const rows: Row[] = useMemo(() => {
-    const ids = new Set<string>(added);
+    const ids = new Set<string>();
     for (const s of stock) {
       const initial = initials[s.productId] ?? s.initial;
       if (initial > 0 || initial + s.produced - s.demand > 0) {
         ids.add(s.productId);
       }
     }
-    return [...ids]
-      .map((productId) => {
-        const s = byId.get(productId);
-        const name =
-          s?.name ?? products.find((p) => p.id === productId)?.name ?? productId;
-        const initial = initials[productId] ?? s?.initial ?? 0;
-        const produced = s?.produced ?? 0;
-        const demand = s?.demand ?? 0;
-        return {
-          productId,
-          name,
-          initial,
-          produced,
-          demand,
-          current: initial + produced - demand,
-        };
-      })
-      .sort((a, b) => a.name.localeCompare(b.name, 'es'));
+    for (const id of added) ids.add(id);
+    return [...ids].map((productId) => {
+      const s = byId.get(productId);
+      const name =
+        s?.name ?? products.find((p) => p.id === productId)?.name ?? productId;
+      const initial = initials[productId] ?? s?.initial ?? 0;
+      const produced = s?.produced ?? 0;
+      const demand = s?.demand ?? 0;
+      return {
+        productId,
+        name,
+        initial,
+        produced,
+        demand,
+        current: initial + produced - demand,
+      };
+    });
   }, [stock, initials, added, byId, products]);
 
   function startEditing() {
