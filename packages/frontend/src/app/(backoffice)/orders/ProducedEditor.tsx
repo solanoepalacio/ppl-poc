@@ -8,6 +8,7 @@ import type {
   SetProducedProduct,
 } from '@pannico/shared';
 import { setSlotProduced } from '@/lib/api';
+import { trackEvent } from '@/lib/analytics';
 import { ProductPicker, itemsFromQuantities } from './ProductPicker';
 import { Modal } from './Modal';
 
@@ -135,6 +136,7 @@ export function ProducedEditor({
     );
     try {
       await setSlotProduced(slotId, items);
+      trackEvent('produced_saved', producedProps(items, current));
       setEditing(false);
       startTransition(() => router.refresh());
     } catch (e) {
@@ -324,6 +326,31 @@ export function ProducedEditor({
       </Modal>
     </>
   );
+}
+
+/**
+ * What a save did, read off the submitted set against what the server held.
+ *
+ * `added` and `removed` are separated from the totals because the save is
+ * deliberately non-idempotent — an id-less entry appends — so a replayed body
+ * duplicates a batch. Counting appends and deletions per save is what makes that
+ * trade observable: a run of saves that add and then remove the same amount is
+ * the manager cleaning up a double-submit, which the totals alone would hide.
+ */
+function producedProps(items: SetProducedProduct[], current: ProducedProduct[]) {
+  const entries = items.flatMap((i) => i.entries);
+  const submitted = new Set(
+    entries.map((e) => e.id).filter((id): id is string => id !== undefined),
+  );
+  return {
+    productCount: items.filter((i) => i.entries.length > 0).length,
+    entryCount: entries.length,
+    totalQuantity: entries.reduce((n, e) => n + e.quantity, 0),
+    added: entries.filter((e) => e.id === undefined).length,
+    removed: current
+      .flatMap((p) => p.entries)
+      .filter((e) => !submitted.has(e.id)).length,
+  };
 }
 
 function draftFrom(current: ProducedProduct[]): Draft {

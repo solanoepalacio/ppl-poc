@@ -1,10 +1,19 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import type { SlotShortfallItem } from '@pannico/shared';
 import { closeCurrentSlot, getCloseSlotPreview } from '@/lib/api';
+import { trackEvent } from '@/lib/analytics';
 import { Modal } from './Modal';
+
+/** The shape every shortfall event carries, so the three read the same way. */
+function shortfallProps(list: SlotShortfallItem[]) {
+  return {
+    shortfallCount: list.length,
+    totalShortfall: list.reduce((n, s) => n + s.shortfall, 0),
+  };
+}
 
 /**
  * Closes the current open bloque, which atomically opens a fresh one and carries
@@ -25,12 +34,29 @@ export function CloseSlotButton({ disabled }: { disabled?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   const [shortfalls, setShortfalls] = useState<SlotShortfallItem[] | null>(null);
+  /**
+   * The shortfall prompt still awaiting a decision, mirrored out of state so the
+   * analytics stay one-per-prompt. The outcome is reported from three entry
+   * points — "Cerrar igual", "Cancelar", and the dialog's own onClose (ESC and
+   * backdrop) — and whichever runs first clears this, so the others find nothing
+   * left to report. Only a successful close consumes it, so a failed attempt the
+   * manager retries still knows what is on screen.
+   */
+  const prompt = useRef<SlotShortfallItem[] | null>(null);
 
   async function close() {
     setError(false);
     setBusy(true);
+    const discarding = prompt.current ?? [];
     try {
       await closeCurrentSlot();
+      prompt.current = null;
+      trackEvent('slot_closed', {
+        // The bloques that cost something are the ones closed over a warning;
+        // the flag is what separates them without joining across events.
+        hadShortfall: discarding.length > 0,
+        ...shortfallProps(discarding),
+      });
       setShortfalls(null);
       startTransition(() => router.refresh());
     } catch {
@@ -38,6 +64,16 @@ export function CloseSlotButton({ disabled }: { disabled?: boolean }) {
     } finally {
       setBusy(false);
     }
+  }
+
+  /** Dismisses the prompt without closing: the warning changed the manager's mind. */
+  function cancel() {
+    const pending = prompt.current;
+    prompt.current = null;
+    if (pending !== null) {
+      trackEvent('slot_close_cancelled', shortfallProps(pending));
+    }
+    setShortfalls(null);
   }
 
   async function start() {
@@ -56,6 +92,8 @@ export function CloseSlotButton({ disabled }: { disabled?: boolean }) {
     if (short.length > 0) {
       // Hand the decision to the manager rather than dropping the shortfall
       // behind a generic confirm.
+      prompt.current = short;
+      trackEvent('slot_close_shortfall_shown', shortfallProps(short));
       setShortfalls(short);
       return;
     }
@@ -83,13 +121,13 @@ export function CloseSlotButton({ disabled }: { disabled?: boolean }) {
 
       <Modal
         open={shortfalls !== null}
-        onClose={() => setShortfalls(null)}
+        onClose={cancel}
         title="Hay productos con faltante"
         footer={
           <>
             <button
               className="btn-modal-secondary"
-              onClick={() => setShortfalls(null)}
+              onClick={cancel}
               disabled={busy}
             >
               Cancelar

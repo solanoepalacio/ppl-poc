@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Product, SlotStockItem } from '@pannico/shared';
 import { setSlotExistence } from '@/lib/api';
+import { trackEvent } from '@/lib/analytics';
 import { ProductCombobox } from './ProductCombobox';
 import { Modal } from './Modal';
 
@@ -138,6 +139,14 @@ export function ExistenceEditor({
       .map((r) => ({ productId: r.productId, quantity: r.initial }));
     try {
       await setSlotExistence(slotId, items);
+      trackEvent('stock_saved', {
+        productCount: items.length,
+        totalQuantity: items.reduce((n, i) => n + i.quantity, 0),
+        // Off the rows rather than the payload: a shortfall is a stock actual,
+        // which is derived and never sent. This is the leading indicator for the
+        // discard that `slot_closed` reports at the end of the bloque.
+        shortfallCount: rows.filter((r) => r.current < 0).length,
+      });
       setEditing(false);
       startTransition(() => router.refresh());
     } catch (e) {

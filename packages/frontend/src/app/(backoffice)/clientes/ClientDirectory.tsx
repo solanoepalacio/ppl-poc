@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ManagedClient } from '@pannico/shared';
 import { createClient, deleteClient, updateClient } from '@/lib/api';
+import { trackEvent } from '@/lib/analytics';
 
 /** The row being edited, held apart from the server list until it is saved. */
 type EditDraft = { name: string; phone: string };
@@ -56,6 +57,7 @@ export function ClientDirectory({ clients }: { clients: ManagedClient[] }) {
     setBusy(true);
     try {
       await createClient({ name: newName, phone: newPhone });
+      trackEvent('client_created', { hasPhone: newPhone.trim() !== '' });
       setNewName('');
       setNewPhone('');
       refresh();
@@ -74,12 +76,19 @@ export function ClientDirectory({ clients }: { clients: ManagedClient[] }) {
 
   async function saveEdit(id: string) {
     setBusy(true);
+    const before = clients.find((c) => c.id === id);
     try {
       // `phone` goes as null when cleared, which is how the API distinguishes
       // "remove the number" from "leave it alone".
       await updateClient(id, {
         name: draft.name,
         phone: draft.phone.trim() === '' ? null : draft.phone,
+      });
+      // Which field moved, not its contents: a client's name and number are
+      // personal data and have no business leaving for an analytics host.
+      trackEvent('client_updated', {
+        nameChanged: before?.name !== draft.name,
+        phoneChanged: (before?.phone ?? '') !== draft.phone.trim(),
       });
       setEditingId(null);
       refresh();
@@ -94,6 +103,9 @@ export function ClientDirectory({ clients }: { clients: ManagedClient[] }) {
     setBusy(true);
     try {
       await updateClient(client.id, { active });
+      trackEvent(active ? 'client_reactivated' : 'client_deactivated', {
+        orderCount: client.orderCount,
+      });
       refresh();
     } catch (e) {
       fail(client.id, e, 'No se pudo cambiar el estado del cliente.');
@@ -114,6 +126,13 @@ export function ClientDirectory({ clients }: { clients: ManagedClient[] }) {
     setBusy(true);
     try {
       await deleteClient(client.id);
+      // One control, two operations — so two events, chosen the same way the
+      // server chooses: a client with orders is retired, never deleted. Folding
+      // them into one would make "how much of the directory is actually being
+      // destroyed" unanswerable, which is the reason to watch this at all.
+      trackEvent(deletes ? 'client_deleted' : 'client_deactivated', {
+        orderCount: client.orderCount,
+      });
       refresh();
     } catch (e) {
       fail(client.id, e, 'No se pudo eliminar el cliente.');

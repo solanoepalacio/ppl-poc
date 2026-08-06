@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Product } from '@pannico/shared';
 import { ApiError, confirmOrder } from '@/lib/api';
 import { trackEvent } from '@/lib/analytics';
@@ -85,6 +85,12 @@ export function OrderForm({
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const reviewing = secondsLeft !== null && secondsLeft > 0;
   const reviewed = secondsLeft === 0;
+  /**
+   * Whether the filter has already been reported this visit. The event answers
+   * "do customers reach for the filter at all", which one mark per visit
+   * answers and one per keystroke only inflates.
+   */
+  const filterReported = useRef(false);
 
   // One tick per render while the count is running. Returning the clear covers
   // unmount as well, so a customer who closes the page mid-pause cannot leave a
@@ -149,9 +155,19 @@ export function OrderForm({
    */
   function handleActionError(e: unknown) {
     if (e instanceof ApiError && e.status === 404) {
+      // Not reported here: the invalid-link view bundles TrackInvalidLink, so
+      // switching to it emits `order_link_invalid` on its own.
       setOutcome('invalid');
       return;
     }
+    // A customer who cannot submit has no way to tell the bakery so, which makes
+    // this the one failure that is otherwise completely silent. `status` is 0
+    // when the request never reached the server at all.
+    trackEvent('order_confirm_failed', {
+      reason: e instanceof ApiError ? 'server' : 'network',
+      status: e instanceof ApiError ? e.status : 0,
+      itemCount: items.length,
+    });
     setError(e instanceof Error ? e.message : COPY.genericError);
   }
 
@@ -179,8 +195,24 @@ export function OrderForm({
    */
   function startReview() {
     setError(null);
+    // Against `order_confirmed` this is the gate's own success measure: every
+    // order passes through here first, so the difference between the two counts
+    // is exactly the customers who saw their summary and did not go on to
+    // submit — which is the behaviour the pause was added to produce.
+    trackEvent('order_review_raised', {
+      itemCount: items.length,
+      totalQuantity: items.reduce((sum, i) => sum + i.quantity, 0),
+      // The summary was already open, so the gate only added the pause.
+      summaryWasOpen: showSummary,
+    });
     setShowSummary(true);
     setSecondsLeft(REVIEW_PAUSE_SECONDS);
+  }
+
+  /** Opening and closing both report, so the two are comparable. */
+  function toggleSummary(open: boolean) {
+    trackEvent('order_summary_toggled', { open, itemCount: chosen.length });
+    setShowSummary(open);
   }
 
   function confirmPressed() {
@@ -237,7 +269,13 @@ export function OrderForm({
             placeholder={COPY.filterPlaceholder}
             autoComplete="off"
             value={filter}
-            onChange={(e) => setFilter(e.target.value)}
+            onChange={(e) => {
+              if (!filterReported.current && e.target.value !== '') {
+                filterReported.current = true;
+                trackEvent('order_filter_used');
+              }
+              setFilter(e.target.value);
+            }}
           />
           <button
             type="button"
@@ -288,7 +326,7 @@ export function OrderForm({
               className="summary-toggle"
               aria-expanded
               aria-controls="order-summary"
-              onClick={() => setShowSummary(false)}
+              onClick={() => toggleSummary(false)}
             >
               {COPY.hideSummary}
             </button>
@@ -305,7 +343,7 @@ export function OrderForm({
               className="summary-toggle"
               aria-expanded={false}
               aria-controls="order-summary"
-              onClick={() => setShowSummary(true)}
+              onClick={() => toggleSummary(true)}
             >
               {COPY.showSummary}
             </button>

@@ -8,15 +8,33 @@
  * doc and the `AnalyticsEvent` union below in sync.
  */
 
-/** Every custom analytics event the app may emit. */
+/** Every custom analytics event the app may emit, grouped by the surface it comes from. */
 export type AnalyticsEvent =
+  // Customer order form
   | 'order_confirmed'
+  | 'order_confirm_failed'
+  | 'order_review_raised'
+  | 'order_summary_toggled'
+  | 'order_filter_used'
   | 'order_link_invalid'
+  // Back office — orders
   | 'order_link_generated'
   | 'order_link_copied'
   | 'order_created_direct'
   | 'order_items_edited'
-  | 'order_deleted';
+  | 'order_deleted'
+  // Back office — bloque
+  | 'slot_close_shortfall_shown'
+  | 'slot_close_cancelled'
+  | 'slot_closed'
+  | 'stock_saved'
+  | 'produced_saved'
+  // Back office — client directory
+  | 'client_created'
+  | 'client_updated'
+  | 'client_deactivated'
+  | 'client_reactivated'
+  | 'client_deleted';
 
 type EventProps = Record<string, string | number | boolean>;
 
