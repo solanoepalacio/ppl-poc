@@ -390,7 +390,7 @@ export class SlotsService implements OnModuleInit {
   private async stockOf(
     slotId: string,
     tx: PrismaLike = this.prisma,
-  ): Promise<{ all: SlotStockItem[]; items: SlotStockItem[] }> {
+  ): Promise<{ all: SlotStockItem[] }> {
     const [existenceRows, producedRows, demand] = await Promise.all([
       // Insertion order: cuid ids embed a timestamp+counter, so ascending id is
       // the order the rows were written — which is the order the manager entered
@@ -459,7 +459,10 @@ export class SlotsService implements OnModuleInit {
       ...r,
       current: r.initial + r.produced - r.demand,
     }));
-    return { all, items: all.filter((r) => r.initial > 0 || r.current > 0) };
+    // Unfiltered on purpose. Which products the stock control lists is the
+    // control's decision, made from exactly this data; a second filtered set
+    // here would be another answer to the same question, free to drift.
+    return { all };
   }
 
   /** `getDemandMap` against an explicit client, so the carry can read in-transaction. */

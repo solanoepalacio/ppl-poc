@@ -30,10 +30,15 @@ type Row = {
  * that would be meaningless on a row present because of a figure they know
  * nothing about — and they are shared by three other dialogs.
  *
- * Lists a product when its initial or its current is above zero. A shortfall is
- * left out on purpose: it is real, but it is acted on from the production views,
- * not from here. The payload still carries those products so that adding one
- * from the search shows its true stock actual rather than a fiction.
+ * Lists a product when its initial is above zero **or** its current is anything
+ * other than zero — a shortfall included. A negative stock actual is a real
+ * position, and hiding it made the one screen whose subject is stock the one
+ * screen that would not say a product was short. A product is left out only when
+ * both figures are zero, where there is nothing to report.
+ *
+ * The `initial > 0` half is not redundant with the other: it keeps a product the
+ * manager gave a count to on screen when demand consumes exactly all of it, so
+ * the figure just typed cannot vanish as it is typed.
  *
  * Saving is replace-all over the stock inicial only.
  */
@@ -93,7 +98,7 @@ export function ExistenceEditor({
       // and the save, which writes display order, would persist that.
       if (addedIds.has(s.productId)) continue;
       const initial = initials[s.productId] ?? s.initial;
-      if (initial > 0 || initial + s.produced - s.demand > 0) {
+      if (initial > 0 || initial + s.produced - s.demand !== 0) {
         ids.add(s.productId);
       }
     }
