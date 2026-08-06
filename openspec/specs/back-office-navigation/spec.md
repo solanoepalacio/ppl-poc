@@ -3,9 +3,7 @@
 ## Purpose
 
 Defines how the back office is structured around its views and the persistent navigation the manager uses to move between them, and how this navigation is kept off the customer-facing order form.
-
 ## Requirements
-
 ### Requirement: Back office lands on the orders view
 The back office SHALL present the orders view (orders grouped by production bloque) as its landing destination. There SHALL NOT be a separate back-office home page; navigating to the back-office root SHALL result in the orders view.
 
@@ -15,14 +13,16 @@ The back office SHALL present the orders view (orders grouped by production bloq
 
 #### Scenario: No standalone home page
 - **WHEN** the manager is anywhere in the back office
-- **THEN** no standalone landing page distinct from the three views is presented
+- **THEN** no standalone landing page distinct from the back office's views is presented
 
 ### Requirement: Persistent navigation across back-office views
-The back office SHALL present a persistent navigation, visible on every back-office view, with one link to each of its views labelled **Pedidos** (orders by bloque), **Producción salados** (savory-line production totals), and **Producción dulces** (sweet-line production totals). Neither order creation nor bloque management SHALL be a standalone navigation destination; both are launched from the orders view. Selecting a link SHALL navigate to that view. The navigation SHALL indicate which view is currently active.
+The back office SHALL present a persistent navigation, visible on every back-office view, with one link to each of its views labelled **Pedidos** (orders by bloque), **Producción salados** (savory-line production totals), **Producción dulces** (sweet-line production totals), **Clientes** (the client directory), and **Revisar Pedidos** (the bloque's orders grouped by client). Neither order creation nor bloque management SHALL be a standalone navigation destination; both are launched from the orders view. Selecting a link SHALL navigate to that view. The navigation SHALL indicate which view is currently active.
+
+Managing the directory is its own destination rather than something reached from the orders view, because it is not part of recording an order: it is done rarely, before or after the day's orders, and the manager arrives at it with that intent. Reviewing the bloque's orders by client is its own destination for a different reason: it is read by the people packing, who never open the orders view at all.
 
 #### Scenario: Navigation is present on each view
 - **WHEN** the manager is on any back-office view
-- **THEN** the navigation is shown with links to Pedidos, Producción salados, and Producción dulces
+- **THEN** the navigation is shown with links to Pedidos, Producción salados, Producción dulces, Clientes, and Revisar Pedidos
 - **AND** there is no separate Bloques link
 
 #### Scenario: Navigating between views
@@ -48,9 +48,20 @@ The back office SHALL present a persistent navigation, visible on every back-off
 - **THEN** there is no separate Bloques navigation link
 - **AND** bloque management (closing the bloque, editing its stock) is reached from the orders view instead
 
+#### Scenario: Clientes is a navigation destination
+- **WHEN** the manager selects the Clientes link
+- **THEN** the client directory view is shown
+- **AND** the navigation indicates Clientes as the active view
+
+#### Scenario: Revisar Pedidos is a navigation destination
+- **WHEN** the manager selects the Revisar Pedidos link
+- **THEN** the read-only view of the bloque's orders grouped by client is shown
+- **AND** the navigation indicates Revisar Pedidos as the active view
+
 ### Requirement: Customer order form excludes back-office navigation
 The persistent back-office navigation SHALL NOT appear on the customer-facing order form.
 
 #### Scenario: Order form has no back-office navigation
 - **WHEN** a customer opens their order form via a link
 - **THEN** the back-office navigation is not shown
+
