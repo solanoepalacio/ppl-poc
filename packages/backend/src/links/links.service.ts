@@ -40,4 +40,46 @@ export class LinksService {
       slotSeq: slot.seq,
     };
   }
+
+  /**
+   * The link to send an agent-driven customer: the one they already have if it
+   * is still good, a new one otherwise.
+   *
+   * Deliberately **not** what `createLink` does. The manager pressing *Generar
+   * link* means "make me a link" and gets one every time; a customer sending a
+   * second message means nothing of the sort. Without this, "hola" / "quiero
+   * pedir" / "?" leaves the bakery three pending orders for one customer and
+   * three tokens that each still work.
+   *
+   * "Still good" is the same condition the token guard uses: unconsumed, in the
+   * bloque that is open now. A link from a closed bloque no longer resolves, so
+   * it is not reused.
+   */
+  async linkForAgent(
+    clientId: string,
+  ): Promise<CreateLinkResponse & { reused: boolean }> {
+    await this.clientsService.assertActive(clientId);
+    const slot = await this.slotsService.getOpenSlot();
+
+    const existing = await this.prisma.order.findFirst({
+      where: { clientId, slotId: slot.id, consumedAt: null },
+      orderBy: { createdAt: 'asc' },
+      include: { client: true },
+    });
+
+    if (existing) {
+      const base = process.env.FRONTEND_BASE_URL ?? 'http://localhost:3001';
+      return {
+        orderId: existing.id,
+        clientId: existing.clientId,
+        clientName: existing.client.name,
+        token: existing.token,
+        url: `${base.replace(/\/$/, '')}/order/${existing.token}`,
+        slotSeq: slot.seq,
+        reused: true,
+      };
+    }
+
+    return { ...(await this.createLink(clientId)), reused: false };
+  }
 }

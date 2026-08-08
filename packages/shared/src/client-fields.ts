@@ -18,22 +18,35 @@ export function slugifyClientName(name: string): string {
 }
 
 /**
- * Reduces a phone number to its digits, so one number is one stored value
- * however it was typed — `+54 381 555-1234`, `(0381) 5551234` and `543815551234`
- * all become the same string. That is what makes the uniqueness constraint mean
- * anything, and what lets an inbound WhatsApp `wa_id` be matched directly.
+ * Reduces a phone number to the canonical form both sides of a WhatsApp match are
+ * compared in: digits only, with the Argentine mobile `9` removed.
+ *
+ * Digits only means `+54 9 381 555-1234`, `(0381) 15 555-1234` and
+ * `5493815551234` stop being three different strings. The `9` has to go too
+ * because it is the one digit the two sides genuinely disagree about: a number is
+ * dialled as `+54 9 381 …` but WhatsApp reports the sender's `wa_id` as
+ * `54 381 …`, and comparing those would never match. Dropping it on both sides
+ * makes the comparison a comparison rather than an interpretation.
+ *
+ * This is the form that gets **stored**, so a client's number is unique per real
+ * number rather than per way of writing it. Storing what was typed and
+ * canonicalizing only at match time would let the same number be entered twice in
+ * two styles, as two clients, and an inbound message would then match both.
  *
  * Returns `null` for absent, blank or digitless input: "no phone" is a real
  * state, and any number of clients may be in it.
  *
- * Deliberately not full E.164 — nothing here invents a country code it was not
- * given. Whether stored numbers must carry one is a decision for the change that
- * introduces the WhatsApp agent, which will have real payloads to match against.
+ * Argentina-specific on purpose. The bakery's customers are all local, and a
+ * general rule would have to encode every country's mobile conventions to buy
+ * nothing today. If that changes, this is the one place to widen.
  */
 export function normalizeClientPhone(
   phone: string | null | undefined,
 ): string | null {
   if (phone === null || phone === undefined) return null;
   const digits = phone.replace(/\D/g, '');
-  return digits === '' ? null : digits;
+  if (digits === '') return null;
+  // `54` + `9` + area + line → `54` + area + line. Guarded on the country code so
+  // a number from anywhere else that happens to start `…9…` is left alone.
+  return digits.startsWith('549') ? '54' + digits.slice(3) : digits;
 }

@@ -3,7 +3,12 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  // `rawBody` keeps the exact bytes of each request body alongside the parsed
+  // one. The WhatsApp webhook needs them: Meta's signature is an HMAC over what
+  // was actually sent, and verifying it against a re-serialised payload proves
+  // only that we can re-serialise — any difference in key order or whitespace
+  // changes the digest.
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   // Browser traffic reaches the backend through the Next.js proxy
   // (same-origin), so cross-origin CORS is normally unnecessary. Only enable it

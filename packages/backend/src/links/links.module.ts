@@ -8,5 +8,6 @@ import { ClientsModule } from '../clients/clients.module';
   imports: [SlotsModule, ClientsModule],
   controllers: [LinksController],
   providers: [LinksService],
+  exports: [LinksService],
 })
 export class LinksModule {}

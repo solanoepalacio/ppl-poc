@@ -39,9 +39,17 @@ export async function middleware(req: NextRequest) {
  * source and the optimizer gets a redirect to the login page instead of an image
  * and answers 400 — so the customer order page, which needs no session at all,
  * renders with a broken logo.
+ *
+ * `api/whatsapp/webhook` is excluded because Meta calls it, and Meta has no
+ * session. Gated, it would answer 401 to every delivery — which Meta reads as a
+ * failure and retries for up to seven days, so the symptom would be silence plus
+ * a queue rather than an error anyone sees. Excluding it here does not leave it
+ * open: the backend rejects any delivery whose `X-Hub-Signature-256` does not
+ * verify against the app secret, which is a stronger check than the session
+ * cookie would have been.
  */
 export const config = {
   matcher: [
-    '/((?!login|order/|api/orders/by-token/|_next/static|_next/image|pannico-wordmark\\.png|favicon\\.ico).*)',
+    '/((?!login|order/|api/orders/by-token/|api/whatsapp/webhook|_next/static|_next/image|pannico-wordmark\\.png|favicon\\.ico).*)',
   ],
 };
