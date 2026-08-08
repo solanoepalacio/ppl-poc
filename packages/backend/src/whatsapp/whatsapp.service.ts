@@ -1,0 +1,221 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { createHmac, timingSafeEqual } from 'node:crypto';
+import { normalizeClientPhone } from '@pannico/shared';
+import { PrismaService } from '../prisma/prisma.service';
+import { LinksService } from '../links/links.service';
+import { WhatsappConfigService } from './whatsapp.config';
+
+/**
+ * Several messages from one sender inside this window are answered once. Long
+ * enough to absorb "hola" / "quiero pedir" / "?" typed in a row, short enough
+ * that a customer who comes back later is not ignored.
+ */
+const SUPPRESSION_MS = 90_000;
+
+/** The minimum shape we read out of a delivery; Meta sends a great deal more. */
+type InboundMessage = { wamid: string; from: string };
+
+/** What acting on a delivery did, for the log and for the tests. */
+export type InboundOutcome =
+  | { kind: 'ignored'; reason: string }
+  | { kind: 'suppressed' }
+  | { kind: 'unknown-sender' }
+  | { kind: 'replied'; clientName: string; reused: boolean };
+
+@Injectable()
+export class WhatsappService {
+  private readonly logger = new Logger('WhatsappAgent');
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: WhatsappConfigService,
+    private readonly links: LinksService,
+  ) {}
+
+  /**
+   * Verifies Meta's signature over the **raw** body.
+   *
+   * The raw bytes matter: a signature checked against a re-serialised payload
+   * proves only that we can re-serialise, since any difference in key order or
+   * whitespace changes the digest. Compared in constant time — a fast reject on
+   * the first wrong byte is a way to learn the secret one byte at a time.
+   */
+  verifySignature(rawBody: Buffer, header: string | undefined): boolean {
+    if (!header?.startsWith('sha256=')) return false;
+    const expected = createHmac('sha256', this.config.require().appSecret)
+      .update(rawBody)
+      .digest();
+    let given: Buffer;
+    try {
+      given = Buffer.from(header.slice('sha256='.length), 'hex');
+    } catch {
+      return false;
+    }
+    // timingSafeEqual throws on a length mismatch, which is itself a leak-free
+    // reject — but it has to be caught rather than thrown at the caller.
+    return given.length === expected.length && timingSafeEqual(given, expected);
+  }
+
+  /** Echoes the challenge only when the verify token is the configured one. */
+  verifyChallenge(mode?: string, token?: string, challenge?: string): string | null {
+    if (mode !== 'subscribe' || !challenge) return null;
+    const expected = this.config.require().verifyToken;
+    return token === expected ? challenge : null;
+  }
+
+  /**
+   * Pulls the inbound messages out of a delivery, ignoring everything else.
+   *
+   * A delivery carries `messages` (what a customer sent) or `statuses` (what
+   * became of a message *we* sent) on the same webhook. Reading a status as an
+   * inbound message is the loop where every reply provokes another reply.
+   */
+  extractMessages(payload: unknown): InboundMessage[] {
+    const out: InboundMessage[] = [];
+    const entries = (payload as { entry?: unknown[] })?.entry;
+    if (!Array.isArray(entries)) return out;
+    for (const entry of entries) {
+      const changes = (entry as { changes?: unknown[] })?.changes;
+      if (!Array.isArray(changes)) continue;
+      for (const change of changes) {
+        const value = (change as { value?: Record<string, unknown> })?.value;
+        // `statuses` present means this is about our own messages: skip it
+        // outright rather than hoping `messages` is absent.
+        if (!value || Array.isArray(value.statuses)) continue;
+        const messages = value.messages;
+        if (!Array.isArray(messages)) continue;
+        for (const m of messages) {
+          const { id, from } = (m ?? {}) as { id?: string; from?: string };
+          if (typeof id === 'string' && typeof from === 'string') {
+            out.push({ wamid: id, from });
+          }
+        }
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Acts on one inbound message.
+   *
+   * Never throws: the caller must acknowledge the delivery whatever happens, and
+   * a rejection would only make Meta redeliver the same message for a week.
+   */
+  async handleMessage(message: InboundMessage): Promise<InboundOutcome> {
+    const { wamid, from } = message;
+    // The sender's canonical identity — and what everything downstream uses,
+    // replies included.
+    //
+    // Replying to the raw `from` looks more correct (it is the id the platform
+    // reported) but fails for Argentine numbers: the platform reports the sender
+    // *with* the mobile `9` and keeps its recipient allow-list *without* it, so a
+    // reply addressed to the raw value is rejected as a recipient that is not on
+    // the list. Meta's own console sends to the form without the 9. Observed
+    // against a real number: `5493814493148` inbound, `543814493148` accepted.
+    const sender = normalizeClientPhone(from) ?? from;
+
+    // Claim the message before doing anything. The primary key is what makes a
+    // redelivery — or two deliveries racing — a no-op rather than a second link.
+    try {
+      await this.prisma.whatsappInbound.create({ data: { wamid, from: sender } });
+    } catch {
+      return { kind: 'ignored', reason: 'ya procesado' };
+    }
+
+    if (await this.recentlyReplied(sender)) {
+      return { kind: 'suppressed' };
+    }
+
+    const client = await this.prisma.client.findFirst({
+      where: { phone: sender, active: true },
+      select: { id: true, name: true },
+    });
+
+    if (!client) {
+      if (await this.send(sender, UNKNOWN_SENDER_TEXT)) await this.markReplied(wamid);
+      return { kind: 'unknown-sender' };
+    }
+
+    const { url, reused } = await this.links.linkForAgent(client.id);
+    // Only a reply that actually went out marks the message replied. A failed
+    // send that counted would suppress the customer's next message too, turning
+    // one lost reply into silence for the whole window — exactly when they are
+    // most likely to try again.
+    if (await this.send(sender, orderText(client.name, url))) {
+      await this.markReplied(wamid);
+    }
+    return { kind: 'replied', clientName: client.name, reused };
+  }
+
+  /** True when this sender was answered inside the window. Keyed on the canonical
+   * identity, so the same person reaching us in two shapes is still one sender. */
+  private async recentlyReplied(from: string): Promise<boolean> {
+    const since = new Date(Date.now() - SUPPRESSION_MS);
+    const recent = await this.prisma.whatsappInbound.findFirst({
+      where: { from, replied: true, receivedAt: { gte: since } },
+      select: { wamid: true },
+    });
+    return recent !== null;
+  }
+
+  private async markReplied(wamid: string): Promise<void> {
+    await this.prisma.whatsappInbound.update({
+      where: { wamid },
+      data: { replied: true },
+    });
+  }
+
+  /**
+   * Sends a free-form text reply.
+   *
+   * Free-form rather than a template because the customer messaged first, which
+   * opens the 24-hour service window: inside it this needs no approval and costs
+   * nothing.
+   *
+   * Best-effort by design. A failure here must not undo the order that was just
+   * created — the link still works and the manager can share it by hand — so it
+   * is logged and swallowed. Reports whether it went out, which is what decides
+   * if the message counts as replied.
+   */
+  private async send(to: string, body: string): Promise<boolean> {
+    const { graphBaseUrl, phoneNumberId, accessToken } = this.config.require();
+    try {
+      const res = await fetch(`${graphBaseUrl}/${phoneNumberId}/messages`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          to,
+          type: 'text',
+          text: { body },
+        }),
+      });
+      if (!res.ok) {
+        // Meta's body carries the reason; it holds no credential of ours.
+        this.logger.error(
+          `Reply to ${redact(to)} rejected (${res.status}): ${(await res.text()).slice(0, 300)}`,
+        );
+        return false;
+      }
+      return true;
+    } catch (e) {
+      this.logger.error(
+        `Reply to ${redact(to)} failed: ${e instanceof Error ? e.message : String(e)}`,
+      );
+      return false;
+    }
+  }
+}
+
+/** Provisional copy, to be reworded. */
+const UNKNOWN_SENDER_TEXT =
+  'Hola! No tenemos este número registrado. Dejanos tu pedido por acá y una persona lo va a tomar.';
+
+const orderText = (name: string, url: string) =>
+  `Hola ${name}! Hacé tu pedido acá: ${url} — válido para el bloque actual`;
+
+/** Keeps a customer's full number out of the logs. */
+const redact = (phone: string) => `…${phone.slice(-4)}`;

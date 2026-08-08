@@ -158,3 +158,24 @@ model SlotProduced {
   @@index([slotId])
   @@index([slotId, productId])
 }
+
+/// One inbound WhatsApp message the agent has already acted on, keyed by the id
+/// Meta assigns it (`wamid`). Persisted rather than kept in memory for two
+/// reasons: Meta retries a delivery until it is acknowledged — for up to seven
+/// days — so a retry can easily arrive after a restart, and in-memory state stops
+/// working the moment there is more than one process.
+///
+/// `from` and `receivedAt` are what the suppression window reads: several
+/// messages from one sender in quick succession should produce one reply, not
+/// one each. `from` holds the sender's **canonical** number, not the raw one the
+/// platform reported, so one person cannot count as two senders because their
+/// number arrived in two shapes. `replied` records whether a reply actually went
+/// out, so a send that failed does not look like one that succeeded.
+model WhatsappInbound {
+  wamid      String   @id
+  from       String
+  receivedAt DateTime @default(now())
+  replied    Boolean  @default(false)
+
+  @@index([from, receivedAt])
+}
