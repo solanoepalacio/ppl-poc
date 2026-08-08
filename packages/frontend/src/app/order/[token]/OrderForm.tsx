@@ -19,7 +19,7 @@ const COPY = {
   confirm: 'Confirmar pedido',
   /** Carries the seconds left, so the pause reads as a wait and not as a dead control. */
   review: (seconds: number) => `Revisar pedido...${seconds}`,
-  reviewNotice: 'Por favor revise su pedido antes de confirmarlo',
+  reviewNotice: 'POR FAVOR REVISE SU PEDIDO ANTES DE CONFIRMARLO',
   busy: 'Enviando…',
   summaryTitle: 'Resumen de su pedido',
   showSummary: 'Ver Pedido',
@@ -32,8 +32,10 @@ const COPY = {
  * enough that the screen cannot be dismissed by a second reflexive tap on a
  * control the finger is already over, short enough not to read as a hang — and
  * counted down on the button itself so the wait is legible rather than inferred.
+ * Three rather than five: the notice is on the summary from the start now, so the
+ * pause is no longer the customer's first warning and has less to buy.
  */
-const REVIEW_PAUSE_SECONDS = 5;
+const REVIEW_PAUSE_SECONDS = 3;
 
 /**
  * Frictionless picklist form: no login, no prices, no payment. The whole
@@ -247,9 +249,9 @@ export function OrderForm({
   // Nothing chosen means nothing to summarise, so the control would open an
   // empty panel; the count already says zero.
   const summaryOpen = showSummary && chosen.length > 0;
-  // Stays up once raised, so it is still on screen for the confirm it is warning
-  // about — not only during the pause.
-  const showNotice = secondsLeft !== null;
+  // Part of the summary, not something the confirm raises: it has to be read
+  // while the order is still being built, not once the customer has decided.
+  const showNotice = summaryOpen;
 
   return (
     <div className="customer-shell">
@@ -303,14 +305,11 @@ export function OrderForm({
       <div className="action-bar">
         {summaryOpen && (
           <section className="order-summary" id="order-summary">
-            {/* Inside the panel on purpose: it makes "the summary is already
-                open, so only the notice appears" fall out of the markup instead
-                of needing a second code path, and collapsing the summary takes
-                the notice with it — it is about the list it sits on. */}
+            {/* No role="alert": it is present from the moment the summary opens,
+                and an alert that was always there is not an alert — it would just
+                be announced on load. The text carries it. */}
             {showNotice && (
-              <p className="order-review-notice" role="alert">
-                {COPY.reviewNotice}
-              </p>
+              <p className="order-review-notice">{COPY.reviewNotice}</p>
             )}
             <h2 className="order-summary-title">{COPY.summaryTitle}</h2>
             <ul className="order-summary-list">

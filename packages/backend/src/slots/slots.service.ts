@@ -156,6 +156,22 @@ export class SlotsService implements OnModuleInit {
       }
       // Read the closing bloque's position before anything changes.
       const { all } = await this.stockOf(slot.id, tx);
+
+      // A shortfall means the bakery owes units it has not baked, and closing
+      // would discard that debt — the work does not disappear because the bloque
+      // did. Rejected here rather than only in the control that offers the close:
+      // a guard one caller applies is not a guard. Before any write, so a refused
+      // close leaves the bloque exactly as it was.
+      const short = all.filter((r) => r.current < 0);
+      if (short.length > 0) {
+        const detail = short
+          .map((r) => `${r.name} (${r.current})`)
+          .join(', ');
+        throw new BadRequestException(
+          `No se puede cerrar el bloque: hay productos con stock actual negativo. Producí lo que falta o corregí el stock inicial. Faltan: ${detail}.`,
+        );
+      }
+
       const closed = await tx.slot.update({
         where: { id },
         data: { status: 'closed', closedAt: new Date() },

@@ -939,16 +939,44 @@ describe('SlotsService', () => {
       });
     });
 
-    it('does not carry a shortfall', async () => {
+    it('refuses to close while a product is in shortfall', async () => {
       readyToClose();
       prisma.orderItem.findMany.mockResolvedValue([
         { productId: 'p1', quantity: 50, product: { name: 'Debiendo' } },
       ]);
 
-      await service.closeSlot('slot_open');
+      await expect(service.closeSlot('slot_open')).rejects.toThrow(
+        BadRequestException,
+      );
 
-      // Nothing positive to carry, so no rows are written at all.
+      // Refused before any write: the bloque stays open and no successor is
+      // created. A rejection that has already closed the bloque is not one.
+      expect(prisma.slot.update).not.toHaveBeenCalled();
+      expect(prisma.slot.create).not.toHaveBeenCalled();
       expect(prisma.slotExistence.createMany).not.toHaveBeenCalled();
+    });
+
+    it('names the short products in the refusal', async () => {
+      readyToClose();
+      prisma.orderItem.findMany.mockResolvedValue([
+        { productId: 'p1', quantity: 50, product: { name: 'Debiendo' } },
+      ]);
+
+      // A caller that never saw the preview still learns what to do about it.
+      await expect(service.closeSlot('slot_open')).rejects.toThrow(/Debiendo/);
+    });
+
+    it('closes once the shortfall has been produced', async () => {
+      readyToClose();
+      prisma.orderItem.findMany.mockResolvedValue([
+        { productId: 'p1', quantity: 50, product: { name: 'Debiendo' } },
+      ]);
+      prisma.slotProduced.groupBy.mockResolvedValue([
+        { productId: 'p1', _sum: { quantity: 50 } },
+      ]);
+
+      await expect(service.closeSlot('slot_open')).resolves.toBeDefined();
+      expect(prisma.slot.create).toHaveBeenCalled();
     });
 
     it('does not carry a product that nets to exactly zero', async () => {

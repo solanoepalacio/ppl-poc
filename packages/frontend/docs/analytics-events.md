@@ -65,16 +65,18 @@ gate — the measure of whether the pause does what it was added to do.
 
 | Event | When it fires | Properties | Source |
 |-------|---------------|------------|--------|
-| `slot_close_shortfall_shown` | Closing is blocked by the warning: products have a negative stock actual | `shortfallCount`, `totalShortfall` | `(backoffice)/orders/CloseSlotButton.tsx` |
-| `slot_close_cancelled` | Manager backs out of the close after seeing the warning | `shortfallCount`, `totalShortfall` | `(backoffice)/orders/CloseSlotButton.tsx` |
-| `slot_closed` | A bloque is closed and its successor opened | `hadShortfall`, `shortfallCount`, `totalShortfall` | `(backoffice)/orders/CloseSlotButton.tsx` |
+| `slot_close_blocked` | A close is refused because products have a negative stock actual | `shortfallCount`, `totalShortfall` | `(backoffice)/orders/CloseSlotButton.tsx` |
+| `slot_closed` | A bloque is closed and its successor opened | — | `(backoffice)/orders/CloseSlotButton.tsx` |
 | `stock_saved` | Manager saves the bloque's stock inicial | `productCount`, `totalQuantity`, `shortfallCount` | `(backoffice)/orders/ExistenceEditor.tsx` |
 | `produced_saved` | Manager saves producción real | `productCount`, `entryCount`, `totalQuantity`, `added`, `removed` | `(backoffice)/orders/ProducedEditor.tsx` |
 
-Closing a bloque discards any negative stock actual, which is the only
-irreversible data loss in the app. The three `slot_close*` events are what make
-that visible: `shown` against `cancelled` says whether the warning changes
-anybody's mind, and `slot_closed{hadShortfall:true}` counts the times it didn't.
+A bloque with a negative stock actual can no longer be closed, so what is worth
+measuring changed with it. `slot_close_blocked` counts how often that refusal
+stops a close and how deep the hole was — the signal being whether the rule is a
+rare safety net or a daily obstruction. It has no counterpart event: dismissing
+the dialog is the only thing left to do, so a second one would just mirror it.
+`slot_closed` carries no shortfall properties because a close that succeeds has
+none by construction.
 On `produced_saved`, `added`/`removed` track entries appended and deleted per
 save — the save is deliberately non-idempotent, so a duplicated batch followed
 by a deletion is a real pattern worth seeing.

@@ -24,8 +24,7 @@ export type AnalyticsEvent =
   | 'order_items_edited'
   | 'order_deleted'
   // Back office — bloque
-  | 'slot_close_shortfall_shown'
-  | 'slot_close_cancelled'
+  | 'slot_close_blocked'
   | 'slot_closed'
   | 'stock_saved'
   | 'produced_saved'

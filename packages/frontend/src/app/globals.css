@@ -541,22 +541,25 @@ select {
   padding-bottom: 0.25rem;
   border-bottom: 1px solid var(--line);
 }
-/* The review notice, raised by the first Confirmar pedido. Amber marks it as the
-   one thing on the panel that is not a reading of the order but an instruction
-   about it. The amber is the border and the tint only — at 4.6:1 on white it is
-   not AA as text — so the sentence itself is body ink on the tint, which clears
-   AA comfortably. It is a sentence either way: nothing here is carried by colour
-   alone. */
+/* The review notice, sitting on the summary from the moment it opens. Given the
+   header's treatment rather than its own so the two read as the same kind of
+   instruction — a statement about how ordering works, not a passing alert. Red is
+   the border and the text; the tint stays white behind it, which is where that
+   red has the most contrast to give. */
 .order-review-notice {
   flex-shrink: 0;
   margin: 0 0 0.55rem;
-  padding: 0.5rem 0.7rem;
-  border-left: 3px solid var(--brand-amber);
-  border-radius: 0 var(--radius) var(--radius) 0;
-  background: #fdf6e6;
-  color: var(--ink);
-  font-weight: 600;
+  padding: 0.45rem 0.7rem;
+  border: 1.5px solid #ff4d11;
+  border-radius: 10px;
+  background: #fff;
+  color: #ff4d11;
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
   line-height: 1.35;
+  text-align: center;
 }
 .order-summary-title {
   flex-shrink: 0;

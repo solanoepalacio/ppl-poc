@@ -1,7 +1,6 @@
 import type { SlotViewOrder } from '@pannico/shared';
 import { getOrdersBySlot, getProducts, getSlots } from '@/lib/api';
 import { AutoRefresh } from '../AutoRefresh';
-import { AutoScroll } from '../AutoScroll';
 import { SlotPicker } from '../SlotPicker';
 import { ViewHeader } from '../ViewHeader';
 
@@ -84,10 +83,12 @@ function groupByClient(
  * with a dozen products costs four lines instead of twelve and the next client
  * still fits above the fold.
  *
- * Unattended, like the production views: <AutoRefresh /> re-reads the bloque so a
- * screen on the wall is never showing the orders as they stood when someone
- * happened to open it, and <AutoScroll /> cycles the list when there are more
- * clients than fit, so the ones at the bottom are not permanently unread.
+ * <AutoRefresh /> re-reads the bloque so a screen on the wall is never showing
+ * the orders as they stood when someone happened to open it.
+ *
+ * Deliberately **not** auto-scrolled, unlike the production views. This one is
+ * looked *up* in: someone is reading a particular client's row, and a page that
+ * moves under them costs more than reaching the bottom of a long list by hand.
  */
 export default async function RevisarPedidosPage({
   searchParams,
@@ -110,7 +111,6 @@ export default async function RevisarPedidosPage({
   return (
     <>
       <AutoRefresh />
-      <AutoScroll />
       <ViewHeader
         title="Revisar pedidos"
         modifier="bo-header--review"

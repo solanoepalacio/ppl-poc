@@ -1,29 +1,24 @@
 'use client';
 
-import { useRef, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import type { SlotShortfallItem } from '@pannico/shared';
 import { closeCurrentSlot, getCloseSlotPreview } from '@/lib/api';
 import { trackEvent } from '@/lib/analytics';
 import { Modal } from './Modal';
 
-/** The shape every shortfall event carries, so the three read the same way. */
-function shortfallProps(list: SlotShortfallItem[]) {
-  return {
-    shortfallCount: list.length,
-    totalShortfall: list.reduce((n, s) => n + s.shortfall, 0),
-  };
-}
-
 /**
  * Closes the current open bloque, which atomically opens a fresh one and carries
  * each product's stock actual forward as the new bloque's stock inicial.
  *
- * A stock actual below zero cannot carry — a stock inicial is a counted quantity
- * and never negative — so closing discards it. That is a real loss, so the button
- * asks the backend first and, when anything is short, shows what is about to be
- * dropped and makes the manager choose. With nothing short it keeps the plain
- * confirm it always had.
+ * A bloque with any product in shortfall **cannot** be closed: the shortfall is
+ * work the bakery owes, and closing would discard it. The button asks the backend
+ * first and, when anything is short, shows what is blocking the close instead of
+ * offering to proceed. With nothing short it keeps the plain confirm it always
+ * had.
+ *
+ * The preview is the fast path, not the guard — the backend refuses either way,
+ * which is what covers an order landing between the preview and the close.
  *
  * Grayed out and unclickable via `disabled` when the selected bloque is not the
  * open one.
@@ -34,29 +29,15 @@ export function CloseSlotButton({ disabled }: { disabled?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   const [shortfalls, setShortfalls] = useState<SlotShortfallItem[] | null>(null);
-  /**
-   * The shortfall prompt still awaiting a decision, mirrored out of state so the
-   * analytics stay one-per-prompt. The outcome is reported from three entry
-   * points — "Cerrar igual", "Cancelar", and the dialog's own onClose (ESC and
-   * backdrop) — and whichever runs first clears this, so the others find nothing
-   * left to report. Only a successful close consumes it, so a failed attempt the
-   * manager retries still knows what is on screen.
-   */
-  const prompt = useRef<SlotShortfallItem[] | null>(null);
 
   async function close() {
     setError(false);
     setBusy(true);
-    const discarding = prompt.current ?? [];
     try {
       await closeCurrentSlot();
-      prompt.current = null;
-      trackEvent('slot_closed', {
-        // The bloques that cost something are the ones closed over a warning;
-        // the flag is what separates them without joining across events.
-        hadShortfall: discarding.length > 0,
-        ...shortfallProps(discarding),
-      });
+      // No shortfall properties on this one: a close that succeeds now has none
+      // by construction, since the backend refuses any bloque that does.
+      trackEvent('slot_closed', {});
       setShortfalls(null);
       startTransition(() => router.refresh());
     } catch {
@@ -64,16 +45,6 @@ export function CloseSlotButton({ disabled }: { disabled?: boolean }) {
     } finally {
       setBusy(false);
     }
-  }
-
-  /** Dismisses the prompt without closing: the warning changed the manager's mind. */
-  function cancel() {
-    const pending = prompt.current;
-    prompt.current = null;
-    if (pending !== null) {
-      trackEvent('slot_close_cancelled', shortfallProps(pending));
-    }
-    setShortfalls(null);
   }
 
   async function start() {
@@ -90,10 +61,14 @@ export function CloseSlotButton({ disabled }: { disabled?: boolean }) {
     setBusy(false);
 
     if (short.length > 0) {
-      // Hand the decision to the manager rather than dropping the shortfall
-      // behind a generic confirm.
-      prompt.current = short;
-      trackEvent('slot_close_shortfall_shown', shortfallProps(short));
+      // Nothing to decide: the close is refused. The dialog exists to say which
+      // products are holding it up. Reported because how often the refusal fires,
+      // and how deep the hole is, is the one thing worth knowing about it — and
+      // it is the only outcome left, so there is no second event to pair it with.
+      trackEvent('slot_close_blocked', {
+        shortfallCount: short.length,
+        totalShortfall: short.reduce((n, s) => n + s.shortfall, 0),
+      });
       setShortfalls(short);
       return;
     }
@@ -121,33 +96,25 @@ export function CloseSlotButton({ disabled }: { disabled?: boolean }) {
 
       <Modal
         open={shortfalls !== null}
-        onClose={cancel}
-        title="Hay productos con faltante"
+        onClose={() => setShortfalls(null)}
+        title="No se puede cerrar el bloque"
         footer={
-          <>
-            <button
-              className="btn-modal-secondary"
-              onClick={cancel}
-              disabled={busy}
-            >
-              Cancelar
-            </button>
-            <button
-              className="btn-modal-primary"
-              onClick={() => void close()}
-              disabled={busy}
-            >
-              Cerrar igual
-            </button>
-          </>
+          <button
+            className="btn-modal-primary"
+            onClick={() => setShortfalls(null)}
+            disabled={busy}
+          >
+            Entendido
+          </button>
         }
       >
         <div className="close-warning">
           <p className="muted">
             Estos productos tienen stock actual negativo: se pidió más de lo que
-            hay. Al cerrar, ese faltante <strong>se descarta</strong> — no pasa
-            como stock inicial al bloque nuevo, porque el stock inicial no puede
-            ser negativo.
+            hay. El bloque <strong>no se puede cerrar</strong> hasta que dejen de
+            estarlo — ese faltante es trabajo pendiente y cerrar lo descartaría.
+            Registrá la producción que falta, o corregí el stock inicial si el
+            faltante es un error de conteo.
           </p>
           <ul className="close-warning-list">
             {(shortfalls ?? []).map((s) => (
