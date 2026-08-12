@@ -179,3 +179,19 @@ model WhatsappInbound {
 
   @@index([from, receivedAt])
 }
+
+/// A conversation the agent has handed over to a person, keyed by the customer's
+/// canonical number. While a row's `expiresAt` is in the future the agent stays
+/// out of that conversation entirely.
+///
+/// `expiresAt` is a deadline of **inactivity**, pushed forward by every further
+/// message from that customer, not a fixed span from when the handover began. A
+/// conversation with a person outlasts any span worth hard-coding, and one that
+/// ended on a clock would have the agent start answering in the middle of it.
+model WhatsappHandoff {
+  sender    String   @id
+  startedAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}

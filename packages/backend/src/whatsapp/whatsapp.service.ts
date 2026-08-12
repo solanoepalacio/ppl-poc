@@ -12,13 +12,30 @@ import { WhatsappConfigService } from './whatsapp.config';
  */
 const SUPPRESSION_MS = 90_000;
 
+/**
+ * How long a handover to a person survives **without the customer writing**. Not
+ * a span from when it began: every further message pushes it forward, because a
+ * conversation with a person outlasts anything worth hard-coding here and one
+ * that ended on a clock would have the agent start answering in the middle of it.
+ * Silence is what says the conversation is over.
+ *
+ * Three minutes is a testing value; the real one is longer, and raising it costs
+ * nothing but a longer tail of silence after a conversation ends.
+ */
+const HANDOFF_IDLE_MS = 3 * 60_000;
+
+/** The reply choices the link message offers, by the id they come back as. */
+const BUTTON = { advisor: 'hablar_asesor', orderSent: 'pedido_enviado' } as const;
+
 /** The minimum shape we read out of a delivery; Meta sends a great deal more. */
-type InboundMessage = { wamid: string; from: string };
+type InboundMessage = { wamid: string; from: string; buttonId?: string };
 
 /** What acting on a delivery did, for the log and for the tests. */
 export type InboundOutcome =
   | { kind: 'ignored'; reason: string }
   | { kind: 'suppressed' }
+  | { kind: 'handed-over'; extended: boolean }
+  | { kind: 'order-sent' }
   | { kind: 'unknown-sender' }
   | { kind: 'replied'; clientName: string; reused: boolean };
 
@@ -85,9 +102,21 @@ export class WhatsappService {
         const messages = value.messages;
         if (!Array.isArray(messages)) continue;
         for (const m of messages) {
-          const { id, from } = (m ?? {}) as { id?: string; from?: string };
+          const msg = (m ?? {}) as {
+            id?: string;
+            from?: string;
+            interactive?: { button_reply?: { id?: string } };
+          };
+          const { id, from } = msg;
           if (typeof id === 'string' && typeof from === 'string') {
-            out.push({ wamid: id, from });
+            // A tapped choice arrives as an interactive message rather than
+            // text, carrying the id we gave the button.
+            const buttonId = msg.interactive?.button_reply?.id;
+            out.push({
+              wamid: id,
+              from,
+              ...(typeof buttonId === 'string' ? { buttonId } : {}),
+            });
           }
         }
       }
@@ -122,6 +151,27 @@ export class WhatsappService {
       return { kind: 'ignored', reason: 'ya procesado' };
     }
 
+    // Checked before anything else the agent might say. While a person has the
+    // conversation, every message from this customer does exactly one thing:
+    // push the handover further out. Nothing is sent, nothing is created.
+    if (await this.extendHandoffIfActive(sender)) {
+      return { kind: 'handed-over', extended: true };
+    }
+
+    if (message.buttonId === BUTTON.advisor) {
+      await this.startHandoff(sender);
+      // The acknowledgement is the last thing the agent says. Without it the
+      // customer cannot tell being handed over from not having been heard.
+      if (await this.send(sender, ADVISOR_ACK_TEXT)) await this.markReplied(wamid);
+      return { kind: 'handed-over', extended: false };
+    }
+
+    if (message.buttonId === BUTTON.orderSent) {
+      // Doing nothing is implemented rather than assumed: left to fall through,
+      // this would be answered with another link, which is the opposite.
+      return { kind: 'order-sent' };
+    }
+
     if (await this.recentlyReplied(sender)) {
       return { kind: 'suppressed' };
     }
@@ -141,10 +191,40 @@ export class WhatsappService {
     // send that counted would suppress the customer's next message too, turning
     // one lost reply into silence for the whole window — exactly when they are
     // most likely to try again.
-    if (await this.send(sender, orderText(client.name, url))) {
+    if (await this.sendWithChoices(sender, orderText(client.name, url))) {
       await this.markReplied(wamid);
     }
     return { kind: 'replied', clientName: client.name, reused };
+  }
+
+  /**
+   * Pushes an active handover forward and reports whether there was one.
+   *
+   * The deadline is recomputed from *now* rather than added to what was there,
+   * so the handover always outlives the conversation by the same idle period
+   * however long the conversation runs.
+   */
+  private async extendHandoffIfActive(sender: string): Promise<boolean> {
+    const active = await this.prisma.whatsappHandoff.findFirst({
+      where: { sender, expiresAt: { gt: new Date() } },
+      select: { sender: true },
+    });
+    if (!active) return false;
+    await this.prisma.whatsappHandoff.update({
+      where: { sender },
+      data: { expiresAt: new Date(Date.now() + HANDOFF_IDLE_MS) },
+    });
+    return true;
+  }
+
+  /** Starts or restarts a handover. An expired row is reused rather than left. */
+  private async startHandoff(sender: string): Promise<void> {
+    const expiresAt = new Date(Date.now() + HANDOFF_IDLE_MS);
+    await this.prisma.whatsappHandoff.upsert({
+      where: { sender },
+      create: { sender, expiresAt },
+      update: { expiresAt, startedAt: new Date() },
+    });
   }
 
   /** True when this sender was answered inside the window. Keyed on the canonical
@@ -178,6 +258,32 @@ export class WhatsappService {
    * if the message counts as replied.
    */
   private async send(to: string, body: string): Promise<boolean> {
+    return this.post(to, { type: 'text', text: { body } });
+  }
+
+  /**
+   * The link message, with the two choices the customer can tap.
+   *
+   * The link itself stays in the body: a reply choice returns an id, it does not
+   * open a URL, so the two cannot be the same control.
+   */
+  private async sendWithChoices(to: string, body: string): Promise<boolean> {
+    return this.post(to, {
+      type: 'interactive',
+      interactive: {
+        type: 'button',
+        body: { text: body },
+        action: {
+          buttons: [
+            { type: 'reply', reply: { id: BUTTON.advisor, title: 'Hablar con un asesor' } },
+            { type: 'reply', reply: { id: BUTTON.orderSent, title: 'Pedido enviado' } },
+          ],
+        },
+      },
+    });
+  }
+
+  private async post(to: string, payload: Record<string, unknown>): Promise<boolean> {
     const { graphBaseUrl, phoneNumberId, accessToken } = this.config.require();
     try {
       const res = await fetch(`${graphBaseUrl}/${phoneNumberId}/messages`, {
@@ -186,12 +292,7 @@ export class WhatsappService {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          to,
-          type: 'text',
-          text: { body },
-        }),
+        body: JSON.stringify({ messaging_product: 'whatsapp', to, ...payload }),
       });
       if (!res.ok) {
         // Meta's body carries the reason; it holds no credential of ours.
@@ -209,6 +310,10 @@ export class WhatsappService {
     }
   }
 }
+
+/** Provisional copy, to be reworded. */
+const ADVISOR_ACK_TEXT =
+  'Listo, una persona te responderá en un momento. Gracias';
 
 /** Provisional copy, to be reworded. */
 const UNKNOWN_SENDER_TEXT =

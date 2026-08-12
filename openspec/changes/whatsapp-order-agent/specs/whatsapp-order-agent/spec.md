@@ -63,6 +63,73 @@ exceptional, and without this each retry would be another link.
 - **THEN** the endpoint still acknowledges it successfully
 - **AND** Meta is not made to retry it
 
+### Requirement: The reply offers a way out to a person
+The reply carrying the order link SHALL also offer the customer two choices: to
+**speak to a person**, and to say their **order has been sent**. A customer who
+does not want to deal with a form has to be able to say so without knowing a
+magic word, and guessing that intent from free text is a worse bet than asking.
+
+The link SHALL stay in the body of the message. A reply choice returns an
+identifier, it does not open a URL, so the two cannot be the same control.
+
+Choosing *order sent* SHALL do nothing beyond being accepted: no reply, and
+nothing created. Doing nothing has to be implemented rather than assumed — left
+to fall through, the choice would be answered with another link, which is the
+opposite of nothing.
+
+#### Scenario: The link message offers both choices
+- **WHEN** the agent replies to a known sender
+- **THEN** the message contains the order link
+- **AND** offers a choice to speak to a person and a choice to say the order was sent
+
+#### Scenario: Saying the order was sent is answered with silence
+- **WHEN** the customer chooses that their order has been sent
+- **THEN** no reply is sent
+- **AND** no order or link is created
+
+### Requirement: Asking for a person hands the conversation over
+When the customer chooses to speak to a person, the agent SHALL acknowledge it
+once and then stay out of the conversation, so whoever takes it over is not
+talking over a bot.
+
+The acknowledgement SHALL be the last thing the agent says. It exists because the
+alternative is silence the customer cannot distinguish from not having been heard.
+
+For as long as the handover holds, the agent SHALL ignore everything from that
+customer: no link, no courtesy reply, nothing. The handover SHALL be scoped to
+that customer alone and SHALL NOT affect anyone else's conversation.
+
+The handover SHALL last for a period of **inactivity**, not a fixed span from
+when it began: every further message from that customer SHALL extend it. A
+conversation with a person runs longer than any span worth hard-coding, and one
+that ends on a clock would have the agent start answering in the middle of it —
+the exact thing the handover exists to prevent. Silence is what says the
+conversation is over.
+
+Once the handover has lapsed, the agent SHALL behave exactly as it did before it:
+the next message is answered with a link as usual.
+
+#### Scenario: Asking for a person is acknowledged once
+- **WHEN** the customer chooses to speak to a person
+- **THEN** the agent replies once saying somebody will answer shortly
+
+#### Scenario: The agent says nothing more while the handover holds
+- **WHEN** the customer sends further messages while the handover holds
+- **THEN** the agent does not reply to any of them
+- **AND** creates no order or link
+
+#### Scenario: Each message extends the handover
+- **WHEN** the customer sends a message while the handover holds
+- **THEN** the handover is extended from that message
+
+#### Scenario: The handover lapses after the customer goes quiet
+- **WHEN** the customer sends nothing for the whole handover period and then writes again
+- **THEN** the agent answers with an order link as it did before
+
+#### Scenario: A handover belongs to one conversation
+- **WHEN** one customer's conversation has been handed over
+- **THEN** another customer writing in is answered normally
+
 ### Requirement: A known sender is answered with their order link
 The system SHALL resolve an inbound message's sender to a client by matching the
 sender's number against the directory, and SHALL reply with a message containing

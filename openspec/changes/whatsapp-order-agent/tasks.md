@@ -74,6 +74,32 @@
   identity; the reply still goes to the raw `wa_id`, which is what the platform
   delivers to.
 
+## 5c. Handing the conversation to a person
+
+- [x] 5.12 The link message becomes interactive: the link stays in the body — a
+  reply choice returns an id, it cannot open a URL — with **Hablar con un asesor**
+  and **Pedido enviado** beside it.
+- [x] 5.13 Read `interactive.button_reply.id` out of the delivery, so a tap is
+  distinguishable from someone typing the same words.
+- [x] 5.14 `WhatsappHandoff`, keyed by the canonical sender, with an `expiresAt`
+  that is an **idle** deadline: every further message recomputes it from *now*.
+  A span fixed at the start would have the agent begin answering in the middle of
+  a conversation with a person, which is the one thing the handover exists to
+  prevent.
+- [x] 5.15 Check the handover **before** anything else the agent might say, so a
+  handed-over conversation costs exactly one write and no reply.
+- [x] 5.16 Acknowledge the handover once, then nothing. Without the
+  acknowledgement the customer cannot tell being handed over from not having been
+  heard.
+- [x] 5.17 Implement *Pedido enviado* doing nothing explicitly. Left to fall
+  through it would be answered with another link.
+- [x] 5.18 Idle window at 3 minutes for testing; raising it costs only a longer
+  tail of silence after a conversation ends.
+- [x] 5.19 Tests: acknowledged once and no link; silence while it holds; extended
+  from the new message; lapsed handovers behave as before; scoped to one sender;
+  *Pedido enviado* answered with silence; and the button id read from a real
+  delivery shape.
+
 ## 6. Verify locally
 
 - [ ] 6.1 Load the real phone numbers into the directory first, **in the form

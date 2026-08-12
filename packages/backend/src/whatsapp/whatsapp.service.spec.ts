@@ -59,6 +59,7 @@ const statusOnly = {
 describe('WhatsappService', () => {
   let prisma: {
     whatsappInbound: { create: jest.Mock; findFirst: jest.Mock; update: jest.Mock };
+    whatsappHandoff: { findFirst: jest.Mock; update: jest.Mock; upsert: jest.Mock };
     client: { findFirst: jest.Mock };
   };
   let links: { linkForAgent: jest.Mock };
@@ -71,6 +72,11 @@ describe('WhatsappService', () => {
         create: jest.fn().mockResolvedValue({}),
         findFirst: jest.fn().mockResolvedValue(null),
         update: jest.fn().mockResolvedValue({}),
+      },
+      whatsappHandoff: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        update: jest.fn().mockResolvedValue({}),
+        upsert: jest.fn().mockResolvedValue({}),
       },
       client: { findFirst: jest.fn().mockResolvedValue(null) },
     };
@@ -132,6 +138,31 @@ describe('WhatsappService', () => {
       ]);
     });
 
+    it('reads which choice was tapped out of an interactive message', () => {
+      const tap = {
+        object: 'whatsapp_business_account',
+        entry: [{ changes: [{ field: 'messages', value: {
+          messaging_product: 'whatsapp',
+          messages: [{
+            id: 'wamid.9', from: '543815551234', type: 'interactive',
+            interactive: {
+              type: 'button_reply',
+              button_reply: { id: 'hablar_asesor', title: 'Hablar con un asesor' },
+            },
+          }],
+        } }] }],
+      };
+      expect(service.extractMessages(tap)).toEqual([
+        { wamid: 'wamid.9', from: '543815551234', buttonId: 'hablar_asesor' },
+      ]);
+    });
+
+    it('leaves the choice absent on a plain text message', () => {
+      expect(
+        service.extractMessages(inbound('wamid.1', '543815551234'))[0],
+      ).not.toHaveProperty('buttonId');
+    });
+
     it('ignores a delivery that carries only status updates', () => {
       // Statuses describe our own replies; reading one as inbound is the loop
       // where each reply provokes another.
@@ -157,9 +188,15 @@ describe('WhatsappService', () => {
       expect(links.linkForAgent).toHaveBeenCalledWith('c1');
       const body = JSON.parse(fetchMock.mock.calls[0][1].body);
       expect(body.to).toBe('543815551234');
-      expect(body.text.body).toContain('https://t.test/order/abc');
-      // Free-form text, not a template: the customer messaged first.
-      expect(body.type).toBe('text');
+      // Interactive rather than plain text: the link comes with the two choices.
+      // Still free-form — the customer messaged first — so no template.
+      expect(body.type).toBe('interactive');
+      expect(body.interactive.body.text).toContain('https://t.test/order/abc');
+      expect(
+        body.interactive.action.buttons.map(
+          (x: { reply: { id: string } }) => x.reply.id,
+        ),
+      ).toEqual(['hablar_asesor', 'pedido_enviado']);
     });
 
     it('matches a sender whose stored number carries the Argentine 9', async () => {
@@ -278,5 +315,87 @@ describe('WhatsappService', () => {
         service.handleMessage({ wamid: 'w1', from: '543815551234' }),
       ).resolves.toMatchObject({ kind: 'replied' });
     });
+  
+  describe('handover to a person', () => {
+    const known = { id: 'c1', name: 'Alo Bar' };
+    const advisor = { wamid: 'w1', from: '543815551234', buttonId: 'hablar_asesor' };
+
+    it('acknowledges once and hands the conversation over', async () => {
+      prisma.client.findFirst.mockResolvedValue(known);
+
+      const out = await service.handleMessage(advisor);
+
+      expect(out).toEqual({ kind: 'handed-over', extended: false });
+      expect(prisma.whatsappHandoff.upsert).toHaveBeenCalled();
+      // The acknowledgement is plain text and the last thing the agent says.
+      const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+      expect(body.type).toBe('text');
+      expect(body.text.body).toMatch(/una persona te responderá/i);
+      // No link: asking for a person is not asking for the form.
+      expect(links.linkForAgent).not.toHaveBeenCalled();
+    });
+
+    it('says nothing at all while the handover holds', async () => {
+      prisma.whatsappHandoff.findFirst.mockResolvedValue({ sender: '543815551234' });
+      prisma.client.findFirst.mockResolvedValue(known);
+
+      const out = await service.handleMessage({ wamid: 'w2', from: '543815551234' });
+
+      expect(out).toEqual({ kind: 'handed-over', extended: true });
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(links.linkForAgent).not.toHaveBeenCalled();
+    });
+
+    it('extends the handover from the new message, not from when it began', async () => {
+      prisma.whatsappHandoff.findFirst.mockResolvedValue({ sender: '543815551234' });
+
+      const before = Date.now();
+      await service.handleMessage({ wamid: 'w2', from: '543815551234' });
+
+      const { expiresAt } = prisma.whatsappHandoff.update.mock.calls[0][0].data;
+      // Recomputed from now, so the handover always outlives the conversation by
+      // the same idle period however long the conversation runs.
+      expect(expiresAt.getTime()).toBeGreaterThanOrEqual(before + 3 * 60_000);
+    });
+
+    it('only treats a handover as active while it has not lapsed', async () => {
+      prisma.whatsappHandoff.findFirst.mockResolvedValue(null);
+      prisma.client.findFirst.mockResolvedValue(known);
+
+      const out = await service.handleMessage({ wamid: 'w3', from: '543815551234' });
+
+      expect(prisma.whatsappHandoff.findFirst.mock.calls[0][0].where.expiresAt).toEqual({
+        gt: expect.any(Date),
+      });
+      // Lapsed, so the agent is back to what it did before.
+      expect(out).toMatchObject({ kind: 'replied' });
+    });
+
+    it('is scoped to one conversation', async () => {
+      prisma.whatsappHandoff.findFirst.mockResolvedValue(null);
+      prisma.client.findFirst.mockResolvedValue(known);
+
+      await service.handleMessage({ wamid: 'w4', from: '543819999999' });
+
+      expect(prisma.whatsappHandoff.findFirst.mock.calls[0][0].where.sender).toBe(
+        '543819999999',
+      );
+    });
+
+    it('answers "pedido enviado" with silence, not another link', async () => {
+      prisma.client.findFirst.mockResolvedValue(known);
+
+      const out = await service.handleMessage({
+        wamid: 'w5',
+        from: '543815551234',
+        buttonId: 'pedido_enviado',
+      });
+
+      expect(out).toEqual({ kind: 'order-sent' });
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(links.linkForAgent).not.toHaveBeenCalled();
+    });
   });
+
+});
 });

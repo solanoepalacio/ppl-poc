@@ -94,12 +94,28 @@ export class WhatsappController {
   }
 }
 
-const describe = (o: Awaited<ReturnType<WhatsappService['handleMessage']>>) => {
+/**
+ * The one-line account of what a delivery did.
+ *
+ * Annotated `: string` on purpose. Left to inference a missing case is a
+ * `undefined` branch rather than an error, which is how a silence the agent is
+ * supposed to explain got logged as `undefined` — the outcome the operator most
+ * needs to read is the one with nothing to show for it.
+ */
+const describe = (
+  o: Awaited<ReturnType<WhatsappService['handleMessage']>>,
+): string => {
   switch (o.kind) {
     case 'ignored':
       return `ignorado (${o.reason})`;
     case 'suppressed':
       return 'suprimido (respuesta reciente al mismo remitente)';
+    case 'handed-over':
+      return o.extended
+        ? 'en manos de una persona, silencio y ventana renovada'
+        : 'pidió un asesor: derivado, ventana abierta';
+    case 'order-sent':
+      return 'avisó que ya envió el pedido, sin respuesta';
     case 'unknown-sender':
       return 'remitente desconocido, respuesta de cortesía';
     case 'replied':
