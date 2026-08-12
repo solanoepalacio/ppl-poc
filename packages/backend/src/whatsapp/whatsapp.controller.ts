@@ -1,16 +1,22 @@
 import {
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   Headers,
   HttpCode,
   Logger,
   NotFoundException,
+  Param,
   Post,
   Query,
   Req,
 } from '@nestjs/common';
 import type { Request } from 'express';
+import type {
+  EndWhatsappHandoffResponse,
+  WhatsappHandoffsResponse,
+} from '@pannico/shared';
 import { WhatsappConfigService } from './whatsapp.config';
 import { WhatsappService } from './whatsapp.service';
 
@@ -46,6 +52,41 @@ export class WhatsappController {
       throw new ForbiddenException();
     }
     return echo;
+  }
+
+  /**
+   * The conversations a person is currently handling.
+   *
+   * Back office, so it stays behind the session — the middleware excludes only
+   * the webhook, which has to be reachable by Meta and defends itself with the
+   * signature instead.
+   *
+   * Answers normally when the agent is unconfigured — `enabled: false` and
+   * whatever rows are left — rather than the webhook's 404. This is a question
+   * about state, and the control asking it has to be able to say "the agent is
+   * not set up", which a 404 cannot be told apart from a wrong URL.
+   */
+  @Get('handoffs')
+  async handoffs(): Promise<WhatsappHandoffsResponse> {
+    return {
+      enabled: this.config.enabled,
+      handoffs: await this.whatsapp.listHandoffs(),
+    };
+  }
+
+  /**
+   * Ends one, by the customer's canonical number.
+   *
+   * `ended: false` is a success. Two people ending the same conversation — or one
+   * doing it just after it lapsed on its own — is the ordinary case, and the state
+   * they both wanted is the one that already holds; a 404 would dress that up as a
+   * failure and put an error in front of somebody who got what they asked for.
+   */
+  @Delete('handoffs/:sender')
+  async endHandoff(
+    @Param('sender') sender: string,
+  ): Promise<EndWhatsappHandoffResponse> {
+    return { ended: await this.whatsapp.endHandoff(sender) };
   }
 
   /**

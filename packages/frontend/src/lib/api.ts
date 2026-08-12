@@ -24,6 +24,8 @@ import type {
   SlotListResponse,
   SlotOrdersResponse,
   TokenValidationResponse,
+  WhatsappHandoffsResponse,
+  EndWhatsappHandoffResponse,
 } from '@pannico/shared';
 
 /**
@@ -143,6 +145,21 @@ export function deleteClient(id: string): Promise<DeleteClientResponse> {
   return request<DeleteClientResponse>(`/clients/${encodeURIComponent(id)}`, {
     method: 'DELETE',
   });
+}
+
+/** The WhatsApp conversations a person is currently handling. */
+export function getWhatsappHandoffs(): Promise<WhatsappHandoffsResponse> {
+  return request<WhatsappHandoffsResponse>(`/whatsapp/handoffs`);
+}
+
+/** Ends one; `ended: false` means it was already over, which is not an error. */
+export function endWhatsappHandoff(
+  sender: string,
+): Promise<EndWhatsappHandoffResponse> {
+  return request<EndWhatsappHandoffResponse>(
+    `/whatsapp/handoffs/${encodeURIComponent(sender)}`,
+    { method: 'DELETE' },
+  );
 }
 
 export function getOrdersBySlot(slotId?: string): Promise<SlotOrdersResponse> {

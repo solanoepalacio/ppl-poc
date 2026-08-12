@@ -130,6 +130,89 @@ the next message is answered with a link as usual.
 - **WHEN** one customer's conversation has been handed over
 - **THEN** another customer writing in is answered normally
 
+### Requirement: An open handover can be ended by hand
+Waiting out the inactivity period is the handover's floor, not its only exit. The
+bakery SHALL be able to end one deliberately, because the person who had the
+conversation is the only one who knows it is over — the silence that ends it on
+its own is a guess made from the outside, and while it runs the customer cannot
+get a link even by asking.
+
+The back office SHALL show which conversations are currently handed over and, for
+each, who it is with and since when, and SHALL offer to end any of them. A
+handover that has already lapsed SHALL NOT be shown: it is not something anyone
+can act on.
+
+What is shown is a snapshot — one can open, lapse, or be ended by somebody else
+while it is on screen — so it SHALL be possible to read it again without closing
+it. It SHALL NOT refresh itself: this is opened to act on rather than left up on
+a wall, and a list that reshuffles under the cursor is worse than one that is
+honestly out of date.
+
+Ending SHALL take effect at once — the customer's next message is answered with a
+link as usual — and SHALL be scoped to that conversation alone.
+
+At once means the suppression window SHALL NOT outlive the handover either. That
+window is measured from the last reply sent, and the last reply was the
+handover's own acknowledgement, so leaving it in place would meet the customer
+with more silence for up to its whole length right after the conversation was
+handed back — the exact thing ending it was meant to stop.
+
+Ending SHALL tell the customer the advisory is over, and SHALL do so only when
+there was a handover to end — somebody who is not in one must never be told that
+theirs finished. The notice closes a conversation that was opened with a promise
+that a person would answer; without it the customer is left unable to tell an
+advisory that ended from one still under way.
+
+The notice SHALL NOT count as a reply for the purposes of the suppression window.
+That window has just been cleared precisely so the customer can write back at
+once, and counting this would put it straight back.
+
+Ending a handover that is already gone — lapsed, or ended from somewhere else —
+SHALL NOT be an error. Two people reaching the same conclusion is the expected
+case, and the outcome they both wanted is the one that already holds.
+
+#### Scenario: Open handovers are listed with who and since when
+- **WHEN** the back office asks for the conversations currently handed over
+- **THEN** it gets each one with the client it is with and when it began
+
+#### Scenario: The list can be read again without closing it
+- **WHEN** the back office asks for the list again while it is on screen
+- **THEN** it shows what is open at that moment
+
+#### Scenario: A lapsed handover is not offered
+- **WHEN** a handover's inactivity period has run out
+- **THEN** it is not among the ones shown
+
+#### Scenario: A handover with a number nobody claims is still listed
+- **WHEN** a handed-over number matches no client in the directory
+- **THEN** it is still listed, identified by its number
+
+#### Scenario: Ending gives the customer back to the agent
+- **WHEN** a handover is ended from the back office
+- **AND** that customer writes again
+- **THEN** the agent answers with an order link as it did before the handover
+
+#### Scenario: The customer is not left waiting out the suppression window
+- **WHEN** a handover is ended moments after the agent acknowledged it
+- **AND** that customer writes straight away
+- **THEN** they are answered rather than suppressed
+
+#### Scenario: The customer is told the advisory ended
+- **WHEN** an open handover is ended
+- **THEN** the customer is sent a notice saying the advisory is over
+
+#### Scenario: Nothing is sent when there was nothing to end
+- **WHEN** ending is asked for a customer whose handover had already lapsed or been ended
+- **THEN** no notice is sent
+
+#### Scenario: Ending one leaves the others alone
+- **WHEN** one of several open handovers is ended
+- **THEN** the rest keep holding
+
+#### Scenario: Ending an already-gone handover is not an error
+- **WHEN** the back office ends a handover that has already lapsed or been ended
+- **THEN** the request succeeds and reports that there was nothing to end
+
 ### Requirement: A known sender is answered with their order link
 The system SHALL resolve an inbound message's sender to a client by matching the
 sender's number against the directory, and SHALL reply with a message containing

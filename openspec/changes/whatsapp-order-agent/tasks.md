@@ -100,6 +100,27 @@
   *Pedido enviado* answered with silence; and the button id read from a real
   delivery shape.
 
+## 5d. Ending a handover on purpose
+
+- [ ] 5.20 List the handovers still holding, each resolved to its client, newest
+  activity first. A number matching nobody is still listed under its own number:
+  a conversation with somebody the directory does not know is the one most likely
+  to be in a person's hands.
+- [ ] 5.21 End one by sender. Ending something already gone is a success that
+  reports it ended nothing, not a 404: two people ending the same conversation is
+  the expected case, not a race to lose.
+- [ ] 5.22 An "Asesoría" control in the bloque toolbar: the open conversations,
+  who each is with, since when, and a way to end each. Not disabled on a closed
+  bloque — a conversation is not scoped to one.
+- [ ] 5.23 Read the list when the control opens rather than with the page: it is
+  opened on purpose, and one read at page load is stale before anyone looks. Plus
+  a way to read it again without closing — by hand, not on a timer: this is
+  opened to act on, and a list that reshuffles under the cursor is worse than one
+  that is honestly stale.
+- [ ] 5.24 Tests: the listing omits lapsed handovers and names the client behind
+  each number; ending returns the customer to the agent; ending one leaves the
+  others holding; ending something already gone reports it ended nothing.
+
 ## 6. Verify locally
 
 - [ ] 6.1 Load the real phone numbers into the directory first, **in the form

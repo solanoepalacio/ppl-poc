@@ -21,6 +21,9 @@ while somebody is looking at the screen.
   and repeated messages inside a short window are answered once.
 - **The manual Generar link control stays**, for unknown numbers and customers
   who are not on WhatsApp.
+- **A customer can ask for a person**, and while a person has the conversation the
+  agent says nothing. It ends on its own once the customer goes quiet, **or when
+  the back office ends it** from a list of the conversations currently open.
 
 ## Capabilities
 
@@ -54,6 +57,11 @@ while somebody is looking at the screen.
   still exist — the manager can fall back to the manual control. The webhook
   still answers 200, because a non-200 makes Meta retry the same message for up
   to seven days.
+- **Back office:** the bloque toolbar gains an "Asesoría" control listing the open
+  handovers, each with a way to end it. It is not tied to a bloque — a
+  conversation outlives one — so it stays available on any bloque. It reads and
+  writes only handover state: nothing on the path an inbound message takes
+  changes, so the agent cannot be broken by it.
 - **Local first.** Verified against a Meta test number with ngrok in front, not
   deployed. `FRONTEND_BASE_URL` has to be the public tunnel URL or the link that
   reaches the customer's phone will not open.

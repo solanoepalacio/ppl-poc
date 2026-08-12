@@ -8,6 +8,7 @@ import {
 } from '@/lib/api';
 import { SlotPicker } from '../SlotPicker';
 import { ViewHeader } from '../ViewHeader';
+import { AdvisorHandoffsModal } from './AdvisorHandoffsModal';
 import { CloseSlotButton } from './CloseSlotButton';
 import { CreateOrderModal } from './CreateOrderModal';
 import { GenerateLinkModal } from './GenerateLinkModal';
@@ -19,8 +20,8 @@ import { OrdersTable } from './OrdersTable';
  * Back-office orders view: the orders in the selected production bloque (default
  * the open one) as an expandable table. Selecting a bloque in the toolbar
  * navigates immediately, so the selection lives in the URL (?slotId=...). The
- * slate toolbar is also where bloques are managed — always "Agregar pedido",
- * plus (open bloque only) "Cerrar bloque" and "Ver stock".
+ * slate toolbar is also where bloques are managed — always "Agregar pedido" and
+ * "Asesoría", plus (open bloque only) "Cerrar bloque" and "Ver stock".
  */
 export default async function OrdersPage({
   searchParams,
@@ -71,6 +72,9 @@ export default async function OrdersPage({
                 current={produced?.items ?? []}
                 disabled={!isOpen}
               />
+              {/* Never disabled: a handed-over conversation belongs to a
+                  customer, not to a bloque, and it outlives the one it began in. */}
+              <AdvisorHandoffsModal />
               <GenerateLinkModal clients={clients} disabled={!isOpen} />
               <CreateOrderModal
                 products={products}

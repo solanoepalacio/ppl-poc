@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { normalizeClientPhone } from '@pannico/shared';
+import {
+  normalizeClientPhone,
+  type WhatsappHandoff as WhatsappHandoffSummary,
+} from '@pannico/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { LinksService } from '../links/links.service';
 import { WhatsappConfigService } from './whatsapp.config';
@@ -227,6 +230,78 @@ export class WhatsappService {
     });
   }
 
+  /**
+   * The conversations a person is currently handling, newest activity first.
+   *
+   * Ordering by the deadline *is* ordering by activity: every row's deadline is
+   * its last message plus the same idle period, so the two sort identically.
+   *
+   * The client lookup is for a label and nothing else, so a retired client still
+   * lends its name — knowing who the number belongs to is the point, and being
+   * retired does not make the conversation anonymous. A number matching nobody
+   * keeps its place in the list under its own number, since a conversation with
+   * somebody the directory does not know is the likeliest one to need a person.
+   */
+  async listHandoffs(): Promise<WhatsappHandoffSummary[]> {
+    const rows = await this.prisma.whatsappHandoff.findMany({
+      where: { expiresAt: { gt: new Date() } },
+      orderBy: { expiresAt: 'desc' },
+    });
+    if (rows.length === 0) return [];
+    const clients = await this.prisma.client.findMany({
+      where: { phone: { in: rows.map((r) => r.sender) } },
+      select: { phone: true, name: true },
+    });
+    const names = new Map(clients.map((c) => [c.phone, c.name]));
+    return rows.map((r) => ({
+      sender: r.sender,
+      clientName: names.get(r.sender) ?? null,
+      startedAt: r.startedAt.toISOString(),
+      expiresAt: r.expiresAt.toISOString(),
+    }));
+  }
+
+  /**
+   * Ends one conversation by sender, reporting whether there was one to end.
+   *
+   * The row goes whether or not it had lapsed — a lapsed one is dead weight — but
+   * only a live one counts as having been ended. Answering `false` for one that
+   * was already gone is the honest report: the caller asked to change something
+   * that had already changed.
+   *
+   * The customer is told the advisory is over — only when there was one to end,
+   * so somebody who is not in a conversation is never informed that theirs
+   * finished. Best-effort like every other send: a message that cannot be
+   * delivered does not undo the ending, which has already happened.
+   *
+   * The suppression window goes with it. It is measured from the last reply that
+   * went out, and the last reply was the handover's own acknowledgement — so
+   * without this the customer keeps meeting silence for up to a minute and a half
+   * after the conversation was handed back, which is the very thing ending it was
+   * meant to stop. Clearing the flag does not weaken the dedupe: that turns on the
+   * message id existing, not on this.
+   */
+  async endHandoff(sender: string): Promise<boolean> {
+    const active = await this.prisma.whatsappHandoff.findFirst({
+      where: { sender, expiresAt: { gt: new Date() } },
+      select: { sender: true },
+    });
+    await this.prisma.whatsappHandoff.deleteMany({ where: { sender } });
+    // Unconditional, like the delete: whoever asked wants this customer back with
+    // the agent, and that is true whether or not the handover was still holding.
+    await this.prisma.whatsappInbound.updateMany({
+      where: { from: sender, replied: true },
+      data: { replied: false },
+    });
+    // Sent last, after the state is already what it says it is: the notice
+    // describes something that has happened, not something being attempted. It
+    // deliberately does not count as a reply — the suppression was just cleared
+    // so the customer can write back at once, and marking this would put it
+    // straight back.
+    if (active) await this.send(sender, HANDOFF_END_TEXT);
+    return active !== null;
+  }
+
   /** True when this sender was answered inside the window. Keyed on the canonical
    * identity, so the same person reaching us in two shapes is still one sender. */
   private async recentlyReplied(from: string): Promise<boolean> {
@@ -314,6 +389,9 @@ export class WhatsappService {
 /** Provisional copy, to be reworded. */
 const ADVISOR_ACK_TEXT =
   'Listo, una persona te responderá en un momento. Gracias';
+
+/** Provisional copy, to be reworded. */
+const HANDOFF_END_TEXT = 'Fin de asesoría.';
 
 /** Provisional copy, to be reworded. */
 const UNKNOWN_SENDER_TEXT =

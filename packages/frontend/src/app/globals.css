@@ -1332,6 +1332,37 @@ select {
   color: #9a3412;
 }
 
+/* ── Asesoría: the conversations a person is currently handling ──────────── */
+.handoff-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.handoff-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.handoff-row:last-child {
+  border-bottom: none;
+}
+/* Stacked and allowed to shrink, so a long client name wraps instead of
+   squeezing the button it shares the row with. */
+.handoff-who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.handoff-who .muted {
+  font-size: 0.85rem;
+}
+
 /* ── Close confirmation: what the close is about to discard ──────────────── */
 .close-warning {
   margin: 0 0 12px;

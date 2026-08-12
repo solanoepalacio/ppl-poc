@@ -58,9 +58,20 @@ const statusOnly = {
 
 describe('WhatsappService', () => {
   let prisma: {
-    whatsappInbound: { create: jest.Mock; findFirst: jest.Mock; update: jest.Mock };
-    whatsappHandoff: { findFirst: jest.Mock; update: jest.Mock; upsert: jest.Mock };
-    client: { findFirst: jest.Mock };
+    whatsappInbound: {
+      create: jest.Mock;
+      findFirst: jest.Mock;
+      update: jest.Mock;
+      updateMany: jest.Mock;
+    };
+    whatsappHandoff: {
+      findFirst: jest.Mock;
+      findMany: jest.Mock;
+      update: jest.Mock;
+      upsert: jest.Mock;
+      deleteMany: jest.Mock;
+    };
+    client: { findFirst: jest.Mock; findMany: jest.Mock };
   };
   let links: { linkForAgent: jest.Mock };
   let service: WhatsappService;
@@ -72,13 +83,19 @@ describe('WhatsappService', () => {
         create: jest.fn().mockResolvedValue({}),
         findFirst: jest.fn().mockResolvedValue(null),
         update: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
       whatsappHandoff: {
         findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
         update: jest.fn().mockResolvedValue({}),
         upsert: jest.fn().mockResolvedValue({}),
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
-      client: { findFirst: jest.fn().mockResolvedValue(null) },
+      client: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
     };
     links = {
       linkForAgent: jest
@@ -394,6 +411,136 @@ describe('WhatsappService', () => {
       expect(out).toEqual({ kind: 'order-sent' });
       expect(fetchMock).not.toHaveBeenCalled();
       expect(links.linkForAgent).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('ending a handover from the back office', () => {
+    const row = (sender: string, expiresInMs: number) => ({
+      sender,
+      startedAt: new Date(1_700_000_000_000),
+      expiresAt: new Date(Date.now() + expiresInMs),
+    });
+
+    it('lists the open ones, newest activity first, named after their client', async () => {
+      prisma.whatsappHandoff.findMany.mockResolvedValue([
+        row('543815551234', 180_000),
+        row('543819999999', 40_000),
+      ]);
+      prisma.client.findMany.mockResolvedValue([
+        { phone: '543815551234', name: 'Alo Bar' },
+      ]);
+
+      const list = await service.listHandoffs();
+
+      expect(list.map((h) => h.clientName)).toEqual(['Alo Bar', null]);
+      // A number the directory does not know keeps its place: that conversation
+      // is the likeliest one to be in a person's hands.
+      expect(list[1].sender).toBe('543819999999');
+      expect(prisma.whatsappHandoff.findMany.mock.calls[0][0].orderBy).toEqual({
+        expiresAt: 'desc',
+      });
+    });
+
+    it('leaves out the ones that have already lapsed', async () => {
+      await service.listHandoffs();
+
+      expect(prisma.whatsappHandoff.findMany.mock.calls[0][0].where.expiresAt).toEqual({
+        gt: expect.any(Date),
+      });
+    });
+
+    it('does not ask about clients when there is nothing handed over', async () => {
+      expect(await service.listHandoffs()).toEqual([]);
+      expect(prisma.client.findMany).not.toHaveBeenCalled();
+    });
+
+    it('ends one and says it ended it', async () => {
+      prisma.whatsappHandoff.findFirst.mockResolvedValue({ sender: '543815551234' });
+
+      expect(await service.endHandoff('543815551234')).toBe(true);
+      expect(prisma.whatsappHandoff.deleteMany).toHaveBeenCalledWith({
+        where: { sender: '543815551234' },
+      });
+    });
+
+    it('tells the customer the advisory is over', async () => {
+      prisma.whatsappHandoff.findFirst.mockResolvedValue({ sender: '543815551234' });
+
+      await service.endHandoff('543815551234');
+
+      const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+      expect(body.to).toBe('543815551234');
+      expect(body.text.body).toMatch(/fin de asesoría/i);
+      // Not marked as a reply: the suppression was just cleared so the customer
+      // can write back at once, and marking this would put it straight back.
+      expect(prisma.whatsappInbound.update).not.toHaveBeenCalled();
+    });
+
+    it('reports ending nothing when it had already lapsed or been ended', async () => {
+      prisma.whatsappHandoff.findFirst.mockResolvedValue(null);
+
+      expect(await service.endHandoff('543815551234')).toBe(false);
+      // The dead row still goes: it is weight, not state.
+      expect(prisma.whatsappHandoff.deleteMany).toHaveBeenCalled();
+      // Nobody is told their advisory ended when they were not in one.
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('still ends it when the notice cannot be delivered', async () => {
+      prisma.whatsappHandoff.findFirst.mockResolvedValue({ sender: '543815551234' });
+      fetchMock.mockResolvedValue({ ok: false, status: 400, text: async () => 'no' });
+
+      // Best-effort: the ending already happened, and a send that failed cannot
+      // put the conversation back in a person's hands.
+      expect(await service.endHandoff('543815551234')).toBe(true);
+      expect(prisma.whatsappHandoff.deleteMany).toHaveBeenCalled();
+    });
+
+    it('ends only the one asked for', async () => {
+      prisma.whatsappHandoff.findFirst.mockResolvedValue({ sender: '543815551234' });
+
+      await service.endHandoff('543815551234');
+
+      expect(prisma.whatsappHandoff.deleteMany.mock.calls[0][0].where).toEqual({
+        sender: '543815551234',
+      });
+    });
+
+    it('clears the suppression the handover itself created', async () => {
+      prisma.whatsappHandoff.findFirst.mockResolvedValue({ sender: '543815551234' });
+
+      await service.endHandoff('543815551234');
+
+      // Without this the customer meets silence for the rest of the window right
+      // after being handed back — the window is measured from the last reply, and
+      // the last reply was the acknowledgement that handed them over.
+      expect(prisma.whatsappInbound.updateMany).toHaveBeenCalledWith({
+        where: { from: '543815551234', replied: true },
+        data: { replied: false },
+      });
+    });
+
+    it('answers the customer straight away once it is ended', async () => {
+      // Their last message was answered seconds ago — inside the suppression
+      // window — but ending the handover cleared it, so nothing is suppressed.
+      prisma.whatsappHandoff.findFirst.mockResolvedValue(null);
+      prisma.whatsappInbound.findFirst.mockResolvedValue(null);
+      prisma.client.findFirst.mockResolvedValue({ id: 'c1', name: 'Alo Bar' });
+
+      await expect(
+        service.handleMessage({ wamid: 'w10', from: '543815551234' }),
+      ).resolves.toMatchObject({ kind: 'replied' });
+    });
+
+    it('gives the customer back to the agent once it is ended', async () => {
+      // Ended, so the next message finds no live handover — which is exactly the
+      // state a lapsed one leaves behind, and is answered the same way.
+      prisma.whatsappHandoff.findFirst.mockResolvedValue(null);
+      prisma.client.findFirst.mockResolvedValue({ id: 'c1', name: 'Alo Bar' });
+
+      await expect(
+        service.handleMessage({ wamid: 'w9', from: '543815551234' }),
+      ).resolves.toMatchObject({ kind: 'replied' });
     });
   });
 

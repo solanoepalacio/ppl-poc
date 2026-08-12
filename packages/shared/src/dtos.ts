@@ -317,3 +317,44 @@ export interface DeleteClientResponse {
   /** `deleted` — no orders referenced it. `deactivated` — some did, so it was retired. */
   outcome: 'deleted' | 'deactivated';
 }
+
+/**
+ * One conversation a person is currently handling, as the back office sees it.
+ *
+ * Identified by the customer's number rather than by a client: a handover can
+ * belong to a number that matches nobody in the directory, and that is precisely
+ * the conversation most likely to need a person.
+ */
+export interface WhatsappHandoff {
+  /** The customer's canonical number — what identifies the conversation. */
+  sender: string;
+  /** The client that number belongs to, or `null` when it matches none. */
+  clientName: string | null;
+  startedAt: string;
+  /** When it lapses on its own, unless the customer writes again first. */
+  expiresAt: string;
+}
+
+/**
+ * `GET /whatsapp/handoffs` response: only the ones still holding, newest activity
+ * first.
+ *
+ * `enabled` rather than a 404 when the agent has no credentials. The control
+ * needs to say "the agent is not set up" — which is a state — and a 404 is
+ * indistinguishable from a wrong URL.
+ */
+export interface WhatsappHandoffsResponse {
+  enabled: boolean;
+  handoffs: WhatsappHandoff[];
+}
+
+/**
+ * `DELETE /whatsapp/handoffs/:sender` response.
+ *
+ * `false` is a success, not a failure: it means the handover was already gone —
+ * lapsed, or ended by somebody else. Two people ending the same conversation is
+ * expected, and both of them wanted the state that now holds.
+ */
+export interface EndWhatsappHandoffResponse {
+  ended: boolean;
+}
