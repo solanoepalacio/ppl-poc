@@ -260,6 +260,13 @@ reply sent to that sender.
 A client whose link for the bloque has already been used SHALL be treated as a
 new request: their order is placed, and a further message is a further order.
 
+Confirming an order SHALL end the suppression window for that customer. The
+window rests on reading several messages in a row as one customer asking one
+thing, and an order placed in between is what makes that reading false: what
+follows is a second request, not a repeat of the first. Without this, a customer
+who confirms and immediately asks for another link is answered with silence for
+the remainder of the window — having just been shown that writing in works.
+
 #### Scenario: A second message reuses the outstanding link
 - **WHEN** a client with an unconsumed link for the open bloque sends another
   message after the suppression window
@@ -269,6 +276,11 @@ new request: their order is placed, and a further message is a further order.
 #### Scenario: Several messages in quick succession are answered once
 - **WHEN** a client sends several messages inside the suppression window
 - **THEN** exactly one reply is sent
+
+#### Scenario: Ordering again straight after confirming is answered
+- **WHEN** a client confirms an order and writes again inside the suppression window
+- **THEN** they are answered with a link for their next order
+- **AND** are not suppressed
 
 #### Scenario: A client who already ordered can order again
 - **WHEN** a client whose link for the open bloque has already been used sends a

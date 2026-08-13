@@ -449,6 +449,21 @@ describe('WhatsappService', () => {
       });
     });
 
+    it('reopens the agent to the customer, who may want to order again', async () => {
+      prisma.order.findUnique.mockResolvedValue(confirmed);
+
+      service.orderConfirmed('ord_1');
+      await settle();
+
+      // The order they just placed is what ends the exchange the window was
+      // collapsing. Without this, asking for a second link seconds after
+      // confirming the first is met with silence for the rest of the window.
+      expect(prisma.whatsappInbound.updateMany).toHaveBeenCalledWith({
+        where: { from: '543815551234', replied: true },
+        data: { replied: false },
+      });
+    });
+
     it('sends nothing when the client has no number on file', async () => {
       prisma.order.findUnique.mockResolvedValue({
         ...confirmed,

@@ -245,14 +245,14 @@ export class WhatsappService {
    * order is unaffected — only the receipt is.
    */
   orderConfirmed(orderId: string): void {
-    void this.sendOrderSummary(orderId).catch((e: unknown) => {
+    void this.handleOrderConfirmed(orderId).catch((e: unknown) => {
       this.logger.error(
         `Summary for ${orderId} failed: ${e instanceof Error ? e.message : String(e)}`,
       );
     });
   }
 
-  private async sendOrderSummary(orderId: string): Promise<void> {
+  private async handleOrderConfirmed(orderId: string): Promise<void> {
     if (!this.config.enabled) return;
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -270,7 +270,18 @@ export class WhatsappService {
     });
     // No phone is not a failure: a client can be in the directory without one,
     // and there is simply nowhere to send this.
-    if (!order?.client.phone || order.items.length === 0) return;
+    if (!order?.client.phone) return;
+
+    // A confirmed order ends the exchange the suppression window was collapsing.
+    // That window answers "hola" / "quiero pedir" / "?" once, on the reading that
+    // several messages in a row are one customer asking one thing — and an order
+    // placed in between is exactly what makes that reading wrong. What comes next
+    // is a second request, not a repeat of the first, and until this it was met
+    // with silence for the rest of the window: the customer had just been given a
+    // link, used it, and asking for another got them nothing.
+    await this.clearSuppression(order.client.phone);
+
+    if (order.items.length === 0) return;
     await this.send(
       order.client.phone,
       orderSummaryText(
@@ -339,10 +350,7 @@ export class WhatsappService {
     await this.prisma.whatsappHandoff.deleteMany({ where: { sender } });
     // Unconditional, like the delete: whoever asked wants this customer back with
     // the agent, and that is true whether or not the handover was still holding.
-    await this.prisma.whatsappInbound.updateMany({
-      where: { from: sender, replied: true },
-      data: { replied: false },
-    });
+    await this.clearSuppression(sender);
     // Sent last, after the state is already what it says it is: the notice
     // describes something that has happened, not something being attempted. It
     // deliberately does not count as a reply — the suppression was just cleared
@@ -350,6 +358,25 @@ export class WhatsappService {
     // straight back.
     if (active) await this.send(sender, HANDOFF_END_TEXT);
     return active !== null;
+  }
+
+  /**
+   * Reopens the agent to a sender by forgetting that they were answered.
+   *
+   * The window is a guess about intent — that messages arriving close together
+   * are one request — and this is what the two things that disprove it have in
+   * common: an order confirmed, or a handover ended. Both say the exchange that
+   * was being collapsed is finished, so whatever comes next is a new one and
+   * deserves an answer rather than the rest of a timer.
+   *
+   * Does not weaken the deduplication of redeliveries: that turns on the message
+   * id already existing, not on this flag.
+   */
+  private async clearSuppression(sender: string): Promise<void> {
+    await this.prisma.whatsappInbound.updateMany({
+      where: { from: sender, replied: true },
+      data: { replied: false },
+    });
   }
 
   /** True when this sender was answered inside the window. Keyed on the canonical
