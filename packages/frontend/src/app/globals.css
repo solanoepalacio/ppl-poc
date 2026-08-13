@@ -1944,6 +1944,179 @@ code {
   margin: 4px 0 0;
 }
 
+/* ── Productos: the client rows plus a line and an umbral ─────────────────── */
+.product-add-row,
+.product-edit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.product-edit {
+  margin-top: 0;
+  width: 100%;
+}
+/* A count of units, so it needs room for three digits and no more. Kept narrow
+   so the name — the field actually being read down the column — keeps the space. */
+.product-threshold-input {
+  flex: 0 1 120px;
+}
+/* Its own select rather than `.bo-select`, which is white text on a translucent
+   white fill because it lives on the slate bloque toolbar. On this card that is
+   invisible — the control reads as an empty box with a chevron. Same geometry as
+   `.client-input` beside it, so the row lines up. */
+.product-select {
+  flex: 0 1 150px;
+  min-width: 0;
+  height: 44px;
+  padding: 0 36px 0 14px;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid #d7cdb9;
+  border-radius: 11px;
+  background-color: #fff;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2214%22 height=%2214%22 fill=%22none%22 stroke=%22%236b6357%22 stroke-width=%222%22 stroke-linecap=%22round%22><path d=%22M4 6l4 4 4-4%22/></svg>');
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.product-select:focus {
+  outline: none;
+  border-color: var(--brand-amber);
+}
+.product-add-hint {
+  margin: 8px 0 0;
+  font-size: 13px;
+}
+.product-line {
+  flex: 0 1 90px;
+  font-size: 13.5px;
+}
+/* A threshold of zero shows as an em dash: there zero means "not set". The stock
+   actual next to it prints its 0, because there zero is a measurement. */
+.product-threshold,
+.product-stock {
+  flex: 0 1 110px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  font-size: 13.5px;
+}
+/* Two classes, not one. `.stock-current--short` is declared far above this, and
+   a media query aside, equal specificity means the later rule wins — so the
+   plain `color` above would quietly swallow the shortfall colour and a negative
+   stock would print like any other number. */
+.product-stock.stock-current--short {
+  color: #9a3412;
+  font-weight: 600;
+}
+/* One grid, shared by the heading row and every product row, so the two cannot
+   disagree about where a column starts.
+   It replaced a flex row whose widths were flex-basis hints: the cells then size
+   themselves per row from their own content, and the heading — whose words are
+   longer than the figures beneath them — drifted right of its column. Widths
+   guessed to match are a guess that has to be re-made every time a label or a
+   button changes; a grid states them once.
+   Compound selectors throughout, because `.client-row` is declared far above and
+   equal specificity would leave the later declaration winning by position. */
+/* The tracks are defined **once, on the list**, and every row borrows them with
+   `subgrid`. Giving each row its own grid with the same template is not the same
+   thing and does not work: a grid resolves its columns from its own contents, so
+   the heading row — whose actions cell is empty, contributing nothing to a
+   `max-content` track — hands that width to the name column and shifts every
+   heading one column right of the values it names.
+   The spare width goes to the actions column, not to the name. A name column set
+   to `1fr` swallows every pixel a wide screen has, which drags the four figures
+   across the screen and parks them against the buttons — the wider the monitor,
+   the worse it reads. Capped, the product and its numbers stay together on the
+   left and the buttons hold the right edge. */
+.product-list {
+  display: grid;
+  grid-template-columns:
+    minmax(180px, 380px) /* nombre — capped, see below */
+    110px /* categoría */
+    90px /* umbral */
+    110px /* stock actual */
+    80px /* pedidos */
+    minmax(max-content, 1fr); /* acciones: at least the buttons — a retired
+                                 product has three where an active one has two —
+                                 and the leftover width on top */
+  column-gap: 18px;
+}
+.client-row.product-row {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+  align-items: center;
+  row-gap: 8px;
+}
+/* Figures right-aligned under right-aligned headings: a column of numbers lines
+   up on its units, and the heading sits over the digits rather than over the
+   whitespace they left. */
+.client-row.product-row .product-threshold,
+.client-row.product-row .product-stock,
+.client-row.product-row .client-orders {
+  text-align: right;
+  flex: none;
+}
+.client-row.product-row .client-name,
+.client-row.product-row .product-line {
+  flex: none;
+}
+.client-row.product-row .client-actions {
+  margin-left: 0;
+  justify-content: flex-end;
+}
+/* Both span the whole grid: the edit form replaces the row, and a failure
+   belongs under the row it came from. */
+.client-row.product-row .product-edit,
+.client-row.product-row .client-row-error {
+  grid-column: 1 / -1;
+}
+
+.product-head {
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-display);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.product-head .client-name {
+  font-weight: 500;
+  color: var(--ink-muted);
+}
+
+/* Below this the six columns stop fitting, and a grid that does not fit is worse
+   than no grid: it overflows sideways. Back to the stacked flex row, with the
+   headings dropped — they name columns that no longer exist. */
+@media (max-width: 900px) {
+  /* The list has to give up its tracks too, or the rows go on being placed in
+     its first column no matter what they say about themselves. */
+  .product-list {
+    display: block;
+  }
+  .client-row.product-row {
+    display: flex;
+  }
+  .client-row.product-row .product-threshold,
+  .client-row.product-row .product-stock,
+  .client-row.product-row .client-orders {
+    text-align: left;
+  }
+  /* Three classes, to outrank the two-class rule above that turns every row into
+     a flex line. Specificity beats order, so `.product-head` alone loses here
+     however far down the file it sits. */
+  .client-row.product-row.product-head {
+    display: none;
+  }
+}
+
 /* States how the form works — quantities are individual items — for a customer
    used to buying by the tray. Loud on purpose: getting this wrong costs the
    bakery a remade order, so it is the one thing on the entry screen allowed to

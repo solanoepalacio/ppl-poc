@@ -41,6 +41,17 @@ const LINKS: { href: string; label: string; icon: ReactNode }[] = [
     ),
   },
   {
+    href: '/productos',
+    label: 'Productos',
+    icon: (
+      <>
+        <path d="M4 8l8-4 8 4-8 4z" />
+        <path d="M4 8v8l8 4 8-4V8" />
+        <path d="M12 12v8" />
+      </>
+    ),
+  },
+  {
     href: '/revisar-pedidos',
     label: 'Revisar Pedidos',
     icon: (

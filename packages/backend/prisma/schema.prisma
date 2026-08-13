@@ -20,9 +20,16 @@ datasource db {
 /// migration's ADD COLUMN valid on existing rows; the seed writes the real value.
 model Product {
   id       String  @id @default(cuid())
-  name     String
+  /// Unique: two products the manager cannot tell apart in a picker are two
+  /// products the demand gets split across, for no reason visible afterwards.
+  name     String  @unique
   active   Boolean @default(true)
   category String  @default("salty")
+  /// Units the bakery wants on the shelf regardless of what was ordered. The
+  /// production views add it to demand, so 0 — the default — means "produce only
+  /// what customers asked for", which is what every product did before this
+  /// existed. Never negative; enforced in the service.
+  threshold Int    @default(0)
 
   orderItems OrderItem[]
   existence  SlotExistence[]

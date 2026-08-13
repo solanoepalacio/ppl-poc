@@ -1,12 +1,27 @@
 import type { ProductCategory } from './product-category';
 
-/** A product in the predefined catalog. */
+/** A product in the catalog. */
 export interface Product {
   id: string;
   name: string;
   active: boolean;
   /** The production line this product is baked on (*salados* / *dulces*). */
   category: ProductCategory;
+  /**
+   * Units to hold on the shelf regardless of what was ordered. Added to demand
+   * when working out what to produce, so `0` — the default — means "produce only
+   * what customers asked for".
+   */
+  threshold: number;
+}
+
+/**
+ * A product as the management view needs it: the record plus how many orders
+ * reference it, which is what decides whether removing it deletes it outright or
+ * only retires it — and lets the control say which before it is pressed.
+ */
+export interface ManagedProduct extends Product {
+  orderCount: number;
 }
 
 /**

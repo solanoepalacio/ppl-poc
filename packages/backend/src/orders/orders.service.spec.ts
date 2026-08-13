@@ -37,7 +37,10 @@ function makePrisma(): PrismaMock {
       create: jest.fn(),
       delete: jest.fn().mockResolvedValue(undefined),
     },
-    product: { findMany: jest.fn() },
+    // Default empty: the catalog check overrides it per test, and the production
+    // totals also read the products carrying a threshold — where "none" is the
+    // state every test written before thresholds existed assumes.
+    product: { findMany: jest.fn().mockResolvedValue([]) },
     client: { findUnique: jest.fn() },
     orderItem: {
       createMany: jest.fn().mockResolvedValue(undefined),
@@ -680,6 +683,106 @@ describe('OrdersService', () => {
       const res = await service.getProductionTotals('slot_7');
 
       expect(res.items.map((i) => i.productId).sort()).toEqual(['p1', 'p2']);
+    });
+
+    describe('thresholds', () => {
+      /** The products the catalog reports as carrying a threshold. */
+      const stubThresholds = (
+        rows: { id: string; name: string; threshold: number }[],
+      ) => prisma.product.findMany.mockResolvedValue(rows);
+
+      it('raises the net to produce up to the threshold', async () => {
+        stubDemand([]);
+        stubThresholds([{ id: 'p1', name: 'Alfajor de nuez', threshold: 100 }]);
+        slots.getExistenceMap.mockResolvedValue(new Map([['p1', 50]]));
+
+        const res = await service.getProductionTotals('slot_7');
+
+        // 100 wanted on the shelf, 50 there: 50 to bake, with nobody having
+        // ordered any of it.
+        expect(res.items).toEqual([
+          {
+            productId: 'p1',
+            name: 'Alfajor de nuez',
+            demand: 0,
+            existence: 50,
+            produced: 0,
+            toProduce: 50,
+          },
+        ]);
+      });
+
+      it('adds the threshold to the demand rather than choosing between them', async () => {
+        stubDemand([
+          orderWith([{ productId: 'p1', name: 'Alfajor de nuez', quantity: 20 }]),
+        ]);
+        stubThresholds([{ id: 'p1', name: 'Alfajor de nuez', threshold: 100 }]);
+        slots.getExistenceMap.mockResolvedValue(new Map([['p1', 50]]));
+
+        const res = await service.getProductionTotals('slot_7');
+
+        // The 20 ordered leave the shelf, so covering them and still holding 100
+        // is 70 of work — not 50, which would send the customer's units out of
+        // the same stock the threshold is meant to keep.
+        expect(res.items[0].toProduce).toBe(70);
+      });
+
+      it('leaves a product at its threshold with nothing to produce', async () => {
+        stubDemand([]);
+        stubThresholds([{ id: 'p1', name: 'Alfajor de nuez', threshold: 100 }]);
+        slots.getExistenceMap.mockResolvedValue(new Map([['p1', 100]]));
+
+        const res = await service.getProductionTotals('slot_7');
+
+        expect(res.items[0].toProduce).toBe(0);
+      });
+
+      it('counts producción real towards the threshold', async () => {
+        stubDemand([]);
+        stubThresholds([{ id: 'p1', name: 'Alfajor de nuez', threshold: 100 }]);
+        slots.getProducedMap.mockResolvedValue(new Map([['p1', 30]]));
+
+        const res = await service.getProductionTotals('slot_7');
+
+        expect(res.items[0].toProduce).toBe(70);
+      });
+
+      it('omits a product with neither demand nor a threshold', async () => {
+        stubDemand([]);
+        stubThresholds([]);
+
+        const res = await service.getProductionTotals('slot_7');
+
+        expect(res.items).toEqual([]);
+      });
+
+      it('asks only for active products with a threshold, scoped to the category', async () => {
+        stubDemand([]);
+        stubThresholds([]);
+
+        await service.getProductionTotals('slot_7', 'sweet');
+
+        // An inactive product is not to be baked, so its threshold is a leftover
+        // rather than an instruction; and the sweet line must not be handed the
+        // savoury line's shelf targets.
+        expect(prisma.product.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { active: true, threshold: { gt: 0 }, category: 'sweet' },
+          }),
+        );
+      });
+
+      it('keeps one entry for a product that is both ordered and stocked', async () => {
+        stubDemand([
+          orderWith([{ productId: 'p1', name: 'Alfajor de nuez', quantity: 5 }]),
+        ]);
+        stubThresholds([{ id: 'p1', name: 'Alfajor de nuez', threshold: 10 }]);
+
+        const res = await service.getProductionTotals('slot_7');
+
+        expect(res.items).toHaveLength(1);
+        expect(res.items[0]).toMatchObject({ demand: 5, toProduce: 15 });
+      });
     });
   });
 });

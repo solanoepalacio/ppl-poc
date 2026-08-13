@@ -4,6 +4,10 @@ import type {
   DeleteClientResponse,
   ManagedClient,
   UpdateClientRequest,
+  ManagedProduct,
+  CreateProductRequest,
+  UpdateProductRequest,
+  DeleteProductResponse,
   CloseSlotResponse,
   ConfirmOrderItem,
   CreateLinkResponse,
@@ -228,6 +232,39 @@ export function setSlotProduced(
     `/slots/${encodeURIComponent(slotId)}/produced`,
     { method: 'PUT', body: JSON.stringify({ items }) },
   );
+}
+
+/**
+ * The whole catalog for the Productos view — retired products included, each
+ * with its order count. A different call from `getProducts`, which feeds the
+ * customer form and the order pickers and must keep returning active only.
+ */
+export function getManagedProducts(): Promise<ManagedProduct[]> {
+  return request<ManagedProduct[]>(`/products?includeInactive=true`);
+}
+
+export function createProduct(body: CreateProductRequest): Promise<Product> {
+  return request<Product>(`/products`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateProduct(
+  id: string,
+  body: UpdateProductRequest,
+): Promise<Product> {
+  return request<Product>(`/products/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+/** Deletes the product, or retires it when orders reference it; says which. */
+export function deleteProduct(id: string): Promise<DeleteProductResponse> {
+  return request<DeleteProductResponse>(`/products/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
 }
 
 export function getProducts(): Promise<Product[]> {

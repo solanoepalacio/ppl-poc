@@ -300,23 +300,53 @@ export class OrdersService {
     // zero: a product covered by them shows 0 to produce, never a negative
     // surplus, so surplus in one product is never charged against another. This
     // is what makes the figure a countdown of what is *missing* rather than a
-    // static record of what was needed. Every ordered product stays on the list —
-    // only products with no demand are absent.
-    const [existence, produced] = await Promise.all([
+    // static record of what was needed.
+    //
+    // The list is no longer the demand alone. A product with a threshold is one
+    // the bakery wants on the shelf whether or not anybody ordered it, and the
+    // product nobody ordered today is exactly the one that quietly runs out — a
+    // list built only from orders can never mention it. So the entries are the
+    // union of "ordered in this bloque" and "active, with a threshold", and only
+    // a product with neither is absent.
+    const [existence, produced, stocked] = await Promise.all([
       this.slotsService.getExistenceMap(slot.id),
       this.slotsService.getProducedMap(slot.id),
+      this.prisma.product.findMany({
+        // Active only: an inactive product is not to be baked, and its threshold
+        // is a leftover rather than an instruction. One already ordered in the
+        // bloque keeps its entry through the demand map below — that demand is
+        // real and somebody is waiting for it.
+        where: { active: true, threshold: { gt: 0 }, ...(category ? { category } : {}) },
+        select: { id: true, name: true, threshold: true },
+      }),
     ]);
-    const items = [...totals.entries()]
-      .map(([productId, { name, quantity }]) => {
+
+    const thresholds = new Map(stocked.map((p) => [p.id, p.threshold]));
+    const rows = new Map<string, { name: string; demand: number }>();
+    for (const [productId, { name, quantity }] of totals) {
+      rows.set(productId, { name, demand: quantity });
+    }
+    for (const p of stocked) {
+      if (!rows.has(p.id)) rows.set(p.id, { name: p.name, demand: 0 });
+    }
+
+    const items = [...rows.entries()]
+      .map(([productId, { name, demand }]) => {
         const inStock = existence.get(productId) ?? 0;
         const alreadyMade = produced.get(productId) ?? 0;
+        const threshold = thresholds.get(productId) ?? 0;
         return {
           productId,
           name,
-          demand: quantity,
+          demand,
           existence: inStock,
           produced: alreadyMade,
-          toProduce: Math.max(0, quantity - inStock - alreadyMade),
+          // Threshold and demand add rather than compete: the units a customer
+          // ordered leave the shelf, so covering the order and holding the
+          // threshold are both work to be done. With a threshold of zero this is
+          // the rule that was here before — which is why every existing test of
+          // it still passes unchanged.
+          toProduce: Math.max(0, threshold + demand - inStock - alreadyMade),
         };
       })
       .sort((a, b) => a.name.localeCompare(b.name));

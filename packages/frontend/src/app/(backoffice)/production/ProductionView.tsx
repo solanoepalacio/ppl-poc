@@ -9,7 +9,13 @@ const TITLE: Record<ProductCategory, string> = {
   salty: 'Producción salados',
   sweet: 'Producción dulces',
 };
-const SUBTITLE = 'Cantidades a producir según pedidos';
+/**
+ * No longer "según pedidos": a row can be here with no order behind it, because
+ * the product is under the threshold the bakery wants on the shelf. Saying
+ * otherwise would have somebody on the line looking for the order that explains
+ * a number, and not finding one.
+ */
+const SUBTITLE = 'Cantidades a producir';
 
 /**
  * One half of the split layout. Rows alternate their text colour by position

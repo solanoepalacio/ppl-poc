@@ -5,6 +5,7 @@ import { LinksModule } from './links/links.module';
 import { OrdersModule } from './orders/orders.module';
 import { SlotsModule } from './slots/slots.module';
 import { ClientsModule } from './clients/clients.module';
+import { ProductsModule } from './products/products.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { ClientsModule } from './clients/clients.module';
     PrismaModule,
     SlotsModule,
     ClientsModule,
+    ProductsModule,
     LinksModule,
     OrdersModule,
   ],

@@ -1,5 +1,6 @@
 import type { OrderItem } from './models';
 import type { Product } from './models';
+import type { ProductCategory } from './product-category';
 import type { Slot } from './slot';
 
 /** `POST /links` request: the manager selects a client from the directory. */
@@ -313,6 +314,37 @@ export interface UpdateClientRequest {
  * find out which one happened.
  */
 export interface DeleteClientResponse {
+  id: string;
+  /** `deleted` — no orders referenced it. `deactivated` — some did, so it was retired. */
+  outcome: 'deleted' | 'deactivated';
+}
+
+/** `POST /products` body. */
+export interface CreateProductRequest {
+  name: string;
+  category: ProductCategory;
+  /** Absent means zero: produce only what customers order. */
+  threshold?: number;
+}
+
+/**
+ * `PATCH /products/:id` body — every field optional, so a caller can change one
+ * without restating the others.
+ */
+export interface UpdateProductRequest {
+  name?: string;
+  category?: ProductCategory;
+  threshold?: number;
+  /** `false` retires the product, `true` reinstates it. */
+  active?: boolean;
+}
+
+/**
+ * `DELETE /products/:id` response. Removal is two operations depending on
+ * whether any order references the product, and the caller should not have to
+ * re-query to find out which one happened.
+ */
+export interface DeleteProductResponse {
   id: string;
   /** `deleted` — no orders referenced it. `deactivated` — some did, so it was retired. */
   outcome: 'deleted' | 'deactivated';
