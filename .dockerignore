@@ -1,0 +1,38 @@
+# The build context is the repo root (both images need the workspace root
+# manifest + lockfile), so everything not needed to install and build is
+# excluded here — it keeps the context small and, more importantly, keeps
+# host-only state out of the images.
+
+# Installed/derived state — the images install and build from scratch.
+node_modules
+**/node_modules
+.yarn/install-state.gz
+**/dist
+**/build
+**/.next
+**/*.tsbuildinfo
+coverage
+
+# Secrets and host-specific configuration. These are supplied at *runtime* by
+# docker-compose (env_file), never baked into an image: a value copied in at
+# build time would also be wrong, since it describes the host's layout
+# (localhost ports, on-disk sqlite path) rather than the container network's.
+**/.env
+**/.env.local
+
+# The host's sqlite database. The container's lives on a mounted volume.
+packages/backend/prisma/*.db
+packages/backend/prisma/*.db-journal
+data
+
+# Docs, specs and design scratch — not inputs to a build.
+.git
+.github
+.claude
+openspec
+design-mock
+resources
+*.md
+docker-compose*.yml
+**/*.log
+.DS_Store
