@@ -20,6 +20,9 @@ build/
 packages/backend/prisma/*.db
 packages/backend/prisma/*.db-journal
 
+# docker volume mount (the container's sqlite database)
+/data/
+
 # env
 .env
 .env.local

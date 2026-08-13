@@ -30,6 +30,9 @@ Run per-workspace with `yarn workspace @pannico/<pkg> run <script>`, or all at o
   `yarn prisma migrate deploy` (apply existing), `yarn prisma generate` (client),
   `yarn db:setup` (deploy + generate + seed). Seed: `yarn prisma:seed`.
 - OpenSpec: `openspec validate --all`, `openspec list` (CLI v1.2.0).
+- Deploy (long-running install): `docker compose up -d --build` — frontend :6065,
+  backend :6066, SQLite bind-mounted at `./data/backend/`. See README for the
+  build-arg caveat around `BACKEND_INTERNAL_URL`.
 
 After changing `schema.prisma` you must `yarn prisma generate` before backend code
 referencing the new models will typecheck.

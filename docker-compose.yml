@@ -1,0 +1,84 @@
+# Pannico, self-hosted.
+#
+#   docker compose up -d --build
+#
+# `restart: unless-stopped` is what makes this survive a reboot: the Docker
+# daemon starts at boot (systemd) and brings back every container that was not
+# deliberately stopped. No separate systemd unit is needed.
+#
+# Configuration comes from the same per-package .env files used for local
+# development, so there is one place to edit secrets. The handful of values
+# that describe *where things are* differ inside the container network and are
+# overridden below — `environment:` wins over `env_file:`.
+
+name: pannico
+
+# Where the frontend finds the backend, defined once. It is needed twice — at
+# build time (next.config.js freezes the /api rewrite into the build) and at run
+# time (server components resolve it per request) — and the two disagreeing is a
+# silent, confusing failure, so both read this anchor.
+x-backend-internal-url: &backend-internal-url "http://backend:6066"
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: packages/backend/Dockerfile
+    image: pannico-backend
+    container_name: pannico-backend
+    restart: unless-stopped
+    # Supplies the Meta/WhatsApp credentials and FRONTEND_BASE_URL (the public
+    # origin used to build shareable order links — a real hostname, so it is
+    # taken from the file rather than overridden here).
+    env_file:
+      - path: ./packages/backend/.env
+        required: false
+    environment:
+      NODE_ENV: production
+      PORT: 6066
+      # The host's path (`file:./dev.db`, relative to prisma/) means nothing
+      # here: the database lives on the mounted volume, outside the image, so
+      # it survives `up --build` and every restart.
+      DATABASE_URL: file:/data/pannico.db
+    volumes:
+      - ./data/backend:/data
+    ports:
+      - "6066:6066"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:6066/').then(()=>process.exit(0),()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  frontend:
+    build:
+      context: .
+      dockerfile: packages/frontend/Dockerfile
+      args:
+        BACKEND_INTERNAL_URL: *backend-internal-url
+    image: pannico-frontend
+    container_name: pannico-frontend
+    restart: unless-stopped
+    # Supplies the back-office credentials, session secret and COOKIE_SECURE.
+    env_file:
+      - path: ./packages/frontend/.env
+        required: false
+    environment:
+      NODE_ENV: production
+      PORT: 6065
+      # Server components reach the backend over the compose network by service
+      # name — `localhost` inside this container is the frontend itself. (The
+      # /api proxy uses the build-time copy of this same value; see the anchor.)
+      BACKEND_INTERNAL_URL: *backend-internal-url
+    ports:
+      - "6065:6065"
+    depends_on:
+      backend:
+        condition: service_healthy
