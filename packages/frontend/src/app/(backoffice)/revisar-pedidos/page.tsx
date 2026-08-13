@@ -3,9 +3,33 @@ import { getOrdersBySlot, getProducts, getSlots } from '@/lib/api';
 import { AutoRefresh } from '../AutoRefresh';
 import { SlotPicker } from '../SlotPicker';
 import { ViewHeader } from '../ViewHeader';
+import { slotLabel } from '../slotLabel';
+import { PrintButton } from './PrintButton';
 
 /** How many products share a row. The band is drawn per row, so this is markup. */
 const PER_ROW = 3;
+
+/**
+ * When the orders on the sheet were read, for the printed header.
+ *
+ * Strictly it is when the page was rendered rather than when the button was
+ * pressed, and that is the more useful of the two: it dates the *orders*, not
+ * the paper. AutoRefresh re-renders every couple of minutes, so it is never far
+ * behind — and it is what a sheet found on a bench needs in order to be trusted
+ * or discarded.
+ *
+ * Formatted on the server, which is safe here: this is a Server Component and
+ * its output is never re-rendered by the browser, so the locale cannot resolve
+ * one way on each side.
+ */
+const printedAt = () =>
+  new Date().toLocaleString('es-AR', {
+    day: 'numeric',
+    month: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 
 /** Splits a list into fixed-size chunks, the last one short. */
 function chunk<T>(list: T[], size: number): T[][] {
@@ -126,7 +150,16 @@ export default async function RevisarPedidosPage({
           slots={slots}
           currentSlotId={view.slot.id}
           closed={view.slot.status !== 'open'}
+          action={<PrintButton />}
         />
+
+        {/* Only on paper. The toolbar carries the bloque on screen, and the
+            toolbar is not printed — a sheet that does not say which bloque it is
+            is worse than no sheet, and one lying on a bench gives no clue how old
+            it is while the orders behind it keep changing. */}
+        <p className="print-sheet-head">
+          {slotLabel(view.slot)} · impreso {printedAt()}
+        </p>
 
         {clients.length === 0 ? (
           <p className="muted items-empty">

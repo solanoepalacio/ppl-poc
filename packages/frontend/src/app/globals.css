@@ -2083,3 +2083,114 @@ code {
     grid-template-columns: 1fr;
   }
 }
+
+/* On screen the printed header is redundant: the toolbar right above it already
+   says which bloque, and the page is being looked at now.
+   Declared *before* the print block on purpose. A media query adds no
+   specificity, so between two rules of equal weight the later one wins — with
+   this underneath, `display: none` would beat the print rule and the sheet would
+   go out with no bloque and no date on it. */
+.print-sheet-head {
+  display: none;
+}
+
+/* ── Revisar Pedidos on paper ─────────────────────────────────────────────────
+   The screen version is built for a wall: viewport-sized type, colour bands, a
+   fixed shell with its own scroller. None of that survives a printer, so this is
+   less a restyle than a second design of the same data.
+   Scoped to the print sheet's own element where it can be, since only this view
+   is printed today; the shell rules cannot be, and are harmless elsewhere. */
+@media print {
+  /* First and most important: the back-office shell is `position: fixed` with
+     `overflow-y: auto` on the column. Left alone, the printer gets exactly the
+     one screenful that happens to be scrolled into view and silently drops every
+     client below it — a sheet that looks complete and is not. */
+  body,
+  .bo-shell,
+  .bo-main {
+    position: static;
+    display: block;
+    overflow: visible;
+    height: auto;
+    /* The cream paper colour is a screen surface. Printers drop backgrounds by
+       default, but the ones set not to would lay down a full-page wash of it. */
+    background: #fff;
+  }
+  /* Navigation, the bloque picker, and the print button itself: all controls,
+     and a control on paper is just ink. The bloque they carried is reprinted by
+     .print-sheet-head, which is why that exists. */
+  .bo-sidebar,
+  .bo-toolbar {
+    display: none !important;
+  }
+  .bo-header {
+    padding: 0 0 8px;
+    /* Its own paper-coloured fill, which the body reset above does not reach. */
+    background: #fff;
+  }
+  .bo-content {
+    padding: 0;
+  }
+
+  .print-sheet-head {
+    display: block;
+    margin: 0 0 10pt;
+    font-size: 10pt;
+    color: #000;
+  }
+
+  /* Type in points, not vh. The vh sizes exist to be read from across a room;
+     against a sheet of paper they resolve against the paper's own height and
+     come out enormous. */
+  .review-list {
+    gap: 0;
+    margin: 0;
+  }
+  .review-client {
+    /* A client split across a page break is the one thing that makes this sheet
+       actively misleading: the second half reads as somebody else's order. */
+    break-inside: avoid;
+    box-shadow: none;
+    border: none;
+    border-top: 1pt solid #000;
+    border-radius: 0;
+    padding: 6pt 0;
+    background: #fff;
+  }
+  /* The one thing on the sheet that has to be found without reading: somebody
+     holding it is looking for a client, not for a product. Bigger and heavier
+     than the products by a clear margin — 12pt against their 10pt was not one,
+     the less so in a condensed face, where equal points read smaller. */
+  .review-client-name {
+    margin: 0 0 5pt;
+    font-size: 15pt;
+    font-weight: 700;
+    color: #000;
+  }
+  .review-products {
+    border-radius: 0;
+  }
+  /* The bands go. Browsers drop background colours by default when printing, so
+     alternating tints would be two identical white rows on most printers and a
+     toner bill on the rest. The hairline does the separating instead — it is
+     what the colour was standing in for up close anyway. */
+  .review-row:nth-child(odd),
+  .review-row:nth-child(even) {
+    background: transparent;
+  }
+  .review-row + .review-row {
+    border-top: 0.5pt solid #999;
+  }
+  .review-product {
+    padding: 2pt 6pt 2pt 0;
+  }
+  .review-product-name {
+    font-size: 10pt;
+    color: #000;
+  }
+  .review-product-qty {
+    font-size: 10pt;
+    color: #000;
+  }
+}
+
