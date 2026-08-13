@@ -263,4 +263,51 @@ describe('ClientsService', () => {
       );
     });
   });
+
+  describe('findByPhone', () => {
+    it('resolves a client by its stored digits', async () => {
+      prisma.client.findFirst.mockResolvedValueOnce(
+        row({ phone: '5491122334455' }),
+      );
+
+      await expect(service.findByPhone('5491122334455')).resolves.toEqual({
+        found: true,
+        client: row({ phone: '5491122334455' }),
+      });
+    });
+
+    it('normalizes the number before matching, and only matches active clients', async () => {
+      prisma.client.findFirst.mockResolvedValueOnce(
+        row({ phone: '5491122334455' }),
+      );
+
+      const res = await service.findByPhone('+54 9 11 2233-4455');
+
+      expect(res.found).toBe(true);
+      // However it was typed, it is the digits that are looked up — and a
+      // retired client must not resolve, since it cannot be given a link.
+      expect(prisma.client.findFirst.mock.calls[0][0].where).toEqual({
+        phone: '5491122334455',
+        active: true,
+      });
+    });
+
+    it('reports an unknown number as not found rather than throwing', async () => {
+      prisma.client.findFirst.mockResolvedValueOnce(null);
+
+      await expect(service.findByPhone('5490000000000')).resolves.toEqual({
+        found: false,
+      });
+    });
+
+    it('treats a blank or digitless number as not found without querying', async () => {
+      await expect(service.findByPhone('   ')).resolves.toEqual({
+        found: false,
+      });
+      await expect(service.findByPhone('sin teléfono')).resolves.toEqual({
+        found: false,
+      });
+      expect(prisma.client.findFirst).not.toHaveBeenCalled();
+    });
+  });
 });

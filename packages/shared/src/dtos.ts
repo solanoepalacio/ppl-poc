@@ -1,3 +1,4 @@
+import type { Client } from './models';
 import type { OrderItem } from './models';
 import type { Product } from './models';
 import type { Slot } from './slot';
@@ -21,6 +22,15 @@ export interface CreateLinkResponse {
    * The link stays valid until that bloque is closed (no fixed expiry time).
    */
   slotSeq: number;
+  /**
+   * Whether this is the client's existing link for the bloque rather than a
+   * newly minted one. Generating a link for a client who already has an unused
+   * one in the open bloque returns that link instead of issuing a second, so a
+   * caller that repeats the request — an automated agent answering a customer
+   * who writes twice — neither invalidates the link already shared nor leaves a
+   * surplus empty order behind.
+   */
+  reused: boolean;
 }
 
 /**
@@ -316,4 +326,21 @@ export interface DeleteClientResponse {
   id: string;
   /** `deleted` — no orders referenced it. `deactivated` — some did, so it was retired. */
   outcome: 'deleted' | 'deactivated';
+}
+
+/**
+ * `GET /clients/by-phone/:phone` response. Resolves an inbound message's number
+ * to the client it belongs to, so an automated caller can tell a customer from a
+ * stranger before acting on the message.
+ *
+ * Not finding a client is a normal answer, not an error, so it comes back as
+ * `found: false` on a successful response rather than a 404 — mirroring token
+ * validation, which reports invalidity in its body for the same reason. A caller
+ * branching on "is this a client?" should not have to treat its ordinary case as
+ * a failure.
+ */
+export interface ClientByPhoneResponse {
+  found: boolean;
+  /** The resolved client; absent when `found` is false. */
+  client?: Client;
 }

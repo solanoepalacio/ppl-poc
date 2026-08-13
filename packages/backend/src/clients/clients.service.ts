@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import type {
   Client,
+  ClientByPhoneResponse,
   CreateClientRequest,
   DeleteClientResponse,
   ManagedClient,
@@ -57,6 +58,34 @@ export class ClientsService {
     if (!client || !client.active) {
       throw new BadRequestException(`Client ${clientId} is not available.`);
     }
+  }
+
+  /**
+   * Resolves a phone number to the client it belongs to, for a caller holding an
+   * inbound message's number rather than a client id.
+   *
+   * The number is normalized before matching, so it resolves however it was
+   * typed — the stored value is digits only, and an inbound `wa_id` or a
+   * hand-typed `+54 9 11 2233-4455` both reduce to it.
+   *
+   * Not finding a client is reported, not thrown: telling a customer from a
+   * stranger is the caller's ordinary first question, and the answer "nobody" is
+   * as routine as any other. A digitless or blank number resolves to nobody
+   * without a query — there is no value to match on.
+   *
+   * Only active clients resolve. A retired client must not be handed a link, and
+   * `assertActive` would reject the follow-up anyway; matching it here would only
+   * turn one clear answer into a confusing two-step failure.
+   */
+  async findByPhone(phone: string): Promise<ClientByPhoneResponse> {
+    const normalized = normalizeClientPhone(phone);
+    if (normalized === null) {
+      return { found: false };
+    }
+    const client = await this.prisma.client.findFirst({
+      where: { phone: normalized, active: true },
+    });
+    return client ? { found: true, client } : { found: false };
   }
 
   async create(input: CreateClientRequest): Promise<Client> {

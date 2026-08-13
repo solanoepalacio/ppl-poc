@@ -1,0 +1,24 @@
+-- Records how an order came to exist: `link` when a shareable customer link
+-- created it, `manual` when the manager transcribed it in the back office.
+--
+-- The distinction is what makes link generation safely repeatable. A manually
+-- transcribed order also carries an unused token and a null `consumedAt`, so
+-- "the client's unconsumed order in the open bloque" matches manual orders too.
+-- Handing one back to a customer would corrupt data rather than merely confuse:
+-- confirming an order appends its items (createMany), so the customer's items
+-- would stack on top of the manager's and double that product's production
+-- totals.
+--
+-- Done with ALTER rather than the table rebuild Prisma usually emits, following
+-- 20260806120000_manage_clients: a rebuild copies every row of Order — plus its
+-- OrderItem, Slot and Client references — and the copy is where a rebuild loses
+-- data. An ADD COLUMN touches nothing that already exists.
+--
+-- Cannot fail: every existing row takes the default. `manual` is deliberate as
+-- that default. Historical rows are a mix of both origins and nothing can tell
+-- them apart retroactively, so treating them all as manual means no historical
+-- row is ever offered for reuse — at worst a client with an old unconsumed link
+-- gets a fresh one, which is exactly the behaviour before this change. The
+-- opposite default would make every historical manual order reusable and walk
+-- straight into the double-counting above.
+ALTER TABLE "Order" ADD COLUMN "source" TEXT NOT NULL DEFAULT 'manual';

@@ -86,6 +86,22 @@ model Order {
   /// Optional raw customer message (e.g. pasted WhatsApp text) captured when a
   /// manager transcribes an order by hand. Null when no message was captured.
   message     String?
+  /// How the order came to exist: `link` when a shareable customer link created
+  /// it, `manual` when the manager transcribed it in the back office. A plain
+  /// String constrained by the shared OrderSource union and validated in the
+  /// service layer (SQLite + Prisma have no native enums), matching Slot.status
+  /// and Product.category.
+  ///
+  /// Only a `link` order may be handed back to a customer: a manual order also
+  /// carries an unused token and an unset `consumedAt`, so without this column it
+  /// is indistinguishable from a live link, and reusing one would append the
+  /// customer's items to the manager's and double the production totals.
+  ///
+  /// The default makes the migration's ADD COLUMN valid on existing rows, and
+  /// `manual` is the safe value for them: nothing can tell a historical row's
+  /// origin retroactively, and treating them all as manual means none is ever
+  /// offered for reuse. Both writers set the value explicitly.
+  source      String    @default("manual")
 
   items  OrderItem[]
   slot   Slot        @relation(fields: [slotId], references: [id], onDelete: Restrict)

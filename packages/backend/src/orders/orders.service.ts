@@ -123,6 +123,10 @@ export class OrdersService {
         token: generateToken(),
         slotId,
         message,
+        // Explicit rather than left to the column default: this is the writer
+        // that makes the order manual, and link generation reads the column to
+        // decide what it may hand a customer.
+        source: 'manual',
         items:
           items.length > 0
             ? {

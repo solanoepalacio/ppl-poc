@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import type {
   Client,
+  ClientByPhoneResponse,
   DeleteClientResponse,
   ManagedClient,
 } from '@pannico/shared';
@@ -31,6 +32,21 @@ export class ClientsController {
     return includeInactive === 'true'
       ? this.clientsService.listManaged()
       : this.clientsService.list();
+  }
+
+  /**
+   * Resolves an inbound message's phone number to its client, so an automated
+   * caller can discard messages from numbers the directory does not know.
+   *
+   * An unknown number answers `{ found: false }` at 200 rather than 404: it is
+   * the expected outcome for a stranger, not a failure, and the read-only token
+   * validation endpoint already reports "no match" in its body for the same
+   * reason. Declared before any `:id` route would be, so a literal `by-phone`
+   * cannot be swallowed as an id.
+   */
+  @Get('by-phone/:phone')
+  findByPhone(@Param('phone') phone: string): Promise<ClientByPhoneResponse> {
+    return this.clientsService.findByPhone(phone);
   }
 
   @Post()
