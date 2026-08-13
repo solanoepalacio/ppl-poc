@@ -72,6 +72,7 @@ describe('WhatsappService', () => {
       deleteMany: jest.Mock;
     };
     client: { findFirst: jest.Mock; findMany: jest.Mock };
+    order: { findUnique: jest.Mock };
   };
   let links: { linkForAgent: jest.Mock };
   let service: WhatsappService;
@@ -96,6 +97,7 @@ describe('WhatsappService', () => {
         findFirst: jest.fn().mockResolvedValue(null),
         findMany: jest.fn().mockResolvedValue([]),
       },
+      order: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     links = {
       linkForAgent: jest
@@ -411,6 +413,64 @@ describe('WhatsappService', () => {
       expect(out).toEqual({ kind: 'order-sent' });
       expect(fetchMock).not.toHaveBeenCalled();
       expect(links.linkForAgent).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('the summary of a confirmed order', () => {
+    // orderConfirmed returns nothing on purpose, so the work it starts has to be
+    // let run before anything is asserted about it.
+    const settle = () => new Promise((r) => setImmediate(r));
+
+    const confirmed = {
+      client: { name: 'Alo Bar', phone: '543815551234' },
+      items: [
+        { quantity: 10, product: { name: 'Medialunas' } },
+        { quantity: 6, product: { name: 'Facturas' } },
+      ],
+    };
+
+    it('sends the customer what they confirmed, in the order they entered it', async () => {
+      prisma.order.findUnique.mockResolvedValue(confirmed);
+
+      service.orderConfirmed('ord_1');
+      await settle();
+
+      const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+      expect(body.to).toBe('543815551234');
+      expect(body.text.body).toContain('Medialunas x 10');
+      expect(body.text.body).toContain('Facturas x 6');
+      // Entered first, listed first: the items are read back by insertion order,
+      // which is what the customer saw on screen before confirming.
+      expect(body.text.body.indexOf('Medialunas')).toBeLessThan(
+        body.text.body.indexOf('Facturas'),
+      );
+      expect(prisma.order.findUnique.mock.calls[0][0].select.items.orderBy).toEqual({
+        id: 'asc',
+      });
+    });
+
+    it('sends nothing when the client has no number on file', async () => {
+      prisma.order.findUnique.mockResolvedValue({
+        ...confirmed,
+        client: { name: 'Alo Bar', phone: null },
+      });
+
+      service.orderConfirmed('ord_1');
+      await settle();
+
+      // Not a failure: a client can be in the directory without a phone, and
+      // there is nowhere to send this.
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('never throws at the order path, whatever happens here', async () => {
+      prisma.order.findUnique.mockRejectedValue(new Error('la base se cayó'));
+
+      // The confirmation is already committed by the time this runs. Throwing
+      // would report a completed order as a failure.
+      expect(() => service.orderConfirmed('ord_1')).not.toThrow();
+      await settle();
+      expect(fetchMock).not.toHaveBeenCalled();
     });
   });
 

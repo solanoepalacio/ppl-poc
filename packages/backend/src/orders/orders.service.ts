@@ -1,7 +1,9 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import {
   type ConfirmOrderItem,
@@ -21,6 +23,7 @@ import { SlotsService, toSlotDto } from '../slots/slots.service';
 import { ClientsService } from '../clients/clients.service';
 import { generateToken } from '../common/token.util';
 import { TokenService } from './token.service';
+import { ORDER_NOTIFIER, type OrderNotifier } from './order-notifier';
 
 @Injectable()
 export class OrdersService {
@@ -29,6 +32,10 @@ export class OrdersService {
     private readonly tokenService: TokenService,
     private readonly slotsService: SlotsService,
     private readonly clientsService: ClientsService,
+    /** Absent when nothing is wired up to hear about confirmations. */
+    @Optional()
+    @Inject(ORDER_NOTIFIER)
+    private readonly notifier?: OrderNotifier,
   ) {}
 
   /** Active catalog products, used by the form and the `/products` endpoint. */
@@ -99,6 +106,13 @@ export class OrdersService {
         data: { consumedAt: now, confirmedAt: now },
       }),
     ]);
+
+    // After the transaction, and deliberately not awaited. The order is already
+    // recorded, so nothing here can change the outcome the customer is waiting
+    // for — and making them wait on a third party for a message that is a
+    // courtesy would trade the one thing that must be fast for one that must
+    // only eventually happen.
+    this.notifier?.orderConfirmed(order.id);
   }
 
   /**

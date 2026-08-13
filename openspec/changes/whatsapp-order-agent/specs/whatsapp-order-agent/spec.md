@@ -281,6 +281,55 @@ new request: their order is placed, and a further message is a further order.
 - **THEN** they are given a link for the open bloque
 - **AND** the closed bloque's link is not reused, since it no longer works
 
+### Requirement: A confirmed order is sent back as a summary
+When a customer confirms an order, the system SHALL send them what they
+confirmed: each product with its quantity, listed in the order they entered
+them, so the message reads back the screen they just left rather than
+re-sorting it.
+
+It SHALL go to the number on the client's record. A client with no number on
+file SHALL simply not be sent one — that is a state the directory allows, not a
+failure.
+
+Sending SHALL NOT be part of confirming. The order is recorded and its link
+consumed first, and the summary is attempted afterwards without the customer
+waiting on it: the confirmation is what they are waiting for, the summary is a
+courtesy, and no failure to deliver a courtesy SHALL turn a recorded order into
+an error.
+
+The summary is a free-form message and SHALL therefore be governed by the
+service window like any other. A customer who reached the form through a link
+shared by hand has never written to the number, so no window is open and the
+message SHALL be refused — the order stands regardless, and the refusal SHALL be
+recorded where it can be seen.
+
+The order path SHALL NOT name a messaging channel. It SHALL announce that an
+order was confirmed, and whatever carries that to a customer SHALL register
+itself to hear it, so that removing the agent removes the message and changes
+nothing about confirming an order.
+
+#### Scenario: The customer gets back what they confirmed
+- **WHEN** a customer confirms an order and their client record has a number
+- **THEN** they are sent a summary listing each product and quantity
+
+#### Scenario: The summary reads in the order the products were entered
+- **WHEN** the summary is built
+- **THEN** its lines follow the order the customer added the products in
+
+#### Scenario: A client with no number is not sent one
+- **WHEN** the confirming client has no number on file
+- **THEN** no message is attempted
+- **AND** the order is confirmed as usual
+
+#### Scenario: A failed summary does not fail the order
+- **WHEN** the summary cannot be delivered, for any reason
+- **THEN** the order stays confirmed and its link consumed
+- **AND** the customer's confirmation still succeeds
+
+#### Scenario: An order confirms with nothing listening
+- **WHEN** no messaging channel is registered
+- **THEN** confirming an order behaves exactly as it did before
+
 ### Requirement: An unknown sender is answered without creating anything
 An inbound message from a number that matches no active client SHALL NOT create
 an order, a token or a client. The system SHALL reply telling the sender to leave

@@ -68,6 +68,7 @@ describe('OrdersService', () => {
     getDemandMap: jest.Mock;
   };
   let clients: { assertActive: jest.Mock };
+  let notifier: { orderConfirmed: jest.Mock };
   let service: OrdersService;
 
   beforeEach(() => {
@@ -82,12 +83,14 @@ describe('OrdersService', () => {
         .mockResolvedValue(new Map<string, { name: string; quantity: number }>()),
     };
     clients = { assertActive: jest.fn().mockResolvedValue(undefined) };
+    notifier = { orderConfirmed: jest.fn() };
     const tokenService = new TokenService(prisma as unknown as PrismaService);
     service = new OrdersService(
       prisma as unknown as PrismaService,
       tokenService,
       slots as unknown as SlotsService,
       clients as unknown as ClientsService,
+      notifier,
     );
   });
 
@@ -105,6 +108,41 @@ describe('OrdersService', () => {
       const updateArg = prisma.order.update.mock.calls[0][0];
       expect(updateArg.data.consumedAt).toBeInstanceOf(Date);
       expect(updateArg.data.confirmedAt).toBeInstanceOf(Date);
+    });
+
+    it('announces the confirmation once the order is recorded', async () => {
+      prisma.order.findUnique.mockResolvedValue({ ...pendingOrder });
+      prisma.product.findMany.mockResolvedValue([{ id: 'p1' }]);
+
+      await service.confirm('tok_valid', [{ productId: 'p1', quantity: 2 }]);
+
+      expect(notifier.orderConfirmed).toHaveBeenCalledWith(pendingOrder.id);
+    });
+
+    it('says nothing about an order that was rejected', async () => {
+      prisma.order.findUnique.mockResolvedValue({ ...pendingOrder });
+
+      await expect(service.confirm('tok_valid', [])).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(notifier.orderConfirmed).not.toHaveBeenCalled();
+    });
+
+    it('confirms with nothing listening', async () => {
+      // The deployment without an agent: the notifier is simply absent, and the
+      // order path is unchanged by its absence.
+      const bare = new OrdersService(
+        prisma as unknown as PrismaService,
+        new TokenService(prisma as unknown as PrismaService),
+        slots as unknown as SlotsService,
+        clients as unknown as ClientsService,
+      );
+      prisma.order.findUnique.mockResolvedValue({ ...pendingOrder });
+      prisma.product.findMany.mockResolvedValue([{ id: 'p1' }]);
+
+      await expect(
+        bare.confirm('tok_valid', [{ productId: 'p1', quantity: 1 }]),
+      ).resolves.toBeUndefined();
     });
 
     it('rejects an empty order and leaves the link usable', async () => {

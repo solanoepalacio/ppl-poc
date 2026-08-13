@@ -231,6 +231,56 @@ export class WhatsappService {
   }
 
   /**
+   * Sends the customer back what they just confirmed.
+   *
+   * Fire-and-forget by signature: it takes the order id and returns nothing, so
+   * the order path cannot accidentally come to depend on it. Everything is
+   * caught here — a confirmation that already happened must not be reported as a
+   * failure because a courtesy message did not go out.
+   *
+   * The 24-hour service window governs this like any other free-form message,
+   * and it is the reason this will not always arrive: a customer who reached the
+   * form through a link the bakery pasted by hand has never written to the
+   * number, so there is no window open to answer into and Meta refuses it. The
+   * order is unaffected — only the receipt is.
+   */
+  orderConfirmed(orderId: string): void {
+    void this.sendOrderSummary(orderId).catch((e: unknown) => {
+      this.logger.error(
+        `Summary for ${orderId} failed: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    });
+  }
+
+  private async sendOrderSummary(orderId: string): Promise<void> {
+    if (!this.config.enabled) return;
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        client: { select: { name: true, phone: true } },
+        // Insertion order, which is the order the customer entered the products
+        // in: ids are time-ordered, and the items are created in one go from the
+        // list the form submitted. The summary therefore reads back the way it
+        // read on screen rather than re-sorting it.
+        items: {
+          orderBy: { id: 'asc' },
+          select: { quantity: true, product: { select: { name: true } } },
+        },
+      },
+    });
+    // No phone is not a failure: a client can be in the directory without one,
+    // and there is simply nowhere to send this.
+    if (!order?.client.phone || order.items.length === 0) return;
+    await this.send(
+      order.client.phone,
+      orderSummaryText(
+        order.client.name,
+        order.items.map((i) => `${i.product.name} x ${i.quantity}`),
+      ),
+    );
+  }
+
+  /**
    * The conversations a person is currently handling, newest activity first.
    *
    * Ordering by the deadline *is* ordering by activity: every row's deadline is
@@ -396,6 +446,16 @@ const HANDOFF_END_TEXT = 'Fin de asesoría.';
 /** Provisional copy, to be reworded. */
 const UNKNOWN_SENDER_TEXT =
   'Hola! No tenemos este número registrado. Dejanos tu pedido por acá y una persona lo va a tomar.';
+
+/**
+ * Provisional copy, to be reworded.
+ *
+ * One product per line rather than a sentence: this is read to be checked
+ * against what the customer meant to order, and a list is checked line by line
+ * while a paragraph has to be parsed.
+ */
+const orderSummaryText = (name: string, lines: string[]) =>
+  `${name}, recibimos tu pedido:\n\n${lines.join('\n')}\n\n¡Gracias!`;
 
 const orderText = (name: string, url: string) =>
   `Hola ${name}! Hacé tu pedido acá: ${url} — válido para el bloque actual`;

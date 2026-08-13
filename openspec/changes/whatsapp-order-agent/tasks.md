@@ -121,6 +121,27 @@
   each number; ending returns the customer to the agent; ending one leaves the
   others holding; ending something already gone reports it ended nothing.
 
+## 5e. The summary of a confirmed order
+
+- [ ] 5.25 A notifier seam owned by the order path: a token and an interface with
+  no dependencies, injected optionally. Orders announce a confirmation; the agent
+  registers itself to hear it. The arrow points that way so the agent stays
+  liftable — a direct call from `OrdersService` would make removing it a change
+  to the order path.
+- [ ] 5.26 Send after the transaction and without awaiting it. The confirmation
+  is what the customer is waiting for; the summary is a courtesy, and one that
+  cannot be delivered must not turn a recorded order into an error.
+- [ ] 5.27 Items read back by insertion order, so the message matches the summary
+  the customer just reviewed on screen instead of re-sorting it.
+- [ ] 5.28 No phone on the client record is a skip, not a failure.
+- [ ] 5.29 Tests: the summary goes to the client's number in entry order; no
+  number means no attempt; nothing thrown at the order path whatever fails here;
+  and an order confirms with no notifier registered at all.
+- [ ] 5.30 The service window applies. A link shared by hand means the customer
+  never wrote to the number, so Meta refuses the summary (131047) and only a
+  template would get through. Expect this to be the common case until orders
+  arrive through the agent.
+
 ## 6. Verify locally
 
 - [ ] 6.1 Load the real phone numbers into the directory first, **in the form

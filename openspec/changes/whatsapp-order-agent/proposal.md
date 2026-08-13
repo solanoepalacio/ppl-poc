@@ -21,6 +21,8 @@ while somebody is looking at the screen.
   and repeated messages inside a short window are answered once.
 - **The manual Generar link control stays**, for unknown numbers and customers
   who are not on WhatsApp.
+- **A confirmed order is sent back to the customer as a summary**, listing what
+  they ordered. Attempted after the order is recorded and never in its way.
 - **A customer can ask for a person**, and while a person has the conversation the
   agent says nothing. It ends on its own once the customer goes quiet, **or when
   the back office ends it** from a list of the conversations currently open.
