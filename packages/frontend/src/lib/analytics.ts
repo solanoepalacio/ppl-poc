@@ -13,7 +13,6 @@ export type AnalyticsEvent =
   // Customer order form
   | 'order_confirmed'
   | 'order_confirm_failed'
-  | 'order_review_raised'
   | 'order_summary_toggled'
   | 'order_filter_used'
   | 'order_link_invalid'

@@ -1,8 +1,18 @@
 {
   "compilerOptions": {
-    "module": "CommonJS",
+    // `node16` rather than the older `node`/CommonJS pair. The LangChain and
+    // LangWatch packages publish their entry points through package.json
+    // `exports`, which node10 resolution predates: under it their types either
+    // fail to resolve or silently degrade to `any`, which is worse — it type-checks
+    // and means nothing. Node resolves them correctly at runtime, and since this
+    // package has no `"type": "module"`, `node16` still emits and loads CommonJS.
+    "module": "node16",
     "target": "ES2021",
-    "moduleResolution": "node",
+    "moduleResolution": "node16",
+    // Required by ts-jest to keep the `node16` module kind rather than silently
+    // rewriting it back to CommonJS — which would take resolution back to node10
+    // and make the tests disagree with `tsc` about what the LangChain types are.
+    "isolatedModules": true,
     "declaration": true,
     "removeComments": true,
     "emitDecoratorMetadata": true,

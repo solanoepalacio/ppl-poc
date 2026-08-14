@@ -3,6 +3,10 @@ import { WhatsappService } from './whatsapp.service';
 import type { WhatsappConfigService } from './whatsapp.config';
 import type { PrismaService } from '../prisma/prisma.service';
 import type { LinksService } from '../links/links.service';
+import type {
+  AbstainReason,
+  OrderIntentClassifier,
+} from '../intent/order-intent.classifier';
 
 const APP_SECRET = 'secreto-de-prueba';
 
@@ -18,7 +22,7 @@ const config = {
 } as unknown as WhatsappConfigService;
 
 /** A delivery carrying one inbound text message. */
-const inbound = (wamid: string, from: string) => ({
+const inbound = (wamid: string, from: string, body = 'hola') => ({
   object: 'whatsapp_business_account',
   entry: [
     {
@@ -29,7 +33,33 @@ const inbound = (wamid: string, from: string) => ({
             messaging_product: 'whatsapp',
             metadata: { phone_number_id: '111' },
             messages: [
-              { id: wamid, from, timestamp: '1', type: 'text', text: { body: 'hola' } },
+              { id: wamid, from, timestamp: '1', type: 'text', text: { body } },
+            ],
+          },
+        },
+      ],
+    },
+  ],
+});
+
+/** A delivery carrying an inbound message that has no text at all. */
+const inboundAudio = (wamid: string, from: string) => ({
+  object: 'whatsapp_business_account',
+  entry: [
+    {
+      changes: [
+        {
+          field: 'messages',
+          value: {
+            messaging_product: 'whatsapp',
+            messages: [
+              {
+                id: wamid,
+                from,
+                timestamp: '1',
+                type: 'audio',
+                audio: { id: 'media.1', mime_type: 'audio/ogg' },
+              },
             ],
           },
         },
@@ -60,10 +90,28 @@ describe('WhatsappService', () => {
   let prisma: {
     whatsappInbound: { create: jest.Mock; findFirst: jest.Mock; update: jest.Mock };
     client: { findFirst: jest.Mock };
+    order: { findUnique: jest.Mock };
   };
   let links: { linkForAgent: jest.Mock };
+  let intent: { classify: jest.Mock };
   let service: WhatsappService;
   let fetchMock: jest.Mock;
+
+  /** The classifier decided this. Defaults to an order, since most cases here
+   * are about what happens *after* a message has been recognised as one. */
+  const classifiesAs = (
+    verdict:
+      | { intent: 'order' | 'not-order' }
+      | { intent: 'abstain'; reason: AbstainReason },
+  ) => intent.classify.mockResolvedValue(verdict);
+
+  /** A text message from a sender, as `extractMessages` would hand it over. */
+  const message = (wamid: string, from: string, text = 'hola') => ({
+    wamid,
+    from,
+    type: 'text',
+    text,
+  });
 
   beforeEach(() => {
     prisma = {
@@ -73,18 +121,21 @@ describe('WhatsappService', () => {
         update: jest.fn().mockResolvedValue({}),
       },
       client: { findFirst: jest.fn().mockResolvedValue(null) },
+      order: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     links = {
       linkForAgent: jest
         .fn()
         .mockResolvedValue({ url: 'https://t.test/order/abc', reused: false }),
     };
+    intent = { classify: jest.fn().mockResolvedValue({ intent: 'order' }) };
     fetchMock = jest.fn().mockResolvedValue({ ok: true, text: async () => '' });
     global.fetch = fetchMock as unknown as typeof fetch;
     service = new WhatsappService(
       prisma as unknown as PrismaService,
       config,
       links as unknown as LinksService,
+      intent as unknown as OrderIntentClassifier,
     );
   });
 
@@ -127,8 +178,25 @@ describe('WhatsappService', () => {
 
   describe('extractMessages', () => {
     it('reads the inbound messages out of a delivery', () => {
-      expect(service.extractMessages(inbound('wamid.1', '543815551234'))).toEqual([
-        { wamid: 'wamid.1', from: '543815551234' },
+      expect(
+        service.extractMessages(inbound('wamid.1', '543815551234', 'quiero pedir')),
+      ).toEqual([
+        {
+          wamid: 'wamid.1',
+          from: '543815551234',
+          type: 'text',
+          // The body comes through: it is what the classifier reads, and
+          // without it every message would be unclassifiable.
+          text: 'quiero pedir',
+        },
+      ]);
+    });
+
+    it('carries the type but no text for a message that has none', () => {
+      // A voice note is not classified and is not transcribed; the missing text
+      // is what says so.
+      expect(service.extractMessages(inboundAudio('wamid.2', '543815551234'))).toEqual([
+        { wamid: 'wamid.2', from: '543815551234', type: 'audio', text: undefined },
       ]);
     });
 
@@ -148,10 +216,11 @@ describe('WhatsappService', () => {
   describe('handleMessage', () => {
     const known = { id: 'c1', name: 'Alo Bar' };
 
-    it('replies to a known sender with their link', async () => {
+    it('replies to a known sender whose message asks to order', async () => {
       prisma.client.findFirst.mockResolvedValue(known);
+      classifiesAs({ intent: 'order' });
 
-      const out = await service.handleMessage({ wamid: 'w1', from: '543815551234' });
+      const out = await service.handleMessage(message('w1', '543815551234'));
 
       expect(out).toEqual({ kind: 'replied', clientName: 'Alo Bar', reused: false });
       expect(links.linkForAgent).toHaveBeenCalledWith('c1');
@@ -170,10 +239,152 @@ describe('WhatsappService', () => {
       expect(body.interactive.body.text).not.toContain('https://');
     });
 
+    describe('the classification gates everything', () => {
+      it('creates nothing and sends nothing when it is not an order', async () => {
+        prisma.client.findFirst.mockResolvedValue(known);
+        classifiesAs({ intent: 'not-order' });
+
+        const out = await service.handleMessage(
+          message('w1', '543815551234', 'a qué hora abren?'),
+        );
+
+        expect(out).toEqual({ kind: 'not-order', clientName: 'Alo Bar' });
+        // A link that was never created cannot be sent to somebody who was not
+        // ordering, and cannot occupy their slot for the bloque.
+        expect(links.linkForAgent).not.toHaveBeenCalled();
+        expect(fetchMock).not.toHaveBeenCalled();
+      });
+
+      it('creates nothing and sends nothing when there is no verdict', async () => {
+        prisma.client.findFirst.mockResolvedValue(known);
+        classifiesAs({ intent: 'abstain', reason: 'timeout' });
+
+        const out = await service.handleMessage(message('w1', '543815551234'));
+
+        // Fail-closed: the same ending as "not an order", carrying the reason it
+        // was reached, which is the only thing that tells the two apart.
+        expect(out).toEqual({
+          kind: 'abstain',
+          clientName: 'Alo Bar',
+          reason: 'timeout',
+        });
+        expect(links.linkForAgent).not.toHaveBeenCalled();
+        expect(fetchMock).not.toHaveBeenCalled();
+      });
+
+      it('keeps every abstain reason distinguishable', async () => {
+        prisma.client.findFirst.mockResolvedValue(known);
+
+        for (const reason of ['unconfigured', 'no-text', 'transport'] as const) {
+          classifiesAs({ intent: 'abstain', reason });
+          await expect(
+            service.handleMessage(message(`w-${reason}`, '543815551234')),
+          ).resolves.toEqual({ kind: 'abstain', clientName: 'Alo Bar', reason });
+        }
+      });
+
+      it('classifies the message body, and only after resolving the client', async () => {
+        prisma.client.findFirst.mockResolvedValue(known);
+
+        await service.handleMessage(
+          message('w1', '543815551234', 'hola! me mandás 3 docenas?'),
+        );
+
+        expect(intent.classify).toHaveBeenCalledWith('hola! me mandás 3 docenas?');
+      });
+
+      it('does not classify a message from somebody we do not know', async () => {
+        prisma.client.findFirst.mockResolvedValue(null);
+
+        await service.handleMessage(message('w1', '999'));
+
+        // The courtesy reply does not depend on intent, and paying for an
+        // inference to decide something we will not act on is pure cost.
+        expect(intent.classify).not.toHaveBeenCalled();
+      });
+
+      it('passes no text along for a message that carries none', async () => {
+        prisma.client.findFirst.mockResolvedValue(known);
+        classifiesAs({ intent: 'abstain', reason: 'no-text' });
+
+        const out = await service.handleMessage({
+          wamid: 'w1',
+          from: '543815551234',
+          type: 'audio',
+        });
+
+        // The classifier is what declines to transcribe; the service just hands
+        // over what the message had, which for a voice note is nothing.
+        expect(intent.classify).toHaveBeenCalledWith(undefined);
+        expect(out).toEqual({
+          kind: 'abstain',
+          clientName: 'Alo Bar',
+          reason: 'no-text',
+        });
+        expect(fetchMock).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('an unanswered message consumes nothing', () => {
+      it('does not arm the suppression window', async () => {
+        prisma.client.findFirst.mockResolvedValue(known);
+        classifiesAs({ intent: 'not-order' });
+
+        await service.handleMessage(message('w1', '543815551234', 'gracias!'));
+
+        // `markReplied` is tied to a reply that went out, and none did. The
+        // window exists to stop *us* answering three times; a message we chose
+        // not to answer is not an answer.
+        expect(prisma.whatsappInbound.update).not.toHaveBeenCalled();
+      });
+
+      it('answers the order that follows a greeting moments later', async () => {
+        prisma.client.findFirst.mockResolvedValue(known);
+        classifiesAs({ intent: 'not-order' });
+        await service.handleMessage(message('w1', '543815551234', 'hola'));
+
+        // Nothing was marked replied, so the window is still shut — the same
+        // customer asking to order ten seconds later is served immediately
+        // rather than met with silence for the rest of it.
+        classifiesAs({ intent: 'order' });
+        const out = await service.handleMessage(
+          message('w2', '543815551234', 'quiero 3 docenas de facturas'),
+        );
+
+        expect(out).toEqual({ kind: 'replied', clientName: 'Alo Bar', reused: false });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+      });
+
+      it('still claims the message, so a redelivery is not acted on twice', async () => {
+        prisma.client.findFirst.mockResolvedValue(known);
+        classifiesAs({ intent: 'not-order' });
+
+        await service.handleMessage(message('w1', '543815551234'));
+
+        // Recording that a message was handled and recording that a reply was
+        // sent are separate facts: the row is the redelivery guard, keyed on
+        // wamid, and has nothing to do with whether we replied.
+        expect(prisma.whatsappInbound.create).toHaveBeenCalledWith({
+          data: { wamid: 'w1', from: '543815551234' },
+        });
+      });
+
+      it('ignores a redelivery of a message that produced no reply', async () => {
+        prisma.whatsappInbound.create.mockRejectedValue(new Error('unique'));
+        prisma.client.findFirst.mockResolvedValue(known);
+
+        const out = await service.handleMessage(message('w1', '543815551234'));
+
+        expect(out).toEqual({ kind: 'ignored', reason: 'ya procesado' });
+        expect(intent.classify).not.toHaveBeenCalled();
+        expect(fetchMock).not.toHaveBeenCalled();
+      });
+    });
+
     it('keeps the button label and body inside Meta’s limits', async () => {
       prisma.client.findFirst.mockResolvedValue({ id: 'c1', name: 'X'.repeat(200) });
 
-      await service.handleMessage({ wamid: 'w1', from: '543815551234' });
+      await service.handleMessage(message('w1', '543815551234'));
 
       // 20 and 1024 are hard caps: over either, the send is rejected outright
       // rather than truncated, so the customer gets nothing at all.
@@ -185,7 +396,7 @@ describe('WhatsappService', () => {
     it('matches a sender whose stored number carries the Argentine 9', async () => {
       prisma.client.findFirst.mockResolvedValue(known);
 
-      await service.handleMessage({ wamid: 'w1', from: '5493815551234' });
+      await service.handleMessage(message('w1', '5493815551234'));
 
       // Both sides are canonicalised, so the stored number is looked up without
       // the 9 whichever way it was entered.
@@ -198,7 +409,7 @@ describe('WhatsappService', () => {
     it('only ever resolves an active client', async () => {
       prisma.client.findFirst.mockResolvedValue(null);
 
-      const out = await service.handleMessage({ wamid: 'w1', from: '543815551234' });
+      const out = await service.handleMessage(message('w1', '543815551234'));
 
       expect(prisma.client.findFirst.mock.calls[0][0].where.active).toBe(true);
       expect(out).toEqual({ kind: 'unknown-sender' });
@@ -206,7 +417,7 @@ describe('WhatsappService', () => {
     });
 
     it('answers an unknown sender without creating anything', async () => {
-      const out = await service.handleMessage({ wamid: 'w1', from: '999' });
+      const out = await service.handleMessage(message('w1', '999'));
 
       expect(out).toEqual({ kind: 'unknown-sender' });
       expect(links.linkForAgent).not.toHaveBeenCalled();
@@ -219,7 +430,7 @@ describe('WhatsappService', () => {
       // The primary key on wamid is what makes the second attempt a no-op.
       prisma.whatsappInbound.create.mockRejectedValue(new Error('unique'));
 
-      const out = await service.handleMessage({ wamid: 'w1', from: '543815551234' });
+      const out = await service.handleMessage(message('w1', '543815551234'));
 
       expect(out).toEqual({ kind: 'ignored', reason: 'ya procesado' });
       expect(fetchMock).not.toHaveBeenCalled();
@@ -228,7 +439,7 @@ describe('WhatsappService', () => {
     it('suppresses a second reply to a sender answered moments ago', async () => {
       prisma.whatsappInbound.findFirst.mockResolvedValue({ wamid: 'w0' });
 
-      const out = await service.handleMessage({ wamid: 'w1', from: '543815551234' });
+      const out = await service.handleMessage(message('w1', '543815551234'));
 
       expect(out).toEqual({ kind: 'suppressed' });
       expect(fetchMock).not.toHaveBeenCalled();
@@ -240,7 +451,7 @@ describe('WhatsappService', () => {
     it('suppresses on the canonical sender, not the raw one', async () => {
       prisma.client.findFirst.mockResolvedValue(known);
 
-      await service.handleMessage({ wamid: 'w1', from: '5493815551234' });
+      await service.handleMessage(message('w1', '5493815551234'));
 
       // Stored canonical: the same person reaching us with and without the
       // Argentine 9 must not count as two senders and get two replies.
@@ -259,7 +470,7 @@ describe('WhatsappService', () => {
       prisma.client.findFirst.mockResolvedValue(known);
       links.linkForAgent.mockResolvedValue({ url: 'https://t.test/order/old', reused: true });
 
-      const out = await service.handleMessage({ wamid: 'w1', from: '543815551234' });
+      const out = await service.handleMessage(message('w1', '543815551234'));
 
       expect(out).toEqual({ kind: 'replied', clientName: 'Alo Bar', reused: true });
     });
@@ -268,7 +479,7 @@ describe('WhatsappService', () => {
       prisma.client.findFirst.mockResolvedValue(known);
       fetchMock.mockRejectedValue(new Error('network down'));
 
-      const out = await service.handleMessage({ wamid: 'w1', from: '543815551234' });
+      const out = await service.handleMessage(message('w1', '543815551234'));
 
       // The link exists and the manager can share it by hand; throwing here
       // would only make Meta redeliver and mint another.
@@ -282,7 +493,7 @@ describe('WhatsappService', () => {
     it('marks the message replied only when the send succeeded', async () => {
       prisma.client.findFirst.mockResolvedValue(known);
 
-      await service.handleMessage({ wamid: 'w1', from: '543815551234' });
+      await service.handleMessage(message('w1', '543815551234'));
 
       expect(prisma.whatsappInbound.update).toHaveBeenCalledWith({
         where: { wamid: 'w1' },
@@ -295,8 +506,111 @@ describe('WhatsappService', () => {
       fetchMock.mockResolvedValue({ ok: false, status: 400, text: async () => 'bad' });
 
       await expect(
-        service.handleMessage({ wamid: 'w1', from: '543815551234' }),
+        service.handleMessage(message('w1', '543815551234')),
       ).resolves.toMatchObject({ kind: 'replied' });
+    });
+  });
+
+  describe('sendOrderConfirmation', () => {
+    const confirmedOrder = {
+      client: { phone: '543815551234' },
+      items: [
+        { quantity: 3, product: { name: 'Medialunas' } },
+        { quantity: 1, product: { name: 'Pan de campo' } },
+      ],
+    };
+
+    /** The client wrote to us this recently, or never. */
+    const lastInbound = (recent: boolean) =>
+      prisma.whatsappInbound.findFirst.mockResolvedValue(
+        recent ? { wamid: 'w0' } : null,
+      );
+
+    it('sends the customer what they ordered', async () => {
+      prisma.order.findUnique.mockResolvedValue(confirmedOrder);
+      lastInbound(true);
+
+      await service.sendOrderConfirmation('o1');
+
+      const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+      expect(body.to).toBe('543815551234');
+      // Templated Spanish, and plain text: there is no link to put on a button,
+      // and this one is read rather than acted on.
+      expect(body.type).toBe('text');
+      expect(body.text.body).toContain('3 x Medialunas');
+      expect(body.text.body).toContain('1 x Pan de campo');
+      // Meta rejects a text body over 4096 characters outright.
+      expect(body.text.body.length).toBeLessThanOrEqual(4096);
+    });
+
+    it('looks only at inbound messages inside the service window', async () => {
+      prisma.order.findUnique.mockResolvedValue(confirmedOrder);
+      lastInbound(true);
+
+      await service.sendOrderConfirmation('o1');
+
+      const { where } = prisma.whatsappInbound.findFirst.mock.calls[0][0];
+      expect(where.from).toBe('543815551234');
+      expect(where.receivedAt.gte).toBeInstanceOf(Date);
+      // Every inbound message counts, replied or not: the window is opened by
+      // the customer writing, which happens whether or not we answered.
+      expect(where.replied).toBeUndefined();
+    });
+
+    it('sends nothing, and reports no failure, without a recent inbound', async () => {
+      prisma.order.findUnique.mockResolvedValue(confirmedOrder);
+      lastInbound(false);
+
+      // The expected case for a link the manager generated by hand: that
+      // customer may never have messaged us, and a free-form send to them would
+      // be rejected rather than delivered.
+      await expect(service.sendOrderConfirmation('o1')).resolves.toBeUndefined();
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('sends nothing for a client with no number on file', async () => {
+      prisma.order.findUnique.mockResolvedValue({
+        ...confirmedOrder,
+        client: { phone: null },
+      });
+      lastInbound(true);
+
+      await service.sendOrderConfirmation('o1');
+
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('sends nothing for an order with no items', async () => {
+      prisma.order.findUnique.mockResolvedValue({ ...confirmedOrder, items: [] });
+      lastInbound(true);
+
+      await service.sendOrderConfirmation('o1');
+
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('does not raise when the send fails', async () => {
+      prisma.order.findUnique.mockResolvedValue(confirmedOrder);
+      lastInbound(true);
+      fetchMock.mockRejectedValue(new Error('network down'));
+
+      // The order is already confirmed and committed by the time this runs;
+      // nothing here can, or should, undo it.
+      await expect(service.sendOrderConfirmation('o1')).resolves.toBeUndefined();
+    });
+
+    it('does not look anything up when the agent is not configured', async () => {
+      const inert = new WhatsappService(
+        prisma as unknown as PrismaService,
+        { enabled: false } as unknown as WhatsappConfigService,
+        links as unknown as LinksService,
+        intent as unknown as OrderIntentClassifier,
+      );
+
+      await inert.sendOrderConfirmation('o1');
+
+      expect(prisma.order.findUnique).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
     });
   });
 });

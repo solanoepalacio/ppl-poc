@@ -1,8 +1,42 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { setupObservability } from 'langwatch/observability/node';
 import { AppModule } from './app.module';
+import { readTracingConfig } from './llm/llm.config';
+
+/**
+ * Starts LangWatch, if it is configured at all.
+ *
+ * Before `NestFactory.create`, and deliberately: the tracer provider has to
+ * exist before anything that might trace is instantiated, and a provider
+ * installed afterwards is one the already-built spans never see.
+ *
+ * Guarded on the key and wrapped, because tracing is the one part of this that
+ * must not be able to stop the app: an untraced backend still takes orders. The
+ * absence of a key is the ordinary case, not a failure, and is reported by
+ * `LlmConfigService` rather than shouted about here.
+ */
+function startTracing(): void {
+  const tracing = readTracingConfig();
+  if (!tracing) return;
+  try {
+    setupObservability({
+      serviceName: 'pannico-backend',
+      langwatch: { apiKey: tracing.apiKey, endpoint: tracing.endpoint },
+    });
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error(
+      `LangWatch setup failed; continuing without tracing: ${
+        e instanceof Error ? e.message : String(e)
+      }`,
+    );
+  }
+}
 
 async function bootstrap(): Promise<void> {
+  startTracing();
+
   // `rawBody` keeps the exact bytes of each request body alongside the parsed
   // one. The WhatsApp webhook needs them: Meta's signature is an HMAC over what
   // was actually sent, and verifying it against a re-serialised payload proves

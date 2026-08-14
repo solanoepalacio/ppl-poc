@@ -4,6 +4,7 @@ import { TokenService } from './token.service';
 import type { PrismaService } from '../prisma/prisma.service';
 import type { SlotsService } from '../slots/slots.service';
 import type { ClientsService } from '../clients/clients.service';
+import type { WhatsappService } from '../whatsapp/whatsapp.service';
 
 /** The open bloque resolveSlot returns by default in these unit tests. */
 const openSlot = {
@@ -71,6 +72,7 @@ describe('OrdersService', () => {
     getDemandMap: jest.Mock;
   };
   let clients: { assertActive: jest.Mock };
+  let whatsapp: { sendOrderConfirmation: jest.Mock };
   let service: OrdersService;
 
   beforeEach(() => {
@@ -85,12 +87,14 @@ describe('OrdersService', () => {
         .mockResolvedValue(new Map<string, { name: string; quantity: number }>()),
     };
     clients = { assertActive: jest.fn().mockResolvedValue(undefined) };
+    whatsapp = { sendOrderConfirmation: jest.fn().mockResolvedValue(undefined) };
     const tokenService = new TokenService(prisma as unknown as PrismaService);
     service = new OrdersService(
       prisma as unknown as PrismaService,
       tokenService,
       slots as unknown as SlotsService,
       clients as unknown as ClientsService,
+      whatsapp as unknown as WhatsappService,
     );
   });
 
@@ -108,6 +112,38 @@ describe('OrdersService', () => {
       const updateArg = prisma.order.update.mock.calls[0][0];
       expect(updateArg.data.consumedAt).toBeInstanceOf(Date);
       expect(updateArg.data.confirmedAt).toBeInstanceOf(Date);
+    });
+
+    it('echoes the confirmed order back over WhatsApp', async () => {
+      prisma.order.findUnique.mockResolvedValue({ ...pendingOrder });
+      prisma.product.findMany.mockResolvedValue([{ id: 'p1' }]);
+
+      await service.confirm('tok_valid', [{ productId: 'p1', quantity: 2 }]);
+
+      // Whether it is actually sent is the agent's decision — it depends on the
+      // service window, which this side knows nothing about.
+      expect(whatsapp.sendOrderConfirmation).toHaveBeenCalledWith('order_1');
+    });
+
+    it('does not make the customer wait on the recap, and survives its failure', async () => {
+      prisma.order.findUnique.mockResolvedValue({ ...pendingOrder });
+      prisma.product.findMany.mockResolvedValue([{ id: 'p1' }]);
+      // Never settles: if `confirm` awaited this, the customer's tap would hang
+      // on Meta's API — least acceptable now that a successful confirm closes
+      // their window.
+      whatsapp.sendOrderConfirmation.mockReturnValue(new Promise(() => undefined));
+
+      await expect(
+        service.confirm('tok_valid', [{ productId: 'p1', quantity: 2 }]),
+      ).resolves.toBeUndefined();
+
+      // And a send that rejects leaves the order confirmed rather than turning
+      // a delivered order into a failed request.
+      whatsapp.sendOrderConfirmation.mockRejectedValue(new Error('Meta down'));
+      prisma.order.findUnique.mockResolvedValue({ ...pendingOrder });
+      await expect(
+        service.confirm('tok_valid', [{ productId: 'p1', quantity: 2 }]),
+      ).resolves.toBeUndefined();
     });
 
     it('rejects an empty order and leaves the link usable', async () => {

@@ -5,9 +5,10 @@ import { TokenService } from './token.service';
 import { TokenGuard } from './token.guard';
 import { SlotsModule } from '../slots/slots.module';
 import { ClientsModule } from '../clients/clients.module';
+import { WhatsappModule } from '../whatsapp/whatsapp.module';
 
 @Module({
-  imports: [SlotsModule, ClientsModule],
+  imports: [SlotsModule, ClientsModule, WhatsappModule],
   controllers: [OrdersController],
   providers: [OrdersService, TokenService, TokenGuard],
   exports: [TokenService],

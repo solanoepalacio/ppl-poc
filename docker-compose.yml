@@ -27,9 +27,9 @@ services:
     image: pannico-backend
     container_name: pannico-backend
     restart: unless-stopped
-    # Supplies the Meta/WhatsApp credentials and FRONTEND_BASE_URL (the public
-    # origin used to build shareable order links — a real hostname, so it is
-    # taken from the file rather than overridden here).
+    # Supplies the Meta/WhatsApp credentials, the LLM_*/LANGWATCH_* values and
+    # FRONTEND_BASE_URL (the public origin used to build shareable order links —
+    # a real hostname, so it is taken from the file rather than overridden here).
     env_file:
       - path: ./packages/backend/.env
         required: false

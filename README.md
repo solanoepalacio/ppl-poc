@@ -45,6 +45,28 @@ yarn workspace @pannico/backend prisma:seed
 - `DATABASE_URL` — SQLite file (default `file:./dev.db`, relative to `prisma/`)
 - `FRONTEND_BASE_URL` — used to build shareable links (default `http://localhost:3001`)
 - `PORT` — backend port (default `3000`)
+- `META_*` — WhatsApp Cloud API credentials. The agent is inert unless all four
+  (`META_ACCESS_TOKEN`, `META_PHONE_NUMBER_ID`, `META_VERIFY_TOKEN`,
+  `META_APP_SECRET`) are set.
+- `LLM_*` — the model that classifies inbound messages (see below)
+- `LANGWATCH_API_KEY` — LLM tracing. Unset means no tracing and a working
+  system; nothing fails for want of it. Optional `LANGWATCH_ENDPOINT` for a
+  self-hosted collector.
+
+Which values are required depends on `LLM_PROVIDER`:
+
+| `LLM_PROVIDER` | required | ignored |
+| --- | --- | --- |
+| `ollama` | `LLM_MODEL`, `LLM_BASE_URL` | `LLM_API_KEY` |
+| `anthropic` | `LLM_MODEL`, `LLM_API_KEY` | `LLM_BASE_URL` |
+
+`LLM_TIMEOUT_MS` (default `10000`) bounds every inference. It is sized for a
+*warm* model, and the backend pins the model in memory (`keep_alive: -1`) to keep
+it that way.
+
+The inference server is reached from the backend only. It sits on the same side
+of the trust boundary as the database; no browser ever calls it, and its
+reachability is deliberately **not** checked at startup.
 
 `packages/frontend/.env.local`:
 

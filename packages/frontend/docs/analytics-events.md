@@ -43,13 +43,19 @@ there is no per-user dimension to any of this.
 |-------|---------------|------------|--------|
 | `order_confirmed` | Customer successfully confirms an order via the form | `itemCount`, `totalQuantity` | `order/[token]/OrderForm.tsx` |
 | `order_confirm_failed` | A confirmation attempt fails for any reason other than an invalid link | `reason` (`server`/`network`), `status`, `itemCount` | `order/[token]/OrderForm.tsx` |
-| `order_review_raised` | First confirm press: the review summary goes up and the button pauses | `itemCount`, `totalQuantity`, `summaryWasOpen` | `order/[token]/OrderForm.tsx` |
 | `order_summary_toggled` | Customer opens or closes the order summary | `open`, `itemCount` | `order/[token]/OrderForm.tsx` |
 | `order_filter_used` | Customer types in the catalog filter (once per visit) | — | `order/[token]/OrderForm.tsx` |
 | `order_link_invalid` | The invalid / expired / already-used link view renders, on load or mid-form | — | `order/[token]/TrackInvalidLink.tsx` |
 
-`order_review_raised` minus `order_confirmed` is the drop-off through the review
-gate — the measure of whether the pause does what it was added to do.
+`order_review_raised` is **gone**, along with the review gate that produced it.
+Confirming now submits on its first activation, so there is no intermediate state
+left to count, and the drop-off it measured no longer exists. `order_confirmed`
+is unaffected and remains the count of orders placed — a comparison against it
+that spans the removal will show the gap closing rather than a change in orders.
+
+`order_confirm_failed` now fires only once a submission's retries are exhausted,
+not on the first transient failure, so its count is closer to "customers who
+could not order" than it used to be.
 
 ### Back office — orders
 

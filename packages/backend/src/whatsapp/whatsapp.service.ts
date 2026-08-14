@@ -3,6 +3,10 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { normalizeClientPhone } from '@pannico/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { LinksService } from '../links/links.service';
+import {
+  OrderIntentClassifier,
+  type AbstainReason,
+} from '../intent/order-intent.classifier';
 import { WhatsappConfigService } from './whatsapp.config';
 
 /**
@@ -12,8 +16,30 @@ import { WhatsappConfigService } from './whatsapp.config';
  */
 const SUPPRESSION_MS = 90_000;
 
-/** The minimum shape we read out of a delivery; Meta sends a great deal more. */
-type InboundMessage = { wamid: string; from: string };
+/**
+ * Meta's service window: how long after a customer's own message we may still
+ * send them free-form text. Fixed by the platform, not by us — outside it a
+ * free-form send is rejected rather than delivered, and only an approved
+ * template would go through.
+ *
+ * Shaved by a minute so a send started right at the boundary is not racing the
+ * clock on Meta's side.
+ */
+const SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000 - 60_000;
+
+/**
+ * The minimum shape we read out of a delivery; Meta sends a great deal more.
+ *
+ * `type` and `text` are what the classifier needs. `text` is absent for every
+ * message kind that carries none — audio, image, sticker, location, a reaction —
+ * and that absence is the whole signal: those are not classified at all.
+ */
+type InboundMessage = {
+  wamid: string;
+  from: string;
+  type: string;
+  text?: string;
+};
 
 /**
  * The message-shaped half of a Graph send — everything but the envelope
@@ -37,11 +63,20 @@ type OutboundMessage =
       };
     };
 
-/** What acting on a delivery did, for the log and for the tests. */
+/**
+ * What acting on a delivery did, for the log and for the tests.
+ *
+ * `not-order` and `abstain` are both silence to the customer and both end the
+ * flow the same way, but they are kept apart here for the same reason they are
+ * kept apart in the trace: one is the classifier working and the other is it
+ * failing, and nothing else in the system can tell you which happened.
+ */
 export type InboundOutcome =
   | { kind: 'ignored'; reason: string }
   | { kind: 'suppressed' }
   | { kind: 'unknown-sender' }
+  | { kind: 'not-order'; clientName: string }
+  | { kind: 'abstain'; clientName: string; reason: AbstainReason }
   | { kind: 'replied'; clientName: string; reused: boolean };
 
 @Injectable()
@@ -52,6 +87,7 @@ export class WhatsappService {
     private readonly prisma: PrismaService,
     private readonly config: WhatsappConfigService,
     private readonly links: LinksService,
+    private readonly intent: OrderIntentClassifier,
   ) {}
 
   /**
@@ -107,9 +143,26 @@ export class WhatsappService {
         const messages = value.messages;
         if (!Array.isArray(messages)) continue;
         for (const m of messages) {
-          const { id, from } = (m ?? {}) as { id?: string; from?: string };
+          const { id, from, type, text } = (m ?? {}) as {
+            id?: string;
+            from?: string;
+            type?: string;
+            text?: { body?: string };
+          };
           if (typeof id === 'string' && typeof from === 'string') {
-            out.push({ wamid: id, from });
+            out.push({
+              wamid: id,
+              from,
+              // Meta always sends a type; defaulting keeps a malformed delivery
+              // out of the "text" path rather than into it.
+              type: typeof type === 'string' ? type : 'unknown',
+              // Only a text message has a body. Anything else is left undefined,
+              // which is what makes it unclassifiable further down.
+              text:
+                type === 'text' && typeof text?.body === 'string'
+                  ? text.body
+                  : undefined,
+            });
           }
         }
       }
@@ -124,7 +177,7 @@ export class WhatsappService {
    * a rejection would only make Meta redeliver the same message for a week.
    */
   async handleMessage(message: InboundMessage): Promise<InboundOutcome> {
-    const { wamid, from } = message;
+    const { wamid, from, text } = message;
     // The sender's canonical identity — and what everything downstream uses,
     // replies included.
     //
@@ -158,15 +211,95 @@ export class WhatsappService {
       return { kind: 'unknown-sender' };
     }
 
+    // The decision point: between knowing *who* wrote and doing anything about
+    // it. A link is created only for a message that asks for one — every other
+    // verdict ends the flow here, before `linkForAgent` is reached, so nothing
+    // is created and nothing is sent.
+    //
+    // Fail-closed, and deliberately: this number is a staffed inbox, so a
+    // message the agent does not answer is a message a person answers — the same
+    // outcome the bakery had before any of this existed. Guessing the other way
+    // puts a link in front of somebody who was not ordering and burns their slot
+    // for the bloque, which nobody reading the thread afterwards can take back.
+    const verdict = await this.intent.classify(text);
+    if (verdict.intent === 'abstain') {
+      return { kind: 'abstain', clientName: client.name, reason: verdict.reason };
+    }
+    if (verdict.intent === 'not-order') {
+      return { kind: 'not-order', clientName: client.name };
+    }
+
     const { url, reused } = await this.links.linkForAgent(client.id);
     // Only a reply that actually went out marks the message replied. A failed
     // send that counted would suppress the customer's next message too, turning
     // one lost reply into silence for the whole window — exactly when they are
     // most likely to try again.
+    //
+    // The same rule is what leaves an *unanswered* message consuming nothing:
+    // the verdicts above return without reaching this, so the window is never
+    // armed by a message we chose not to answer. A customer who says "gracias"
+    // and then asks to order ten seconds later is served immediately.
     if (await this.send(sender, orderMessage(client.name, url))) {
       await this.markReplied(wamid);
     }
     return { kind: 'replied', clientName: client.name, reused };
+  }
+
+  /**
+   * Sends the customer a recap of the order they just confirmed, so the order
+   * they placed is readable in the conversation it started in.
+   *
+   * Conditional on the **service window**. A free-form message is only permitted
+   * inside the 24 hours opened by the customer's own inbound message, and a
+   * back-office-generated link goes to customers who may never have messaged us
+   * at all — a recap to one of those would be rejected by Meta, which is a failed
+   * send in the logs rather than a silent no-op. So there is a check, and finding
+   * no recent inbound is the expected case: nothing is sent, and nothing is
+   * recorded as a failure.
+   *
+   * Best-effort with respect to the order, like every other send here: the order
+   * is already confirmed and committed by the time this runs, and nothing this
+   * method does can undo that.
+   */
+  async sendOrderConfirmation(orderId: string): Promise<void> {
+    if (!this.config.enabled) return;
+
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        client: { select: { phone: true } },
+        items: {
+          orderBy: { id: 'asc' },
+          select: { quantity: true, product: { select: { name: true } } },
+        },
+      },
+    });
+    // A client with no number cannot be messaged, and an order with no items is
+    // not a recap worth sending.
+    const phone = order?.client.phone;
+    if (!phone || !order?.items.length) return;
+
+    if (!(await this.withinServiceWindow(phone))) return;
+
+    await this.send(phone, orderRecapMessage(order.items));
+  }
+
+  /**
+   * Whether this number has written to us recently enough that a free-form reply
+   * is still permitted.
+   *
+   * Reads `WhatsappInbound`, which already records `from` and `receivedAt` for
+   * every message — so this is a query against a table we keep rather than new
+   * state. Note it looks at *every* inbound message, replied or not: the window
+   * is opened by the customer writing, which happens whether or not we answered.
+   */
+  private async withinServiceWindow(phone: string): Promise<boolean> {
+    const since = new Date(Date.now() - SERVICE_WINDOW_MS);
+    const recent = await this.prisma.whatsappInbound.findFirst({
+      where: { from: phone, receivedAt: { gte: since } },
+      select: { wamid: true },
+    });
+    return recent !== null;
   }
 
   /** True when this sender was answered inside the window. Keyed on the canonical
@@ -270,6 +403,45 @@ const orderMessage = (name: string, url: string): OutboundMessage => ({
     },
   },
 });
+
+/**
+ * The recap of a confirmed order.
+ *
+ * Templated Spanish, like every other outbound message here: the model
+ * classifies and does not write, so nothing it produced can reach a customer.
+ *
+ * Itemised rather than a bare acknowledgement, because a recap the customer
+ * cannot check against what they chose is not a receipt. Plain text rather than
+ * interactive: there is no link to put on a button, and this one is read, not
+ * acted on. Meta caps a text body at 4096 characters — an order long enough to
+ * approach that is not a real order, but the list is capped anyway so a
+ * pathological one degrades to a shorter message instead of a rejected send.
+ */
+const orderRecapMessage = (
+  items: { quantity: number; product: { name: string } }[],
+): OutboundMessage => {
+  const shown = items.slice(0, RECAP_MAX_LINES);
+  const lines = shown.map((i) => `• ${i.quantity} x ${i.product.name}`);
+  if (items.length > shown.length) {
+    lines.push(`• y ${items.length - shown.length} producto(s) más`);
+  }
+  return {
+    type: 'text',
+    text: {
+      body: [
+        '¡Listo! Recibimos tu pedido:',
+        '',
+        ...lines,
+        '',
+        'Si algo no está bien, escribinos por acá.',
+      ].join('\n'),
+    },
+  };
+};
+
+/** See `orderRecapMessage`: a guard against Meta's 4096-character body cap, not
+ * a product decision. */
+const RECAP_MAX_LINES = 60;
 
 /** Keeps a customer's full number out of the logs. */
 const redact = (phone: string) => `…${phone.slice(-4)}`;

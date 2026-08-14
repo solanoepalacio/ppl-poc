@@ -78,19 +78,38 @@ export class WhatsappController {
       throw new ForbiddenException();
     }
 
+    // Extracted here, acted on after the response. Handling now calls a language
+    // model, whose latency is neither bounded by nor visible to Meta, and Meta
+    // treats a slow acknowledgement as a failed delivery and sends the message
+    // again — so waiting would risk redelivering a message already being acted
+    // on. Nothing in the outcome reaches the response anyway: the body is a
+    // constant, and failures were already swallowed.
+    //
+    // The cost is that a crash mid-processing loses that message with no
+    // redelivery to save it. Survivable for the same reason everything else here
+    // is: a lost message is an unanswered message, and an unanswered message is
+    // one a person answers.
     const messages = this.whatsapp.extractMessages(req.body);
+    void this.process(messages);
+    return 'EVENT_RECEIVED';
+  }
+
+  /** Acts on the extracted messages after the delivery has been acknowledged. */
+  private async process(
+    messages: ReturnType<WhatsappService['extractMessages']>,
+  ): Promise<void> {
     for (const message of messages) {
       try {
         const outcome = await this.whatsapp.handleMessage(message);
         this.logger.log(`${message.wamid}: ${describe(outcome)}`);
       } catch (e) {
-        // Swallowed on purpose: see the 200 above.
+        // Swallowed on purpose: see the 200 above. There is no longer a response
+        // left to fail, so this log is the only place it can surface.
         this.logger.error(
           `${message.wamid}: failed — ${e instanceof Error ? e.message : String(e)}`,
         );
       }
     }
-    return 'EVENT_RECEIVED';
   }
 }
 
@@ -102,6 +121,13 @@ const describe = (o: Awaited<ReturnType<WhatsappService['handleMessage']>>) => {
       return 'suprimido (respuesta reciente al mismo remitente)';
     case 'unknown-sender':
       return 'remitente desconocido, respuesta de cortesía';
+    // The two silent endings, kept apart. Both leave the message to a person,
+    // but only one of them means the agent is working: a run of `sin veredicto`
+    // is the shape a broken or unreachable model takes in this log.
+    case 'not-order':
+      return `no es un pedido (${o.clientName}), sin respuesta`;
+    case 'abstain':
+      return `sin veredicto (${o.clientName}, ${o.reason}), sin respuesta`;
     case 'replied':
       return `link enviado a ${o.clientName}${o.reused ? ' (reusado)' : ' (nuevo)'}`;
   }

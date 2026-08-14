@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -20,15 +21,19 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SlotsService, toSlotDto } from '../slots/slots.service';
 import { ClientsService } from '../clients/clients.service';
 import { generateToken } from '../common/token.util';
+import { WhatsappService } from '../whatsapp/whatsapp.service';
 import { TokenService } from './token.service';
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger('Orders');
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly tokenService: TokenService,
     private readonly slotsService: SlotsService,
     private readonly clientsService: ClientsService,
+    private readonly whatsapp: WhatsappService,
   ) {}
 
   /** Active catalog products, used by the form and the `/products` endpoint. */
@@ -99,6 +104,19 @@ export class OrdersService {
         data: { consumedAt: now, confirmedAt: now },
       }),
     ]);
+
+    // After the commit, and deliberately not awaited. The order is already
+    // recorded; the recap is a courtesy on top of it, and the customer's tap
+    // should not wait on Meta's API — least of all now that a successful confirm
+    // closes their window. A failed send leaves the order confirmed regardless,
+    // which is why the rejection is logged here rather than propagated.
+    void this.whatsapp.sendOrderConfirmation(order.id).catch((e: unknown) => {
+      this.logger.error(
+        `Order ${order.id} confirmed, but its WhatsApp recap failed: ${
+          e instanceof Error ? e.message : String(e)
+        }`,
+      );
+    });
   }
 
   /**
