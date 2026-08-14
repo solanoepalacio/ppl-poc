@@ -60,8 +60,8 @@ const RETRY_BACKOFF_MS = [400, 1200];
  * a phone, inside a chat, by somebody who has already decided, and now the order
  * comes back to them over WhatsApp anyway.
  *
- * On success the page renders its confirmation and then tries to close itself,
- * so a customer who arrived from a chat is returned to it.
+ * On success the page renders its confirmation and stays there. It does not try
+ * to close itself — see the note at the foot of this file.
  */
 export function OrderForm({
   token,
@@ -195,12 +195,7 @@ export function OrderForm({
         itemCount: items.length,
         totalQuantity: items.reduce((sum, i) => sum + i.quantity, 0),
       });
-      // The success state first, the close attempt after — and after a pause, so
-      // the confirmation is on screen long enough to be read. Closing instantly
-      // would be indistinguishable from the browser crashing, which is the
-      // opposite of the reassurance this screen exists to give.
       setOutcome('issued');
-      closeWindow();
     } catch (e) {
       handleActionError(e);
     } finally {
@@ -342,38 +337,18 @@ export function OrderForm({
 const delay = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-/**
- * How long the confirmation stays up before the window is asked to close.
+/*
+ * There is deliberately no attempt to close the window here.
  *
- * Long enough to read four words and register the tick, short enough that
- * nobody decides the page has hung and reaches for the back button. The
- * customer is on their way back to a chat either way; this is the difference
- * between arriving there having seen a confirmation and arriving there wondering
- * what just happened.
+ * It was tried, and it does not work: closing is only permitted for a window the
+ * page itself opened, and the in-app browser a customer arrives in from a chat
+ * is not one. Desktop Chrome refuses it out loud — "Scripts may close only the
+ * windows that were opened by them" — and on a real phone, in the browser this
+ * flow actually runs in, nothing closed either. What a refused `window.close()`
+ * *does* do varies by browser and is not worth finding out on a customer: it is
+ * a prime suspect for the page reloading itself after a confirmation.
+ *
+ * So the success screen is the ending. The customer leaves the way they came,
+ * by the browser's own back or done control, and the screen they leave behind
+ * says their order arrived.
  */
-const CLOSE_DELAY_MS = 1_800;
-
-/**
- * Asks the browser to close the window, and does not care whether it agrees.
- *
- * Closing is only permitted for a window the page itself opened, which the
- * in-app browser a customer arrives in from a chat is not — so a refusal is the
- * ordinary outcome rather than an error, and there is nothing to report to a
- * customer whose order has already gone through. Where it *is* honoured, the
- * customer is dropped back into the conversation they came from, which is the
- * best ending this flow has.
- *
- * Unconditionally survivable because the success screen stays behind it, and
- * because a reload of this page now renders that same screen from the server —
- * so neither a refusal nor the browser reloading afterwards can turn a confirmed
- * order into "este enlace ya no es válido".
- */
-function closeWindow() {
-  setTimeout(() => {
-    try {
-      window.close();
-    } catch {
-      /* refused; the success state is already on screen */
-    }
-  }, CLOSE_DELAY_MS);
-}

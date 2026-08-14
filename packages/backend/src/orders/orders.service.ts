@@ -111,10 +111,10 @@ export class OrdersService {
     ]);
 
     // After the commit, and deliberately not awaited. The order is already
-    // recorded; the recap is a courtesy on top of it, and the customer's tap
-    // should not wait on Meta's API — least of all now that a successful confirm
-    // closes their window. A failed send leaves the order confirmed regardless,
-    // which is why the rejection is logged here rather than propagated.
+    // recorded; the recap goes to the chat rather than to the page, so the
+    // customer's tap has no reason to wait on Meta's API. A failed send leaves
+    // the order confirmed regardless, which is why the rejection is logged here
+    // rather than propagated.
     void this.whatsapp.sendOrderConfirmation(order.id).catch((e: unknown) => {
       this.logger.error(
         `Order ${order.id} confirmed, but its WhatsApp recap failed: ${
