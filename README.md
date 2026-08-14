@@ -61,6 +61,14 @@ Which values are required depends on `LLM_PROVIDER`:
 | --- | --- | --- |
 | `ollama` | `LLM_MODEL`, `LLM_BASE_URL` | `LLM_API_KEY` |
 | `anthropic` | `LLM_MODEL`, `LLM_API_KEY` | `LLM_BASE_URL` |
+| `groq` | `LLM_MODEL`, `LLM_API_KEY` | `LLM_BASE_URL` |
+
+`groq` is the **fallback** for when the self-hosted server is unavailable — the
+machine down, the model evicted, or no GPU to hand. Switching to it is
+`LLM_PROVIDER` plus a restart: the classifier, the prompt and the parse are
+unchanged, which is what the LangChain dependency is there for. One provider is
+live at a time, so this is a swap rather than an automatic failover — nothing
+retries a failed inference against a second provider.
 
 `LLM_TIMEOUT_MS` (default `60000`) bounds every inference. It is sized for a
 *warm* model, and the backend pins the model in memory (`keep_alive: -1`) to keep

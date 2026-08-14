@@ -3,6 +3,7 @@ import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { ChatOllama } from '@langchain/ollama';
 import { ChatAnthropic } from '@langchain/anthropic';
+import { ChatGroq } from '@langchain/groq';
 import { getLangWatchTracer } from 'langwatch/observability';
 import { LangWatchCallbackHandler } from 'langwatch/observability/instrumentation/langchain';
 import { LlmConfigService, type LlmConfig } from './llm.config';
@@ -182,6 +183,19 @@ function buildModel(config: LlmConfig): BaseChatModel {
       // strips one anyway (see `intent/`): this flag must not be the only thing
       // standing between us and that.
       think: false,
+    });
+  }
+  if (config.provider === 'groq') {
+    return new ChatGroq({
+      apiKey: config.apiKey,
+      model: config.model,
+      temperature: TEMPERATURE,
+      maxTokens: MAX_OUTPUT_TOKENS,
+      // Groq's spelling of the same rule as `think: false` above. It is honoured
+      // only by the reasoning models that offer it (the gpt-oss and qwen3
+      // families); on anything else it is ignored, which is why the parser strips
+      // a reasoning block regardless of what was asked for here.
+      reasoningEffort: 'none',
     });
   }
   return new ChatAnthropic({

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 /** The providers the module knows how to build a chat model for. */
-export const LLM_PROVIDERS = ['ollama', 'anthropic'] as const;
+export const LLM_PROVIDERS = ['ollama', 'anthropic', 'groq'] as const;
 export type LlmProvider = (typeof LLM_PROVIDERS)[number];
 
 const isLlmProvider = (value: string): value is LlmProvider =>
@@ -19,7 +19,15 @@ const isLlmProvider = (value: string): value is LlmProvider =>
 export type LlmConfig = { timeoutMs: number } & (
   | { provider: 'ollama'; model: string; baseUrl: string }
   | { provider: 'anthropic'; model: string; apiKey: string }
+  | { provider: 'groq'; model: string; apiKey: string }
 );
+
+/** Providers whose requirement is a key rather than a URL they can be pointed at. */
+const KEYED_PROVIDERS = ['anthropic', 'groq'] as const;
+type KeyedProvider = (typeof KEYED_PROVIDERS)[number];
+
+const isKeyedProvider = (value: string | undefined): value is KeyedProvider =>
+  (KEYED_PROVIDERS as readonly string[]).includes(value ?? '');
 
 /** LangWatch, when it is switched on. */
 export type TracingConfig = { apiKey: string; endpoint?: string };
@@ -76,12 +84,12 @@ export class LlmConfigService {
     if (!provider || !isLlmProvider(provider)) missing.push('LLM_PROVIDER');
     if (!model) missing.push('LLM_MODEL');
     if (provider === 'ollama' && !baseUrl) missing.push('LLM_BASE_URL');
-    if (provider === 'anthropic' && !apiKey) missing.push('LLM_API_KEY');
+    if (isKeyedProvider(provider) && !apiKey) missing.push('LLM_API_KEY');
 
     this.config = null;
     if (model && baseUrl && provider === 'ollama') {
       this.config = { provider, model, baseUrl, timeoutMs };
-    } else if (model && apiKey && provider === 'anthropic') {
+    } else if (model && apiKey && isKeyedProvider(provider)) {
       this.config = { provider, model, apiKey, timeoutMs };
     }
 

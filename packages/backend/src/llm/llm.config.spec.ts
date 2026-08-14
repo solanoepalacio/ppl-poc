@@ -26,6 +26,12 @@ const ANTHROPIC = {
   LLM_API_KEY: 'sk-ant-secretisimo',
 };
 
+const GROQ = {
+  LLM_PROVIDER: 'groq',
+  LLM_MODEL: 'llama-3.3-70b-versatile',
+  LLM_API_KEY: 'gsk-tambien-secreto',
+};
+
 describe('LlmConfigService', () => {
   let logs: string[];
 
@@ -76,13 +82,26 @@ describe('LlmConfigService', () => {
       });
     });
 
-    it('does not require a key for ollama, nor a base URL for the hosted one', () => {
+    it('reports ready with everything groq needs', () => {
+      const config = build(GROQ);
+
+      expect(config.enabled).toBe(true);
+      expect(config.require()).toEqual({
+        provider: 'groq',
+        model: 'llama-3.3-70b-versatile',
+        apiKey: 'gsk-tambien-secreto',
+        timeoutMs: 60_000,
+      });
+    });
+
+    it('does not require a key for ollama, nor a base URL for the hosted ones', () => {
       // The asymmetry is the whole reason "is the LLM configured?" is a question
       // the provider answers: a value mandatory for one is irrelevant to the
       // other, so a single required-variable list would be wrong for both.
-      expect(build(OLLAMA).enabled).toBe(true);
-      for (const name of VARS) delete process.env[name];
-      expect(build(ANTHROPIC).enabled).toBe(true);
+      for (const env of [OLLAMA, ANTHROPIC, GROQ]) {
+        for (const name of VARS) delete process.env[name];
+        expect(build(env).enabled).toBe(true);
+      }
     });
   });
 
@@ -101,11 +120,14 @@ describe('LlmConfigService', () => {
       expect(logs.join('\n')).toContain('LLM_BASE_URL');
     });
 
-    it('is inert when the hosted provider has no key, and names it', () => {
-      const config = build({ LLM_PROVIDER: 'anthropic', LLM_MODEL: 'claude-sonnet-5' });
+    it('is inert when a hosted provider has no key, and names it', () => {
+      for (const provider of ['anthropic', 'groq']) {
+        for (const name of VARS) delete process.env[name];
+        const config = build({ LLM_PROVIDER: provider, LLM_MODEL: 'un-modelo' });
 
-      expect(config.enabled).toBe(false);
-      expect(logs.join('\n')).toContain('LLM_API_KEY');
+        expect(config.enabled).toBe(false);
+        expect(logs.join('\n')).toContain('LLM_API_KEY');
+      }
     });
 
     it('is inert with no provider at all', () => {
@@ -147,6 +169,14 @@ describe('LlmConfigService', () => {
       expect(said).not.toContain('sk-ant-secretisimo');
       expect(said).not.toContain('sk-lw-tambien-secreto');
       expect(said).not.toContain('claude-sonnet-5');
+    });
+
+    it('does not print a groq key either', () => {
+      build(GROQ);
+
+      const said = logs.join('\n');
+      expect(said).toContain('groq');
+      expect(said).not.toContain('gsk-tambien-secreto');
     });
 
     it('does not print the endpoint either', () => {
