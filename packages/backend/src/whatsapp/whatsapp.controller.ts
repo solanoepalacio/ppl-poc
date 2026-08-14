@@ -174,10 +174,10 @@ const describe = (o: Awaited<ReturnType<WhatsappService['processMessage']>>) => 
     case 'suppressed':
       return 'suprimido (respuesta reciente al mismo remitente)';
     case 'unknown-sender':
-      return 'remitente desconocido, respuesta de cortesía';
-    // The two silent endings, kept apart. Both leave the message to a person,
-    // but only one of them means the agent is working: a run of `sin veredicto`
-    // is the shape a broken or unreachable model takes in this log.
+      return 'remitente desconocido, sin respuesta';
+    // The two classified silences, kept apart. Both leave the message to a
+    // person, but only one of them means the agent is working: a run of `sin
+    // veredicto` is the shape a broken or unreachable model takes in this log.
     case 'not-order':
       return `no es un pedido (${o.clientName}), sin respuesta`;
     case 'abstain':

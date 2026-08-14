@@ -418,7 +418,7 @@ describe('WhatsappService', () => {
 
         await service.processMessage(message('w1', '999'));
 
-        // The courtesy reply does not depend on intent, and paying for an
+        // Nothing is sent to a stranger whatever they wrote, so paying for an
         // inference to decide something we will not act on is pure cost.
         expect(intent.classify).not.toHaveBeenCalled();
       });
@@ -478,8 +478,8 @@ describe('WhatsappService', () => {
 
         const out = await service.processMessage(message('w1', '999'));
 
-        // Not even the courtesy reply. Off means the number reads as the plain
-        // staffed inbox it was, with no automation attached to it at all.
+        // Off is reported as off, not as an unrecognised number: the reason on
+        // the row has to say which, because the fix is a different one.
         expect(out).toEqual({ kind: 'agent-disabled' });
         expect(fetchMock).not.toHaveBeenCalled();
       });
@@ -546,9 +546,9 @@ describe('WhatsappService', () => {
       });
 
       it('records nothing for a message that never reached the classifier', async () => {
-        // One inside the suppression window, or one from a number we do not
-        // know: null reads as "we did not record it", which is true, and is not
-        // a verdict we never reached.
+        // A message answered inside the suppression window: null reads as "we
+        // did not record it", which is true, and is not a verdict we never
+        // reached. The other silent endings do write a reason.
         prisma.whatsappInbound.findFirst.mockResolvedValue({ wamid: 'w0' });
 
         await service.processMessage(message('w1', '543815551234'));
@@ -644,14 +644,39 @@ describe('WhatsappService', () => {
       expect(links.linkForAgent).not.toHaveBeenCalled();
     });
 
-    it('answers an unknown sender without creating anything', async () => {
-      const out = await service.processMessage(message('w1', '999'));
+    describe('a number we do not have on file gets no reply at all', () => {
+      it('sends nothing and creates nothing', async () => {
+        const out = await service.processMessage(message('w1', '999'));
 
-      expect(out).toEqual({ kind: 'unknown-sender' });
-      expect(links.linkForAgent).not.toHaveBeenCalled();
-      expect(JSON.parse(fetchMock.mock.calls[0][1].body).text.body).toMatch(
-        /una persona lo va a tomar/,
-      );
+        // The agent has nothing it can do for a stranger — there is no client to
+        // make a link for — and the number is a staffed inbox, so silence hands
+        // the message to a person rather than dropping it. The courtesy note
+        // this used to send was the one place the agent addressed somebody it
+        // knew nothing about.
+        expect(out).toEqual({ kind: 'unknown-sender' });
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(links.linkForAgent).not.toHaveBeenCalled();
+      });
+
+      it('does not arm the suppression window', async () => {
+        await service.processMessage(message('w1', '999'));
+
+        // Nothing went out, so nothing is owed. A real customer writing from a
+        // second phone must not be met with silence for the rest of the window
+        // on top of not being recognised.
+        expect(markedReplied()).toBe(false);
+      });
+
+      it('says on the row why it was left alone', async () => {
+        await service.processMessage(message('w1', '999'));
+
+        // Otherwise the row is indistinguishable from one suppressed inside the
+        // window, and this is the queue a person is meant to work through.
+        expect(prisma.whatsappInbound.update).toHaveBeenCalledWith({
+          where: { wamid: 'w1' },
+          data: { intent: 'abstain', abstainReason: 'unknown-sender' },
+        });
+      });
     });
 
     it('suppresses a second reply to a sender answered moments ago', async () => {

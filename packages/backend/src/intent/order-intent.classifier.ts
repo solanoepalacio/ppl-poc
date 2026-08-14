@@ -8,6 +8,10 @@ export type AbstainReason =
   /** The agent is switched off. Not a failure — nothing was attempted, and the
    * message is on the row waiting for a person, which is the whole intent. */
   | 'agent-disabled'
+  /** The number is not a client on file. Nothing was classified, because there
+   * is nobody to make a link for — and nothing was sent, because a stranger who
+   * wrote to a bakery is somebody a person answers. */
+  | 'unknown-sender'
   | 'no-text'
   | 'unconfigured'
   | 'timeout'

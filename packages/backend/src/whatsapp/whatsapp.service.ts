@@ -97,9 +97,9 @@ export type IntakeOutcome =
  * The message-shaped half of a Graph send — everything but the envelope
  * (`messaging_product`, `to`), which `send` fills in.
  *
- * Split out so the two replies can differ in kind without duplicating the
- * request: the order reply is an interactive button, the courtesy reply is
- * plain text because it has no link to put on a button.
+ * Split out so the two sends can differ in kind without duplicating the request:
+ * the order reply is an interactive button, the order recap is plain text
+ * because it is read rather than acted on.
  */
 type OutboundMessage =
   | { type: 'text'; text: { body: string } }
@@ -299,10 +299,9 @@ export class WhatsappService {
     const { wamid, from, text } = message;
 
     // With the agent switched off the webhook does nothing but remember. Before
-    // the suppression check and before the client lookup, because none of those
-    // questions have an answer worth having when nothing is going to be sent
-    // either way — and *nothing* is sent, the courtesy reply to an unknown
-    // number included. The number reads as the plain staffed inbox it was.
+    // the suppression check and before the client lookup, because neither
+    // question has an answer worth having when nothing is going to be sent
+    // either way. The number reads as the plain staffed inbox it was.
     //
     // The row is still written, with the reason on it, so a message that arrived
     // while the agent was off is not indistinguishable from one it read and
@@ -324,8 +323,21 @@ export class WhatsappService {
       select: { id: true, name: true },
     });
 
+    // A number that is not a client on file. Silence, like every other ending
+    // here that is not a link: the agent has nothing it can do for a stranger —
+    // there is no client to make a link for — and the number is a staffed inbox,
+    // so not answering hands the message to a person rather than dropping it.
+    //
+    // It used to send a courtesy note saying we did not recognise the number.
+    // That was the one place the agent spoke to somebody it knew nothing about,
+    // and it was worse than silence in both directions: to a stranger it is an
+    // automated brush-off, and to a real customer writing from a second phone it
+    // reads as being turned away by a bakery that knows them.
     if (!client) {
-      if (await this.send(from, UNKNOWN_SENDER_MESSAGE)) await this.markReplied(wamid);
+      await this.recordVerdict(wamid, {
+        intent: 'abstain',
+        reason: 'unknown-sender',
+      });
       return { kind: 'unknown-sender' };
     }
 
@@ -588,15 +600,6 @@ export class WhatsappService {
     }
   }
 }
-
-/** Provisional copy, to be reworded. Plain text: there is no link to put on a
- * button, and an interactive message without one is not a thing. */
-const UNKNOWN_SENDER_MESSAGE: OutboundMessage = {
-  type: 'text',
-  text: {
-    body: 'Hola! No tenemos este número registrado. Dejanos tu pedido por acá y una persona lo va a tomar.',
-  },
-};
 
 /**
  * The order reply, as a call-to-action button rather than a bare URL.
