@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { Prisma } from '@prisma/client';
 import { normalizeClientPhone } from '@pannico/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { LinksService } from '../links/links.service';
@@ -57,12 +58,40 @@ type SendOutcome =
  * message kind that carries none — audio, image, sticker, location, a reaction —
  * and that absence is the whole signal: those are not classified at all.
  */
-type InboundMessage = {
+export type InboundMessage = {
   wamid: string;
   from: string;
   type: string;
   text?: string;
 };
+
+/**
+ * An inbound message as it was recorded, which is the form the rest of the flow
+ * works in.
+ *
+ * `from` is the sender's canonical identity rather than the raw value Meta
+ * reported — settled once, at intake, so nothing downstream has to remember to
+ * normalise it again. `type` is gone: it existed only to decide whether there
+ * was any text to read, and by here that question is answered.
+ */
+export type RecordedMessage = {
+  wamid: string;
+  from: string;
+  text?: string;
+};
+
+/**
+ * What intake made of one message.
+ *
+ * `duplicate` is an ordinary outcome rather than a failure: Meta redelivers a
+ * message until it is acknowledged, so seeing the same one twice is the system
+ * working. Failing to record at all is the exceptional case, and it is raised
+ * rather than returned — there is nothing here to report about a message we do
+ * not have.
+ */
+export type IntakeOutcome =
+  | { kind: 'recorded'; message: RecordedMessage }
+  | { kind: 'duplicate' };
 
 /**
  * The message-shaped half of a Graph send — everything but the envelope
@@ -95,7 +124,6 @@ type OutboundMessage =
  * failing, and nothing else in the system can tell you which happened.
  */
 export type InboundOutcome =
-  | { kind: 'ignored'; reason: string }
   | { kind: 'agent-disabled' }
   | { kind: 'suppressed' }
   | { kind: 'unknown-sender' }
@@ -195,13 +223,31 @@ export class WhatsappService {
   }
 
   /**
-   * Acts on one inbound message.
+   * The first half of handling a delivery: remember the message, and say
+   * whether it is one we have already seen.
    *
-   * Never throws: the caller must acknowledge the delivery whatever happens, and
-   * a rejection would only make Meta redeliver the same message for a week.
+   * Split from `processMessage` and run *before* the webhook is acknowledged,
+   * because this is the only part whose failure Meta can do anything about.
+   * Everything after this point is recoverable from the row — the verdict, the
+   * link, the reply are all things a later pass could redo — and nothing after
+   * this point is recoverable without it. It is a read and an insert, so the
+   * acknowledgement stays prompt.
+   *
+   * Deduplication is the row's existence, checked and then enforced: `wamid` is
+   * the primary key, so two deliveries racing collapse into one and the loser
+   * learns it from the constraint rather than from a check that went stale
+   * between reading and writing.
+   *
+   * The text is stored here rather than alongside the verdict, so a message
+   * whose processing crashes is still readable afterwards. It is what the
+   * classifier was given, which is the only version worth keeping when a verdict
+   * later looks wrong.
+   *
+   * Raises when the row could not be written at all — see the webhook, which
+   * turns that into the one delivery it does not acknowledge.
    */
-  async handleMessage(message: InboundMessage): Promise<InboundOutcome> {
-    const { wamid, from, text } = message;
+  async recordMessage(message: InboundMessage): Promise<IntakeOutcome> {
+    const { wamid, text } = message;
     // The sender's canonical identity — and what everything downstream uses,
     // replies included.
     //
@@ -211,22 +257,46 @@ export class WhatsappService {
     // reply addressed to the raw value is rejected as a recipient that is not on
     // the list. Meta's own console sends to the form without the 9. Observed
     // against a real number: `5493814493148` inbound, `543814493148` accepted.
-    const sender = normalizeClientPhone(from) ?? from;
+    const from = normalizeClientPhone(message.from) ?? message.from;
 
-    // Claim the message before doing anything. The primary key is what makes a
-    // redelivery — or two deliveries racing — a no-op rather than a second link.
-    //
-    // The text is stored with the claim rather than after the verdict, so a
-    // message that crashes the handler is still readable afterwards. It is what
-    // the classifier was given, which is the only version worth keeping when a
-    // verdict later looks wrong.
+    const seen = await this.prisma.whatsappInbound.findUnique({
+      where: { wamid },
+      select: { wamid: true },
+    });
+    if (seen) return { kind: 'duplicate' };
+
     try {
       await this.prisma.whatsappInbound.create({
-        data: { wamid, from: sender, text: text ?? null },
+        data: { wamid, from, text: text ?? null },
       });
-    } catch {
-      return { kind: 'ignored', reason: 'ya procesado' };
+    } catch (e) {
+      // The other delivery of the same message got there between the read above
+      // and this write. Same answer as having found it.
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        return { kind: 'duplicate' };
+      }
+      // Anything else means we have no row, which is a different thing entirely
+      // and is not for this method to swallow.
+      throw e;
     }
+
+    return { kind: 'recorded', message: { wamid, from, text } };
+  }
+
+  /**
+   * The second half: act on a message that is already recorded.
+   *
+   * Runs after the delivery has been acknowledged, so nothing here is on Meta's
+   * clock — which matters because it calls a language model, whose latency is
+   * neither bounded by nor visible to them.
+   *
+   * Failures raise, and the caller logs them; by then there is no response left
+   * to fail and no redelivery they could provoke. What they leave behind is a
+   * row with text and no verdict on it, which is the shape a later rescue would
+   * look for.
+   */
+  async processMessage(message: RecordedMessage): Promise<InboundOutcome> {
+    const { wamid, from, text } = message;
 
     // With the agent switched off the webhook does nothing but remember. Before
     // the suppression check and before the client lookup, because none of those
@@ -245,17 +315,17 @@ export class WhatsappService {
       return { kind: 'agent-disabled' };
     }
 
-    if (await this.recentlyReplied(sender)) {
+    if (await this.recentlyReplied(from)) {
       return { kind: 'suppressed' };
     }
 
     const client = await this.prisma.client.findFirst({
-      where: { phone: sender, active: true },
+      where: { phone: from, active: true },
       select: { id: true, name: true },
     });
 
     if (!client) {
-      if (await this.send(sender, UNKNOWN_SENDER_MESSAGE)) await this.markReplied(wamid);
+      if (await this.send(from, UNKNOWN_SENDER_MESSAGE)) await this.markReplied(wamid);
       return { kind: 'unknown-sender' };
     }
 
@@ -288,7 +358,7 @@ export class WhatsappService {
     // the verdicts above return without reaching this, so the window is never
     // armed by a message we chose not to answer. A customer who says "gracias"
     // and then asks to order ten seconds later is served immediately.
-    if (await this.send(sender, orderMessage(client.name, url))) {
+    if (await this.send(from, orderMessage(client.name, url))) {
       await this.markReplied(wamid);
     }
     return { kind: 'replied', clientName: client.name, reused };

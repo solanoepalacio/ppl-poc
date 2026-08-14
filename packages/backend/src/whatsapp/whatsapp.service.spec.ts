@@ -1,4 +1,5 @@
 import { createHmac } from 'node:crypto';
+import { Prisma } from '@prisma/client';
 import { WhatsappService } from './whatsapp.service';
 import type { WhatsappConfigService } from './whatsapp.config';
 import type { PrismaService } from '../prisma/prisma.service';
@@ -88,7 +89,12 @@ const statusOnly = {
 
 describe('WhatsappService', () => {
   let prisma: {
-    whatsappInbound: { create: jest.Mock; findFirst: jest.Mock; update: jest.Mock };
+    whatsappInbound: {
+      create: jest.Mock;
+      findUnique: jest.Mock;
+      findFirst: jest.Mock;
+      update: jest.Mock;
+    };
     client: { findFirst: jest.Mock };
     order: { findUnique: jest.Mock };
   };
@@ -114,17 +120,36 @@ describe('WhatsappService', () => {
     );
 
   /** A text message from a sender, as `extractMessages` would hand it over. */
-  const message = (wamid: string, from: string, text = 'hola') => ({
+  const delivered = (wamid: string, from: string, text = 'hola') => ({
     wamid,
     from,
     type: 'text',
     text,
   });
 
+  /** The same message once recorded: canonical sender, and no `type` left to
+   * read, since whether there was any text is settled by then. */
+  const message = (wamid: string, from: string, text = 'hola') => ({
+    wamid,
+    from,
+    text,
+  });
+
+  /** A recorded message that carried no text at all — a voice note, a sticker. */
+  const textless = (wamid: string, from: string) => ({ wamid, from });
+
+  /** A unique-constraint violation, as Prisma raises it. */
+  const uniqueViolation = () =>
+    new Prisma.PrismaClientKnownRequestError('unique', {
+      code: 'P2002',
+      clientVersion: '5',
+    });
+
   beforeEach(() => {
     prisma = {
       whatsappInbound: {
         create: jest.fn().mockResolvedValue({}),
+        findUnique: jest.fn().mockResolvedValue(null),
         findFirst: jest.fn().mockResolvedValue(null),
         update: jest.fn().mockResolvedValue({}),
       },
@@ -221,14 +246,101 @@ describe('WhatsappService', () => {
     });
   });
 
-  describe('handleMessage', () => {
+  /**
+   * Intake: the half that runs before the webhook is acknowledged. Everything
+   * downstream of it can be redone from the row it writes; nothing downstream of
+   * it can be redone without one, which is why this is the part Meta waits for.
+   */
+  describe('recordMessage', () => {
+    it('records the message and hands it on to be acted on', async () => {
+      const out = await service.recordMessage(
+        delivered('w1', '543815551234', 'me mandás 3 docenas?'),
+      );
+
+      expect(prisma.whatsappInbound.create).toHaveBeenCalledWith({
+        data: { wamid: 'w1', from: '543815551234', text: 'me mandás 3 docenas?' },
+      });
+      // The text is stored here, with the claim, rather than beside the verdict:
+      // a message whose processing crashes is still readable afterwards, and it
+      // is what the classifier was given.
+      expect(out).toEqual({
+        kind: 'recorded',
+        message: { wamid: 'w1', from: '543815551234', text: 'me mandás 3 docenas?' },
+      });
+    });
+
+    it('stores no text for a message that carries none', async () => {
+      const out = await service.recordMessage({
+        wamid: 'w1',
+        from: '543815551234',
+        type: 'audio',
+      });
+
+      expect(prisma.whatsappInbound.create.mock.calls[0][0].data.text).toBeNull();
+      expect(out).toMatchObject({ message: { text: undefined } });
+    });
+
+    it('canonicalises the sender once, here', async () => {
+      const out = await service.recordMessage(delivered('w1', '5493815551234'));
+
+      // Stored canonical, and handed on canonical: the same person reaching us
+      // with and without the Argentine 9 must not read as two senders, and
+      // nothing downstream should have to remember to normalise again.
+      expect(prisma.whatsappInbound.create.mock.calls[0][0].data.from).toBe('543815551234');
+      expect(out).toMatchObject({ message: { from: '543815551234' } });
+    });
+
+    it('reports a message it already has as a duplicate', async () => {
+      prisma.whatsappInbound.findUnique.mockResolvedValue({ wamid: 'w1' });
+
+      const out = await service.recordMessage(delivered('w1', '543815551234'));
+
+      // Meta redelivers until acknowledged, so this is the system working, not a
+      // failure. Nothing is written and nothing is handed on to be acted on.
+      expect(out).toEqual({ kind: 'duplicate' });
+      expect(prisma.whatsappInbound.create).not.toHaveBeenCalled();
+    });
+
+    it('reports a delivery that lost the race as a duplicate too', async () => {
+      // Two deliveries of the same message in flight: the read found nothing and
+      // the write lost. The primary key is what settles it, not the read.
+      prisma.whatsappInbound.create.mockRejectedValue(uniqueViolation());
+
+      const out = await service.recordMessage(delivered('w1', '543815551234'));
+
+      expect(out).toEqual({ kind: 'duplicate' });
+    });
+
+    it('raises when the row could not be written at all', async () => {
+      prisma.whatsappInbound.create.mockRejectedValue(new Error('database is locked'));
+
+      // Not a duplicate, and not something to swallow: we have no row, so there
+      // is nothing for a later pass to find and redelivery is the only thing
+      // that brings the message back. The webhook turns this into a non-200.
+      await expect(
+        service.recordMessage(delivered('w1', '543815551234')),
+      ).rejects.toThrow('database is locked');
+    });
+
+    it('sends nothing and decides nothing', async () => {
+      await service.recordMessage(delivered('w1', '543815551234'));
+
+      // Intake is on Meta's clock. The model, the link and the reply all belong
+      // to the half that runs after the acknowledgement.
+      expect(intent.classify).not.toHaveBeenCalled();
+      expect(links.linkForAgent).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('processMessage', () => {
     const known = { id: 'c1', name: 'Alo Bar' };
 
     it('replies to a known sender whose message asks to order', async () => {
       prisma.client.findFirst.mockResolvedValue(known);
       classifiesAs({ intent: 'order' });
 
-      const out = await service.handleMessage(message('w1', '543815551234'));
+      const out = await service.processMessage(message('w1', '543815551234'));
 
       expect(out).toEqual({ kind: 'replied', clientName: 'Alo Bar', reused: false });
       expect(links.linkForAgent).toHaveBeenCalledWith('c1');
@@ -252,7 +364,7 @@ describe('WhatsappService', () => {
         prisma.client.findFirst.mockResolvedValue(known);
         classifiesAs({ intent: 'not-order' });
 
-        const out = await service.handleMessage(
+        const out = await service.processMessage(
           message('w1', '543815551234', 'a qué hora abren?'),
         );
 
@@ -267,7 +379,7 @@ describe('WhatsappService', () => {
         prisma.client.findFirst.mockResolvedValue(known);
         classifiesAs({ intent: 'abstain', reason: 'timeout' });
 
-        const out = await service.handleMessage(message('w1', '543815551234'));
+        const out = await service.processMessage(message('w1', '543815551234'));
 
         // Fail-closed: the same ending as "not an order", carrying the reason it
         // was reached, which is the only thing that tells the two apart.
@@ -286,7 +398,7 @@ describe('WhatsappService', () => {
         for (const reason of ['unconfigured', 'no-text', 'transport'] as const) {
           classifiesAs({ intent: 'abstain', reason });
           await expect(
-            service.handleMessage(message(`w-${reason}`, '543815551234')),
+            service.processMessage(message(`w-${reason}`, '543815551234')),
           ).resolves.toEqual({ kind: 'abstain', clientName: 'Alo Bar', reason });
         }
       });
@@ -294,7 +406,7 @@ describe('WhatsappService', () => {
       it('classifies the message body, and only after resolving the client', async () => {
         prisma.client.findFirst.mockResolvedValue(known);
 
-        await service.handleMessage(
+        await service.processMessage(
           message('w1', '543815551234', 'hola! me mandás 3 docenas?'),
         );
 
@@ -304,7 +416,7 @@ describe('WhatsappService', () => {
       it('does not classify a message from somebody we do not know', async () => {
         prisma.client.findFirst.mockResolvedValue(null);
 
-        await service.handleMessage(message('w1', '999'));
+        await service.processMessage(message('w1', '999'));
 
         // The courtesy reply does not depend on intent, and paying for an
         // inference to decide something we will not act on is pure cost.
@@ -315,11 +427,7 @@ describe('WhatsappService', () => {
         prisma.client.findFirst.mockResolvedValue(known);
         classifiesAs({ intent: 'abstain', reason: 'no-text' });
 
-        const out = await service.handleMessage({
-          wamid: 'w1',
-          from: '543815551234',
-          type: 'audio',
-        });
+        const out = await service.processMessage(textless('w1', '543815551234'));
 
         // The classifier is what declines to transcribe; the service just hands
         // over what the message had, which for a voice note is nothing.
@@ -341,17 +449,14 @@ describe('WhatsappService', () => {
       it('records the message with the reason and does nothing else', async () => {
         prisma.client.findFirst.mockResolvedValue(known);
 
-        const out = await service.handleMessage(
+        const out = await service.processMessage(
           message('w1', '543815551234', 'quiero 3 docenas'),
         );
 
         expect(out).toEqual({ kind: 'agent-disabled' });
-        // The row still carries the text and the reason, so a message that
-        // arrived while the agent was off is not indistinguishable from one it
-        // read and decided against.
-        expect(prisma.whatsappInbound.create).toHaveBeenCalledWith({
-          data: { wamid: 'w1', from: '543815551234', text: 'quiero 3 docenas' },
-        });
+        // The row already carries the text, from intake; the reason goes on it
+        // here, so a message that arrived while the agent was off is not
+        // indistinguishable from one it read and decided against.
         expect(prisma.whatsappInbound.update).toHaveBeenCalledWith({
           where: { wamid: 'w1' },
           data: { intent: 'abstain', abstainReason: 'agent-disabled' },
@@ -361,7 +466,7 @@ describe('WhatsappService', () => {
       it('classifies nothing, creates nothing and sends nothing', async () => {
         prisma.client.findFirst.mockResolvedValue(known);
 
-        await service.handleMessage(message('w1', '543815551234'));
+        await service.processMessage(message('w1', '543815551234'));
 
         expect(intent.classify).not.toHaveBeenCalled();
         expect(links.linkForAgent).not.toHaveBeenCalled();
@@ -371,7 +476,7 @@ describe('WhatsappService', () => {
       it('stays silent for an unknown number too', async () => {
         prisma.client.findFirst.mockResolvedValue(null);
 
-        const out = await service.handleMessage(message('w1', '999'));
+        const out = await service.processMessage(message('w1', '999'));
 
         // Not even the courtesy reply. Off means the number reads as the plain
         // staffed inbox it was, with no automation attached to it at all.
@@ -380,21 +485,12 @@ describe('WhatsappService', () => {
       });
 
       it('does not bother resolving the client or the window', async () => {
-        await service.handleMessage(message('w1', '543815551234'));
+        await service.processMessage(message('w1', '543815551234'));
 
         // Neither question has an answer worth having when nothing is going to
         // be sent either way.
         expect(prisma.client.findFirst).not.toHaveBeenCalled();
         expect(prisma.whatsappInbound.findFirst).not.toHaveBeenCalled();
-      });
-
-      it('still ignores a redelivery', async () => {
-        prisma.whatsappInbound.create.mockRejectedValue(new Error('unique'));
-
-        const out = await service.handleMessage(message('w1', '543815551234'));
-
-        expect(out).toEqual({ kind: 'ignored', reason: 'ya procesado' });
-        expect(prisma.whatsappInbound.update).not.toHaveBeenCalled();
       });
 
       it('leaves the order recap working', async () => {
@@ -420,34 +516,13 @@ describe('WhatsappService', () => {
         return calls.length ? calls[calls.length - 1][0].data : undefined;
       };
 
-      it('stores the text the classifier was given', async () => {
-        prisma.client.findFirst.mockResolvedValue(known);
-
-        await service.handleMessage(message('w1', '543815551234', 'me mandás 3 docenas?'));
-
-        // Written with the claim, not after the verdict: a message that crashes
-        // the handler is still readable afterwards.
-        expect(prisma.whatsappInbound.create).toHaveBeenCalledWith({
-          data: { wamid: 'w1', from: '543815551234', text: 'me mandás 3 docenas?' },
-        });
-      });
-
-      it('stores no text for a message that carries none', async () => {
-        prisma.client.findFirst.mockResolvedValue(known);
-        classifiesAs({ intent: 'abstain', reason: 'no-text' });
-
-        await service.handleMessage({ wamid: 'w1', from: '543815551234', type: 'audio' });
-
-        expect(prisma.whatsappInbound.create.mock.calls[0][0].data.text).toBeNull();
-      });
-
       it('records a decided verdict with no abstain reason', async () => {
         prisma.client.findFirst.mockResolvedValue(known);
 
         for (const intent of ['order', 'not-order'] as const) {
           prisma.whatsappInbound.update.mockClear();
           classifiesAs({ intent });
-          await service.handleMessage(message(`w-${intent}`, '543815551234'));
+          await service.processMessage(message(`w-${intent}`, '543815551234'));
 
           // Cleared rather than left alone, so the column cannot carry a stale
           // reason from a row it does not apply to.
@@ -462,7 +537,7 @@ describe('WhatsappService', () => {
         prisma.client.findFirst.mockResolvedValue(known);
         classifiesAs({ intent: 'abstain', reason: 'timeout' });
 
-        await service.handleMessage(message('w1', '543815551234'));
+        await service.processMessage(message('w1', '543815551234'));
 
         // This is the whole point of the column. Without it, an afternoon of the
         // classifier working and an afternoon of the model being unreachable are
@@ -471,12 +546,12 @@ describe('WhatsappService', () => {
       });
 
       it('records nothing for a message that never reached the classifier', async () => {
-        // A redelivery, one inside the suppression window, one from a number we
-        // do not know: null reads as "we did not record it", which is true, and
-        // is not a verdict we never reached.
+        // One inside the suppression window, or one from a number we do not
+        // know: null reads as "we did not record it", which is true, and is not
+        // a verdict we never reached.
         prisma.whatsappInbound.findFirst.mockResolvedValue({ wamid: 'w0' });
 
-        await service.handleMessage(message('w1', '543815551234'));
+        await service.processMessage(message('w1', '543815551234'));
 
         expect(intent.classify).not.toHaveBeenCalled();
         expect(prisma.whatsappInbound.update).not.toHaveBeenCalled();
@@ -488,7 +563,7 @@ describe('WhatsappService', () => {
         prisma.client.findFirst.mockResolvedValue(known);
         classifiesAs({ intent: 'not-order' });
 
-        await service.handleMessage(message('w1', '543815551234', 'gracias!'));
+        await service.processMessage(message('w1', '543815551234', 'gracias!'));
 
         // `markReplied` is tied to a reply that went out, and none did. The
         // window exists to stop *us* answering three times; a message we chose
@@ -499,13 +574,13 @@ describe('WhatsappService', () => {
       it('answers the order that follows a greeting moments later', async () => {
         prisma.client.findFirst.mockResolvedValue(known);
         classifiesAs({ intent: 'not-order' });
-        await service.handleMessage(message('w1', '543815551234', 'hola'));
+        await service.processMessage(message('w1', '543815551234', 'hola'));
 
         // Nothing was marked replied, so the window is still shut — the same
         // customer asking to order ten seconds later is served immediately
         // rather than met with silence for the rest of it.
         classifiesAs({ intent: 'order' });
-        const out = await service.handleMessage(
+        const out = await service.processMessage(
           message('w2', '543815551234', 'quiero 3 docenas de facturas'),
         );
 
@@ -513,36 +588,12 @@ describe('WhatsappService', () => {
         expect(fetchMock).toHaveBeenCalledTimes(1);
       });
 
-      it('still claims the message, so a redelivery is not acted on twice', async () => {
-        prisma.client.findFirst.mockResolvedValue(known);
-        classifiesAs({ intent: 'not-order' });
-
-        await service.handleMessage(message('w1', '543815551234'));
-
-        // Recording that a message was handled and recording that a reply was
-        // sent are separate facts: the row is the redelivery guard, keyed on
-        // wamid, and has nothing to do with whether we replied.
-        expect(prisma.whatsappInbound.create).toHaveBeenCalledWith({
-          data: { wamid: 'w1', from: '543815551234', text: 'hola' },
-        });
-      });
-
-      it('ignores a redelivery of a message that produced no reply', async () => {
-        prisma.whatsappInbound.create.mockRejectedValue(new Error('unique'));
-        prisma.client.findFirst.mockResolvedValue(known);
-
-        const out = await service.handleMessage(message('w1', '543815551234'));
-
-        expect(out).toEqual({ kind: 'ignored', reason: 'ya procesado' });
-        expect(intent.classify).not.toHaveBeenCalled();
-        expect(fetchMock).not.toHaveBeenCalled();
-      });
     });
 
     it('keeps the button label and body inside Meta’s limits', async () => {
       prisma.client.findFirst.mockResolvedValue({ id: 'c1', name: 'X'.repeat(200) });
 
-      await service.handleMessage(message('w1', '543815551234'));
+      await service.processMessage(message('w1', '543815551234'));
 
       // 20 and 1024 are hard caps: over either, the send is rejected outright
       // rather than truncated, so the customer gets nothing at all.
@@ -551,23 +602,24 @@ describe('WhatsappService', () => {
       expect(interactive.body.text.length).toBeLessThanOrEqual(1024);
     });
 
-    it('matches a sender whose stored number carries the Argentine 9', async () => {
+    it('takes the sender it was handed, already canonical', async () => {
       prisma.client.findFirst.mockResolvedValue(known);
 
-      await service.handleMessage(message('w1', '5493815551234'));
+      await service.processMessage(message('w1', '543815551234'));
 
-      // Both sides are canonicalised, so the stored number is looked up without
-      // the 9 whichever way it was entered.
+      // Canonicalising is intake's job and happens once; this half looks the
+      // client up and addresses the reply with what it was given.
       expect(prisma.client.findFirst.mock.calls[0][0].where).toEqual({
         phone: '543815551234',
         active: true,
       });
+      expect(JSON.parse(fetchMock.mock.calls[0][1].body).to).toBe('543815551234');
     });
 
     it('only ever resolves an active client', async () => {
       prisma.client.findFirst.mockResolvedValue(null);
 
-      const out = await service.handleMessage(message('w1', '543815551234'));
+      const out = await service.processMessage(message('w1', '543815551234'));
 
       expect(prisma.client.findFirst.mock.calls[0][0].where.active).toBe(true);
       expect(out).toEqual({ kind: 'unknown-sender' });
@@ -575,7 +627,7 @@ describe('WhatsappService', () => {
     });
 
     it('answers an unknown sender without creating anything', async () => {
-      const out = await service.handleMessage(message('w1', '999'));
+      const out = await service.processMessage(message('w1', '999'));
 
       expect(out).toEqual({ kind: 'unknown-sender' });
       expect(links.linkForAgent).not.toHaveBeenCalled();
@@ -584,20 +636,10 @@ describe('WhatsappService', () => {
       );
     });
 
-    it('acts on a redelivered message once', async () => {
-      // The primary key on wamid is what makes the second attempt a no-op.
-      prisma.whatsappInbound.create.mockRejectedValue(new Error('unique'));
-
-      const out = await service.handleMessage(message('w1', '543815551234'));
-
-      expect(out).toEqual({ kind: 'ignored', reason: 'ya procesado' });
-      expect(fetchMock).not.toHaveBeenCalled();
-    });
-
     it('suppresses a second reply to a sender answered moments ago', async () => {
       prisma.whatsappInbound.findFirst.mockResolvedValue({ wamid: 'w0' });
 
-      const out = await service.handleMessage(message('w1', '543815551234'));
+      const out = await service.processMessage(message('w1', '543815551234'));
 
       expect(out).toEqual({ kind: 'suppressed' });
       expect(fetchMock).not.toHaveBeenCalled();
@@ -606,30 +648,21 @@ describe('WhatsappService', () => {
       expect(prisma.whatsappInbound.findFirst.mock.calls[0][0].where.replied).toBe(true);
     });
 
-    it('suppresses on the canonical sender, not the raw one', async () => {
+    it('suppresses on the canonical sender', async () => {
       prisma.client.findFirst.mockResolvedValue(known);
 
-      await service.handleMessage(message('w1', '5493815551234'));
+      await service.processMessage(message('w1', '543815551234'));
 
-      // Stored canonical: the same person reaching us with and without the
-      // Argentine 9 must not count as two senders and get two replies.
-      expect(prisma.whatsappInbound.create.mock.calls[0][0].data).toEqual({
-        wamid: 'w1',
-        from: '543815551234',
-        text: 'hola',
-      });
+      // The same person reaching us with and without the Argentine 9 arrives
+      // here as one sender, so one of the two cannot slip past the window.
       expect(prisma.whatsappInbound.findFirst.mock.calls[0][0].where.from).toBe('543815551234');
-      // The reply goes to the canonical form, not the raw wa_id: Argentina's
-      // recipient allow-list is keyed without the mobile 9, and a reply
-      // addressed with it comes back as "recipient not in allowed list".
-      expect(JSON.parse(fetchMock.mock.calls[0][1].body).to).toBe('543815551234');
     });
 
     it('reports a reused link as reused', async () => {
       prisma.client.findFirst.mockResolvedValue(known);
       links.linkForAgent.mockResolvedValue({ url: 'https://t.test/order/old', reused: true });
 
-      const out = await service.handleMessage(message('w1', '543815551234'));
+      const out = await service.processMessage(message('w1', '543815551234'));
 
       expect(out).toEqual({ kind: 'replied', clientName: 'Alo Bar', reused: true });
     });
@@ -638,7 +671,7 @@ describe('WhatsappService', () => {
       prisma.client.findFirst.mockResolvedValue(known);
       fetchMock.mockRejectedValue(new Error('network down'));
 
-      const out = await service.handleMessage(message('w1', '543815551234'));
+      const out = await service.processMessage(message('w1', '543815551234'));
 
       // The link exists and the manager can share it by hand; throwing here
       // would only make Meta redeliver and mint another.
@@ -652,7 +685,7 @@ describe('WhatsappService', () => {
     it('marks the message replied only when the send succeeded', async () => {
       prisma.client.findFirst.mockResolvedValue(known);
 
-      await service.handleMessage(message('w1', '543815551234'));
+      await service.processMessage(message('w1', '543815551234'));
 
       expect(prisma.whatsappInbound.update).toHaveBeenCalledWith({
         where: { wamid: 'w1' },
@@ -665,7 +698,7 @@ describe('WhatsappService', () => {
       fetchMock.mockResolvedValue({ ok: false, status: 400, text: async () => 'bad' });
 
       await expect(
-        service.handleMessage(message('w1', '543815551234')),
+        service.processMessage(message('w1', '543815551234')),
       ).resolves.toMatchObject({ kind: 'replied' });
     });
   });
@@ -876,7 +909,7 @@ describe('WhatsappService', () => {
       prisma.client.findFirst.mockResolvedValue({ id: 'c1', name: 'Alo Bar' });
       fetchMock.mockRejectedValue(new Error('network down'));
 
-      await service.handleMessage(message('w1', '543815551234'));
+      await service.processMessage(message('w1', '543815551234'));
 
       expect(fetchMock).toHaveBeenCalledTimes(1);
     });
