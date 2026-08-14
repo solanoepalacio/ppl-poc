@@ -93,7 +93,7 @@ describe('WhatsappService', () => {
     order: { findUnique: jest.Mock };
   };
   let links: { linkForAgent: jest.Mock };
-  let intent: { classify: jest.Mock };
+  let intent: { classify: jest.Mock; enabled: boolean };
   let service: WhatsappService;
   let fetchMock: jest.Mock;
 
@@ -136,7 +136,7 @@ describe('WhatsappService', () => {
         .fn()
         .mockResolvedValue({ url: 'https://t.test/order/abc', reused: false }),
     };
-    intent = { classify: jest.fn().mockResolvedValue({ intent: 'order' }) };
+    intent = { classify: jest.fn().mockResolvedValue({ intent: 'order' }), enabled: true };
     fetchMock = jest.fn().mockResolvedValue({ ok: true, text: async () => '' });
     global.fetch = fetchMock as unknown as typeof fetch;
     service = new WhatsappService(
@@ -330,6 +330,86 @@ describe('WhatsappService', () => {
           reason: 'no-text',
         });
         expect(fetchMock).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('with the agent switched off the webhook only remembers', () => {
+      beforeEach(() => {
+        intent.enabled = false;
+      });
+
+      it('records the message with the reason and does nothing else', async () => {
+        prisma.client.findFirst.mockResolvedValue(known);
+
+        const out = await service.handleMessage(
+          message('w1', '543815551234', 'quiero 3 docenas'),
+        );
+
+        expect(out).toEqual({ kind: 'agent-disabled' });
+        // The row still carries the text and the reason, so a message that
+        // arrived while the agent was off is not indistinguishable from one it
+        // read and decided against.
+        expect(prisma.whatsappInbound.create).toHaveBeenCalledWith({
+          data: { wamid: 'w1', from: '543815551234', text: 'quiero 3 docenas' },
+        });
+        expect(prisma.whatsappInbound.update).toHaveBeenCalledWith({
+          where: { wamid: 'w1' },
+          data: { intent: 'abstain', abstainReason: 'agent-disabled' },
+        });
+      });
+
+      it('classifies nothing, creates nothing and sends nothing', async () => {
+        prisma.client.findFirst.mockResolvedValue(known);
+
+        await service.handleMessage(message('w1', '543815551234'));
+
+        expect(intent.classify).not.toHaveBeenCalled();
+        expect(links.linkForAgent).not.toHaveBeenCalled();
+        expect(fetchMock).not.toHaveBeenCalled();
+      });
+
+      it('stays silent for an unknown number too', async () => {
+        prisma.client.findFirst.mockResolvedValue(null);
+
+        const out = await service.handleMessage(message('w1', '999'));
+
+        // Not even the courtesy reply. Off means the number reads as the plain
+        // staffed inbox it was, with no automation attached to it at all.
+        expect(out).toEqual({ kind: 'agent-disabled' });
+        expect(fetchMock).not.toHaveBeenCalled();
+      });
+
+      it('does not bother resolving the client or the window', async () => {
+        await service.handleMessage(message('w1', '543815551234'));
+
+        // Neither question has an answer worth having when nothing is going to
+        // be sent either way.
+        expect(prisma.client.findFirst).not.toHaveBeenCalled();
+        expect(prisma.whatsappInbound.findFirst).not.toHaveBeenCalled();
+      });
+
+      it('still ignores a redelivery', async () => {
+        prisma.whatsappInbound.create.mockRejectedValue(new Error('unique'));
+
+        const out = await service.handleMessage(message('w1', '543815551234'));
+
+        expect(out).toEqual({ kind: 'ignored', reason: 'ya procesado' });
+        expect(prisma.whatsappInbound.update).not.toHaveBeenCalled();
+      });
+
+      it('leaves the order recap working', async () => {
+        // The recap is not the webhook and has nothing to do with the model:
+        // switching the classifier off must not stop a confirmed order coming
+        // back to the customer.
+        prisma.order.findUnique.mockResolvedValue({
+          client: { phone: '543815551234' },
+          items: [{ quantity: 1, product: { name: 'Pan' } }],
+        });
+        prisma.whatsappInbound.findFirst.mockResolvedValue({ wamid: 'w0' });
+
+        await service.sendOrderConfirmation('o1');
+
+        expect(fetchMock).toHaveBeenCalled();
       });
     });
 

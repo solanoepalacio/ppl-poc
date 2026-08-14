@@ -74,6 +74,7 @@ type OutboundMessage =
  */
 export type InboundOutcome =
   | { kind: 'ignored'; reason: string }
+  | { kind: 'agent-disabled' }
   | { kind: 'suppressed' }
   | { kind: 'unknown-sender' }
   | { kind: 'not-order'; clientName: string }
@@ -203,6 +204,23 @@ export class WhatsappService {
       });
     } catch {
       return { kind: 'ignored', reason: 'ya procesado' };
+    }
+
+    // With the agent switched off the webhook does nothing but remember. Before
+    // the suppression check and before the client lookup, because none of those
+    // questions have an answer worth having when nothing is going to be sent
+    // either way — and *nothing* is sent, the courtesy reply to an unknown
+    // number included. The number reads as the plain staffed inbox it was.
+    //
+    // The row is still written, with the reason on it, so a message that arrived
+    // while the agent was off is not indistinguishable from one it read and
+    // decided against.
+    if (!this.intent.enabled) {
+      await this.recordVerdict(wamid, {
+        intent: 'abstain',
+        reason: 'agent-disabled',
+      });
+      return { kind: 'agent-disabled' };
     }
 
     if (await this.recentlyReplied(sender)) {

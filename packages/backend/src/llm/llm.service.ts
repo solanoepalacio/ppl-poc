@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { ChatOllama } from '@langchain/ollama';
@@ -70,7 +70,7 @@ const OLLAMA_KEEP_ALIVE = -1;
  * to do with an exception it would not also do with a failure.
  */
 @Injectable()
-export class LlmService {
+export class LlmService implements OnApplicationBootstrap {
   private readonly logger = new Logger('Llm');
   private readonly tracer = getLangWatchTracer('pannico-llm');
   /** Built on first use and reused: constructing a client per call would drop
@@ -81,6 +81,60 @@ export class LlmService {
 
   get enabled(): boolean {
     return this.config.enabled;
+  }
+
+  /**
+   * Proves the configured provider actually answers, before the app serves
+   * anything — and stops the boot if it does not.
+   *
+   * This is the one check that is deliberately *not* deferred to the first
+   * message. An unreachable provider makes every classification abstain, and
+   * fail-closed renders that as an agent that has simply gone quiet: nothing
+   * errors, nobody is paged, and the failure is only visible to whoever thinks to
+   * compare the WhatsApp thread against the orders that did not arrive. Refusing
+   * to start turns a silent, deniable failure into a loud one at the moment
+   * somebody is already looking at the deployment.
+   *
+   * A cheap GET rather than a real inference: it proves DNS, TCP, TLS and — for
+   * the hosted providers — the credential, without a cold model load standing
+   * between the container and its health check.
+   *
+   * Nothing re-checks this afterwards. Reachability is a runtime fact that
+   * changes without a restart, so this says the provider answered at boot and
+   * nothing more; a provider that dies later is still a per-call failure, an
+   * abstain, and a trace.
+   */
+  async onApplicationBootstrap(): Promise<void> {
+    if (!this.config.enabled) return;
+
+    const config = this.config.require();
+    const { url, headers } = probeRequest(config);
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), config.timeoutMs);
+    try {
+      const res = await fetch(url, { headers, signal: abort.signal });
+      if (!res.ok) {
+        // A status means it answered — so this is a rejection, not a silence.
+        // Most often a key the provider will not accept, which would otherwise
+        // present as every message going unanswered.
+        throw new Error(
+          `it answered ${res.status} ${res.statusText}`,
+        );
+      }
+      this.logger.log(`${config.provider} reachable; model ${config.model}.`);
+    } catch (e) {
+      const why = abort.signal.aborted
+        ? `no answer within ${config.timeoutMs} ms`
+        : e instanceof Error
+          ? e.message
+          : String(e);
+      throw new Error(
+        `LLM_ENABLED is set but the ${config.provider} provider is not usable: ${why}. ` +
+          'Fix it, or set LLM_ENABLED=false to run without the agent.',
+      );
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   /**
@@ -209,6 +263,37 @@ function buildModel(config: LlmConfig): BaseChatModel {
     // nothing at all. There is no classification here worth thinking about.
     thinking: { type: 'disabled' },
   });
+}
+
+/**
+ * The cheapest request that proves a provider is usable.
+ *
+ * Each provider's model listing: it is a plain GET, costs no tokens, loads no
+ * model, and for the hosted two it is authenticated — so a 200 says the endpoint
+ * is up *and* the key is one they accept, which are the two ways "configured"
+ * can turn out to be a lie.
+ */
+function probeRequest(config: LlmConfig): {
+  url: string;
+  headers: Record<string, string>;
+} {
+  switch (config.provider) {
+    case 'ollama':
+      return { url: `${config.baseUrl.replace(/\/$/, '')}/api/tags`, headers: {} };
+    case 'anthropic':
+      return {
+        url: 'https://api.anthropic.com/v1/models?limit=1',
+        headers: {
+          'x-api-key': config.apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+      };
+    case 'groq':
+      return {
+        url: 'https://api.groq.com/openai/v1/models',
+        headers: { Authorization: `Bearer ${config.apiKey}` },
+      };
+  }
 }
 
 /**

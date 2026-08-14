@@ -71,6 +71,24 @@ export class LlmConfigService {
   private readonly tracing: TracingConfig | null;
 
   constructor() {
+    this.tracing = readTracingConfig();
+    if (!this.tracing) {
+      this.logger.warn('LangWatch tracing off — LANGWATCH_ENABLED is not set.');
+    }
+
+    // Off unless someone said otherwise. A model that answers customers is not
+    // something a half-filled .env should switch on by accident, and the flag is
+    // also the off switch for the agent as a whole: with it unset the WhatsApp
+    // webhook records what arrived and does nothing else.
+    if (!flag(process.env.LLM_ENABLED)) {
+      this.config = null;
+      this.logger.warn(
+        'LLM disabled — LLM_ENABLED is not set. The WhatsApp agent will record inbound ' +
+          'messages and neither create links nor reply to anything.',
+      );
+      return;
+    }
+
     const provider = process.env.LLM_PROVIDER?.trim();
     const model = process.env.LLM_MODEL?.trim();
     const baseUrl = process.env.LLM_BASE_URL?.trim();
@@ -86,6 +104,18 @@ export class LlmConfigService {
     if (provider === 'ollama' && !baseUrl) missing.push('LLM_BASE_URL');
     if (isKeyedProvider(provider) && !apiKey) missing.push('LLM_API_KEY');
 
+    // Switched on and incomplete is a contradiction, so it stops the boot rather
+    // than degrading to inert. Degrading is what this used to do, and it made the
+    // two states that matter look alike from outside: an agent somebody turned
+    // off, and an agent somebody meant to turn on and mistyped.
+    if (missing.length > 0) {
+      throw new Error(
+        `LLM_ENABLED is set but the configuration is incomplete — missing: ${missing.join(
+          ', ',
+        )}. Set them, or set LLM_ENABLED=false.`,
+      );
+    }
+
     this.config = null;
     if (model && baseUrl && provider === 'ollama') {
       this.config = { provider, model, baseUrl, timeoutMs };
@@ -93,22 +123,9 @@ export class LlmConfigService {
       this.config = { provider, model, apiKey, timeoutMs };
     }
 
-    this.tracing = readTracingConfig();
-
-    if (this.config) {
-      this.logger.log(
-        `LLM configured — provider ${this.config.provider}, timeout ${timeoutMs} ms.`,
-      );
-    } else {
-      this.logger.warn(
-        `LLM inert — missing: ${missing.join(', ')}. The WhatsApp agent will not reply ` +
-          'to anything until these are set; it does not fall back to replying.',
-      );
-    }
-
-    if (!this.tracing) {
-      this.logger.warn('LangWatch tracing off — LANGWATCH_ENABLED is not set.');
-    }
+    this.logger.log(
+      `LLM enabled — provider ${provider}, timeout ${timeoutMs} ms.`,
+    );
   }
 
   get enabled(): boolean {

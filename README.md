@@ -75,8 +75,24 @@ retries a failed inference against a second provider.
 it that way.
 
 The inference server is reached from the backend only. It sits on the same side
-of the trust boundary as the database; no browser ever calls it, and its
-reachability is deliberately **not** checked at startup.
+of the trust boundary as the database, and no browser ever calls it.
+
+**`LLM_ENABLED` is the off switch for the whole agent**, and it is off by
+default. Unset, the webhook still verifies signatures and answers 200, records
+every inbound message with `abstainReason = agent-disabled`, and does nothing
+else — no classification, no link, no reply of any kind, including to numbers it
+does not recognise. The number reads as the plain staffed inbox it was.
+
+Set, two things must hold or **the backend refuses to start**: the `LLM_*` values
+must be complete for the chosen provider, and the provider must answer a cheap
+model-listing request at startup. That check costs no tokens and loads no model,
+and for the hosted providers it also proves the key is one they accept.
+
+Refusing to boot is deliberate. An unreachable model makes every message abstain,
+and abstaining is silence — so without it the failure looks exactly like an agent
+nobody switched on, and stays invisible until somebody compares the WhatsApp
+thread against the orders that never arrived. Nothing re-checks afterwards: a
+provider that dies later is a per-call failure, an abstain, and a trace.
 
 `packages/frontend/.env.local`:
 

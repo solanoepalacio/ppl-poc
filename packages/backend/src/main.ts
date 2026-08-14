@@ -67,4 +67,16 @@ async function bootstrap(): Promise<void> {
   console.log(`Backend listening on http://localhost:${port}`);
 }
 
-void bootstrap();
+// A refusal to start is a deliberate outcome here — a contradictory
+// configuration, or an LLM that was switched on and does not answer — so it
+// exits with a readable line and a non-zero code rather than a stack trace from
+// an unhandled rejection. Under `restart: unless-stopped` the container will
+// keep retrying, which is the intent: the deployment stays visibly broken until
+// the provider answers or somebody sets LLM_ENABLED=false.
+void bootstrap().catch((e: unknown) => {
+  // eslint-disable-next-line no-console
+  console.error(
+    `Backend failed to start: ${e instanceof Error ? e.message : String(e)}`,
+  );
+  process.exit(1);
+});

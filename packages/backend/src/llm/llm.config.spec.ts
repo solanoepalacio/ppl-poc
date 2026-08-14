@@ -4,6 +4,7 @@ import { LlmConfigService, readTracingConfig } from './llm.config';
 /** Every variable the service reads, cleared before each case so one test's
  * environment cannot leak into the next. */
 const VARS = [
+  'LLM_ENABLED',
   'LLM_PROVIDER',
   'LLM_MODEL',
   'LLM_BASE_URL',
@@ -14,19 +15,23 @@ const VARS = [
   'LANGWATCH_ENDPOINT',
 ] as const;
 
+/** A complete configuration per provider, agent switched on. */
 const OLLAMA = {
+  LLM_ENABLED: 'true',
   LLM_PROVIDER: 'ollama',
   LLM_MODEL: 'gemma4:12b-it-qat',
   LLM_BASE_URL: 'http://inference.test:11434',
 };
 
 const ANTHROPIC = {
+  LLM_ENABLED: 'true',
   LLM_PROVIDER: 'anthropic',
   LLM_MODEL: 'claude-sonnet-5',
   LLM_API_KEY: 'sk-ant-secretisimo',
 };
 
 const GROQ = {
+  LLM_ENABLED: 'true',
   LLM_PROVIDER: 'groq',
   LLM_MODEL: 'llama-3.3-70b-versatile',
   LLM_API_KEY: 'gsk-tambien-secreto',
@@ -105,58 +110,92 @@ describe('LlmConfigService', () => {
     });
   });
 
-  describe('a partial configuration counts as none', () => {
-    it('is inert without a model, and names it', () => {
-      const config = build({ LLM_PROVIDER: 'ollama', LLM_BASE_URL: OLLAMA.LLM_BASE_URL });
+  describe('the flag is what switches the agent on', () => {
+    it('is off, and says so, when the flag is unset', () => {
+      // Complete configuration, no flag: still off. A half-filled .env must not
+      // be able to start a model answering customers.
+      const { LLM_ENABLED, ...withoutFlag } = OLLAMA;
+      const config = build(withoutFlag);
 
+      expect(LLM_ENABLED).toBe('true');
       expect(config.enabled).toBe(false);
-      expect(logs.join('\n')).toContain('LLM_MODEL');
+      expect(logs.join('\n')).toContain('LLM_ENABLED');
     });
 
-    it('is inert when ollama has no base URL, and names it', () => {
-      const config = build({ LLM_PROVIDER: 'ollama', LLM_MODEL: 'gemma4:12b-it-qat' });
+    it('says being off means recording without replying', () => {
+      // The failure this guards against is reading "LLM disabled" as "the agent
+      // carries on as before". It does not: it stops acting entirely.
+      build({});
 
-      expect(config.enabled).toBe(false);
-      expect(logs.join('\n')).toContain('LLM_BASE_URL');
+      expect(logs.join('\n')).toMatch(/record inbound messages/i);
+      expect(logs.join('\n')).toMatch(/neither create links nor reply/i);
     });
 
-    it('is inert when a hosted provider has no key, and names it', () => {
+    it('is off for anything that is not a recognised yes', () => {
+      for (const raw of ['false', '0', 'no', '', 'sí']) {
+        for (const name of VARS) delete process.env[name];
+        expect(build({ ...OLLAMA, LLM_ENABLED: raw }).enabled).toBe(false);
+      }
+    });
+  });
+
+  describe('switched on and incomplete refuses to start', () => {
+    // Degrading to inert is what this used to do, and it made the two states
+    // that matter look alike: an agent somebody switched off, and an agent
+    // somebody meant to switch on and mistyped.
+    it('refuses without a model, and names it', () => {
+      expect(() =>
+        build({ LLM_ENABLED: 'true', LLM_PROVIDER: 'ollama', LLM_BASE_URL: 'http://x' }),
+      ).toThrow(/LLM_MODEL/);
+    });
+
+    it('refuses when ollama has no base URL, and names it', () => {
+      expect(() =>
+        build({ LLM_ENABLED: 'true', LLM_PROVIDER: 'ollama', LLM_MODEL: 'un-modelo' }),
+      ).toThrow(/LLM_BASE_URL/);
+    });
+
+    it('refuses when a hosted provider has no key, and names it', () => {
       for (const provider of ['anthropic', 'groq']) {
         for (const name of VARS) delete process.env[name];
-        const config = build({ LLM_PROVIDER: provider, LLM_MODEL: 'un-modelo' });
-
-        expect(config.enabled).toBe(false);
-        expect(logs.join('\n')).toContain('LLM_API_KEY');
+        expect(() =>
+          build({ LLM_ENABLED: 'true', LLM_PROVIDER: provider, LLM_MODEL: 'un-modelo' }),
+        ).toThrow(/LLM_API_KEY/);
       }
     });
 
-    it('is inert with no provider at all', () => {
-      const config = build({ LLM_MODEL: 'gemma4:12b-it-qat', LLM_BASE_URL: 'http://x' });
-
-      expect(config.enabled).toBe(false);
-      expect(logs.join('\n')).toContain('LLM_PROVIDER');
+    it('refuses with no provider at all', () => {
+      expect(() =>
+        build({ LLM_ENABLED: 'true', LLM_MODEL: 'un-modelo', LLM_BASE_URL: 'http://x' }),
+      ).toThrow(/LLM_PROVIDER/);
     });
 
     it('treats a provider it cannot build as no provider', () => {
       // Naming LLM_PROVIDER is what points at the typo; silently falling through
       // to a default would start the agent against a model nobody chose.
-      const config = build({ ...OLLAMA, LLM_PROVIDER: 'ollma' });
-
-      expect(config.enabled).toBe(false);
-      expect(logs.join('\n')).toContain('LLM_PROVIDER');
+      expect(() => build({ ...OLLAMA, LLM_PROVIDER: 'ollma' })).toThrow(/LLM_PROVIDER/);
     });
 
-    it('throws from require() rather than handing back nothing', () => {
+    it('names every missing value at once, not the first', () => {
+      expect(() => build({ LLM_ENABLED: 'true', LLM_PROVIDER: 'groq' })).toThrow(
+        /LLM_MODEL.*LLM_API_KEY|LLM_API_KEY.*LLM_MODEL/,
+      );
+    });
+
+    it('says nothing about values when it refuses', () => {
+      // Even the failure path names variables only.
+      try {
+        build({ LLM_ENABLED: 'true', LLM_PROVIDER: 'groq', LLM_API_KEY: 'gsk-secreto' });
+      } catch (e) {
+        expect((e as Error).message).not.toContain('gsk-secreto');
+      }
+      expect.assertions(1);
+    });
+  });
+
+  describe('require()', () => {
+    it('throws rather than handing back nothing', () => {
       expect(() => build({}).require()).toThrow(/not configured/i);
-    });
-
-    it('says that being inert means silence, not a fallback', () => {
-      // The failure mode this is guarding against is somebody reading "LLM
-      // inert" as "the agent carries on as before". It does not: it stops
-      // replying entirely.
-      build({});
-
-      expect(logs.join('\n')).toMatch(/will not reply/i);
     });
   });
 

@@ -117,6 +117,8 @@ const describe = (o: Awaited<ReturnType<WhatsappService['handleMessage']>>) => {
   switch (o.kind) {
     case 'ignored':
       return `ignorado (${o.reason})`;
+    case 'agent-disabled':
+      return 'agente deshabilitado, mensaje registrado sin responder';
     case 'suppressed':
       return 'suprimido (respuesta reciente al mismo remitente)';
     case 'unknown-sender':

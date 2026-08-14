@@ -5,6 +5,9 @@ import { LlmService } from '../llm/llm.service';
 export type OrderIntent = 'order' | 'not-order' | 'abstain';
 
 export type AbstainReason =
+  /** The agent is switched off. Not a failure — nothing was attempted, and the
+   * message is on the row waiting for a person, which is the whole intent. */
+  | 'agent-disabled'
   | 'no-text'
   | 'unconfigured'
   | 'timeout'
@@ -44,6 +47,17 @@ export class OrderIntentClassifier {
   private readonly tracer = getLangWatchTracer('pannico-intent');
 
   constructor(private readonly llm: LlmService) {}
+
+  /**
+   * Whether classifying is switched on at all.
+   *
+   * Exposed here rather than reaching for `LlmService` from the caller, so
+   * `whatsapp/` still knows nothing about providers or models — only that there
+   * is, or is not, a classifier to ask.
+   */
+  get enabled(): boolean {
+    return this.llm.enabled;
+  }
 
   async classify(text: string | undefined): Promise<OrderIntentVerdict> {
     const input = text?.trim() ?? '';
