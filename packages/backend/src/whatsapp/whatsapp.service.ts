@@ -6,6 +6,7 @@ import { LinksService } from '../links/links.service';
 import {
   OrderIntentClassifier,
   type AbstainReason,
+  type OrderIntentVerdict,
 } from '../intent/order-intent.classifier';
 import { WhatsappConfigService } from './whatsapp.config';
 
@@ -191,8 +192,15 @@ export class WhatsappService {
 
     // Claim the message before doing anything. The primary key is what makes a
     // redelivery — or two deliveries racing — a no-op rather than a second link.
+    //
+    // The text is stored with the claim rather than after the verdict, so a
+    // message that crashes the handler is still readable afterwards. It is what
+    // the classifier was given, which is the only version worth keeping when a
+    // verdict later looks wrong.
     try {
-      await this.prisma.whatsappInbound.create({ data: { wamid, from: sender } });
+      await this.prisma.whatsappInbound.create({
+        data: { wamid, from: sender, text: text ?? null },
+      });
     } catch {
       return { kind: 'ignored', reason: 'ya procesado' };
     }
@@ -222,6 +230,7 @@ export class WhatsappService {
     // puts a link in front of somebody who was not ordering and burns their slot
     // for the bloque, which nobody reading the thread afterwards can take back.
     const verdict = await this.intent.classify(text);
+    await this.recordVerdict(wamid, verdict);
     if (verdict.intent === 'abstain') {
       return { kind: 'abstain', clientName: client.name, reason: verdict.reason };
     }
@@ -317,6 +326,31 @@ export class WhatsappService {
     await this.prisma.whatsappInbound.update({
       where: { wamid },
       data: { replied: true },
+    });
+  }
+
+  /**
+   * Writes the verdict onto the claimed row.
+   *
+   * The abstain reason is the point of this. `not-order` and `abstain` end the
+   * flow identically and are identical in the chat, so without the reason beside
+   * the verdict there is nothing that distinguishes an afternoon of the
+   * classifier working from an afternoon of the model being unreachable — both
+   * read as an agent that went quiet.
+   *
+   * Cleared rather than left alone for a decided verdict, so the column cannot
+   * carry a stale reason from a row it does not apply to.
+   */
+  private async recordVerdict(
+    wamid: string,
+    verdict: OrderIntentVerdict,
+  ): Promise<void> {
+    await this.prisma.whatsappInbound.update({
+      where: { wamid },
+      data: {
+        intent: verdict.intent,
+        abstainReason: verdict.intent === 'abstain' ? verdict.reason : null,
+      },
     });
   }
 

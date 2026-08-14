@@ -178,11 +178,27 @@ model SlotProduced {
 /// platform reported, so one person cannot count as two senders because their
 /// number arrived in two shapes. `replied` records whether a reply actually went
 /// out, so a send that failed does not look like one that succeeded.
+/// The four fields after `receivedAt` are what makes the agent's silence
+/// readable. It says nothing for several different reasons — the message was not
+/// an order, the model could not be reached, the agent is switched off — and to
+/// the customer, and in the chat, those are indistinguishable. Without them the
+/// only record is a row saying a message arrived and nothing happened.
+///
+/// `text` is null for a message that carries none (audio, image, sticker,
+/// location, a reaction); that absence is itself the reason it was not
+/// classified. `intent` is null for a message that never reached the classifier —
+/// a redelivery, one inside the suppression window, one from a number we do not
+/// know. `abstainReason` is null unless `intent` is `abstain`, and is what tells
+/// "decided not to reply" apart from "could not decide". `replied` is whether a
+/// reply actually went out, which is a separate fact from any of them.
 model WhatsappInbound {
-  wamid      String   @id
-  from       String
-  receivedAt DateTime @default(now())
-  replied    Boolean  @default(false)
+  wamid         String   @id
+  from          String
+  receivedAt    DateTime @default(now())
+  text          String?
+  intent        String?
+  abstainReason String?
+  replied       Boolean  @default(false)
 
   @@index([from, receivedAt])
 }

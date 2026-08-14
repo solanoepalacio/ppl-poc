@@ -105,6 +105,14 @@ describe('WhatsappService', () => {
       | { intent: 'abstain'; reason: AbstainReason },
   ) => intent.classify.mockResolvedValue(verdict);
 
+  /** Whether the row was marked replied. The row is also updated to record the
+   * verdict, so "update was never called" no longer means "no reply went out" —
+   * only this does. */
+  const markedReplied = () =>
+    prisma.whatsappInbound.update.mock.calls.some(
+      ([arg]) => (arg as { data?: { replied?: boolean } }).data?.replied === true,
+    );
+
   /** A text message from a sender, as `extractMessages` would hand it over. */
   const message = (wamid: string, from: string, text = 'hola') => ({
     wamid,
@@ -325,6 +333,76 @@ describe('WhatsappService', () => {
       });
     });
 
+    describe('what happened is recorded on the row', () => {
+      /** The last thing written to the claimed row. */
+      const written = () => {
+        const calls = prisma.whatsappInbound.update.mock.calls;
+        return calls.length ? calls[calls.length - 1][0].data : undefined;
+      };
+
+      it('stores the text the classifier was given', async () => {
+        prisma.client.findFirst.mockResolvedValue(known);
+
+        await service.handleMessage(message('w1', '543815551234', 'me mandás 3 docenas?'));
+
+        // Written with the claim, not after the verdict: a message that crashes
+        // the handler is still readable afterwards.
+        expect(prisma.whatsappInbound.create).toHaveBeenCalledWith({
+          data: { wamid: 'w1', from: '543815551234', text: 'me mandás 3 docenas?' },
+        });
+      });
+
+      it('stores no text for a message that carries none', async () => {
+        prisma.client.findFirst.mockResolvedValue(known);
+        classifiesAs({ intent: 'abstain', reason: 'no-text' });
+
+        await service.handleMessage({ wamid: 'w1', from: '543815551234', type: 'audio' });
+
+        expect(prisma.whatsappInbound.create.mock.calls[0][0].data.text).toBeNull();
+      });
+
+      it('records a decided verdict with no abstain reason', async () => {
+        prisma.client.findFirst.mockResolvedValue(known);
+
+        for (const intent of ['order', 'not-order'] as const) {
+          prisma.whatsappInbound.update.mockClear();
+          classifiesAs({ intent });
+          await service.handleMessage(message(`w-${intent}`, '543815551234'));
+
+          // Cleared rather than left alone, so the column cannot carry a stale
+          // reason from a row it does not apply to.
+          expect(prisma.whatsappInbound.update.mock.calls[0][0].data).toEqual({
+            intent,
+            abstainReason: null,
+          });
+        }
+      });
+
+      it('records the abstain reason beside the verdict', async () => {
+        prisma.client.findFirst.mockResolvedValue(known);
+        classifiesAs({ intent: 'abstain', reason: 'timeout' });
+
+        await service.handleMessage(message('w1', '543815551234'));
+
+        // This is the whole point of the column. Without it, an afternoon of the
+        // classifier working and an afternoon of the model being unreachable are
+        // the same rows and the same silence.
+        expect(written()).toEqual({ intent: 'abstain', abstainReason: 'timeout' });
+      });
+
+      it('records nothing for a message that never reached the classifier', async () => {
+        // A redelivery, one inside the suppression window, one from a number we
+        // do not know: null reads as "we did not record it", which is true, and
+        // is not a verdict we never reached.
+        prisma.whatsappInbound.findFirst.mockResolvedValue({ wamid: 'w0' });
+
+        await service.handleMessage(message('w1', '543815551234'));
+
+        expect(intent.classify).not.toHaveBeenCalled();
+        expect(prisma.whatsappInbound.update).not.toHaveBeenCalled();
+      });
+    });
+
     describe('an unanswered message consumes nothing', () => {
       it('does not arm the suppression window', async () => {
         prisma.client.findFirst.mockResolvedValue(known);
@@ -335,7 +413,7 @@ describe('WhatsappService', () => {
         // `markReplied` is tied to a reply that went out, and none did. The
         // window exists to stop *us* answering three times; a message we chose
         // not to answer is not an answer.
-        expect(prisma.whatsappInbound.update).not.toHaveBeenCalled();
+        expect(markedReplied()).toBe(false);
       });
 
       it('answers the order that follows a greeting moments later', async () => {
@@ -365,7 +443,7 @@ describe('WhatsappService', () => {
         // sent are separate facts: the row is the redelivery guard, keyed on
         // wamid, and has nothing to do with whether we replied.
         expect(prisma.whatsappInbound.create).toHaveBeenCalledWith({
-          data: { wamid: 'w1', from: '543815551234' },
+          data: { wamid: 'w1', from: '543815551234', text: 'hola' },
         });
       });
 
@@ -458,6 +536,7 @@ describe('WhatsappService', () => {
       expect(prisma.whatsappInbound.create.mock.calls[0][0].data).toEqual({
         wamid: 'w1',
         from: '543815551234',
+        text: 'hola',
       });
       expect(prisma.whatsappInbound.findFirst.mock.calls[0][0].where.from).toBe('543815551234');
       // The reply goes to the canonical form, not the raw wa_id: Argentina's
@@ -487,7 +566,7 @@ describe('WhatsappService', () => {
       expect(links.linkForAgent).toHaveBeenCalled();
       // Not marked replied: a send that failed must not suppress the customer's
       // next message, which is when they are most likely to try again.
-      expect(prisma.whatsappInbound.update).not.toHaveBeenCalled();
+      expect(markedReplied()).toBe(false);
     });
 
     it('marks the message replied only when the send succeeded', async () => {
