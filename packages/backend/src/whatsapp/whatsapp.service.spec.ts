@@ -748,14 +748,137 @@ describe('WhatsappService', () => {
       expect(fetchMock).not.toHaveBeenCalled();
     });
 
-    it('does not raise when the send fails', async () => {
-      prisma.order.findUnique.mockResolvedValue(confirmedOrder);
-      lastInbound(true);
+    /**
+     * The recap is the customer's only evidence that the order exists — the form's
+     * success screen goes with the window, and what is left is a chat where they
+     * said something and nothing came back. Customers reported not believing the
+     * order had gone through for exactly that reason, so a dropped send is a
+     * customer who thinks the bakery has no record of them.
+     *
+     * Driven on fake timers: the schedule is tens of seconds of real waiting, and
+     * what is under test is which attempts are made, not how long they take.
+     */
+    describe('a recap that fails in transit is retried', () => {
+      beforeEach(() => jest.useFakeTimers());
+      afterEach(() => jest.useRealTimers());
+
+      /** Runs the send to completion, letting every backoff elapse. */
+      const runToCompletion = async () => {
+        const done = service.sendOrderConfirmation('o1');
+        await jest.advanceTimersByTimeAsync(120_000);
+        await done;
+      };
+
+      const rejectsWith = (status: number, body = '{}') =>
+        fetchMock.mockResolvedValue({ ok: false, status, text: async () => body });
+
+      it('gives up only after four attempts when the network keeps dropping', async () => {
+        prisma.order.findUnique.mockResolvedValue(confirmedOrder);
+        lastInbound(true);
+        fetchMock.mockRejectedValue(new Error('network down'));
+
+        await runToCompletion();
+
+        expect(fetchMock).toHaveBeenCalledTimes(4);
+      });
+
+      it('stops as soon as one gets through', async () => {
+        prisma.order.findUnique.mockResolvedValue(confirmedOrder);
+        lastInbound(true);
+        fetchMock
+          .mockRejectedValueOnce(new Error('network down'))
+          .mockResolvedValueOnce({ ok: true, text: async () => '' });
+
+        await runToCompletion();
+
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+      });
+
+      it('retries a server-side error', async () => {
+        prisma.order.findUnique.mockResolvedValue(confirmedOrder);
+        lastInbound(true);
+        rejectsWith(503);
+
+        await runToCompletion();
+
+        expect(fetchMock).toHaveBeenCalledTimes(4);
+      });
+
+      it('retries a rate limit, which Meta reports as a 400', async () => {
+        prisma.order.findUnique.mockResolvedValue(confirmedOrder);
+        lastInbound(true);
+        // The status alone would file this under never-retry, and it is the
+        // failure most certain to succeed on a second attempt.
+        rejectsWith(400, JSON.stringify({ error: { code: 130429, message: 'rate limit' } }));
+
+        await runToCompletion();
+
+        expect(fetchMock).toHaveBeenCalledTimes(4);
+      });
+
+      it('does not retry a rejection that will not change', async () => {
+        prisma.order.findUnique.mockResolvedValue(confirmedOrder);
+        lastInbound(true);
+        // Outside the service window. Meta will refuse this identically however
+        // often it is sent, and hammering it only delays the log line saying so.
+        rejectsWith(400, JSON.stringify({ error: { code: 131047, message: 're-engagement' } }));
+
+        await runToCompletion();
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+      });
+
+      it('does not retry a 400 it cannot read a reason out of', async () => {
+        prisma.order.findUnique.mockResolvedValue(confirmedOrder);
+        lastInbound(true);
+        rejectsWith(400, '<html>bad gateway page</html>');
+
+        await runToCompletion();
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+      });
+
+      it('never raises, whatever happens', async () => {
+        prisma.order.findUnique.mockResolvedValue(confirmedOrder);
+        lastInbound(true);
+        fetchMock.mockRejectedValue(new Error('network down'));
+
+        // The order is already confirmed and committed by the time this runs;
+        // nothing here can, or should, undo it.
+        const done = service.sendOrderConfirmation('o1');
+        await jest.advanceTimersByTimeAsync(120_000);
+        await expect(done).resolves.toBeUndefined();
+      });
+
+      it('waits longer between each attempt', async () => {
+        prisma.order.findUnique.mockResolvedValue(confirmedOrder);
+        lastInbound(true);
+        fetchMock.mockRejectedValue(new Error('network down'));
+
+        const done = service.sendOrderConfirmation('o1');
+        await jest.advanceTimersByTimeAsync(0);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        await jest.advanceTimersByTimeAsync(1_000);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        await jest.advanceTimersByTimeAsync(5_000);
+        expect(fetchMock).toHaveBeenCalledTimes(3);
+        await jest.advanceTimersByTimeAsync(20_000);
+        // Last attempt lands around 26 s in, while the customer is still
+        // holding the phone.
+        expect(fetchMock).toHaveBeenCalledTimes(4);
+        await done;
+      });
+    });
+
+    it('does not retry the inbound reply, which has a manual fallback', async () => {
+      // The order link is recoverable by hand — the manager can share it — and
+      // the customer is waiting on the reply in real time. The recap is neither.
+      prisma.client.findFirst.mockResolvedValue({ id: 'c1', name: 'Alo Bar' });
       fetchMock.mockRejectedValue(new Error('network down'));
 
-      // The order is already confirmed and committed by the time this runs;
-      // nothing here can, or should, undo it.
-      await expect(service.sendOrderConfirmation('o1')).resolves.toBeUndefined();
+      await service.handleMessage(message('w1', '543815551234'));
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
     it('does not look anything up when the agent is not configured', async () => {
