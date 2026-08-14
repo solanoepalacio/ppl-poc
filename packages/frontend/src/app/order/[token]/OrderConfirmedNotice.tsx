@@ -23,8 +23,8 @@ export function OrderConfirmedNotice() {
         <span className="emoji" aria-hidden="true">
           ✅
         </span>
-        <h1>¡Pedido recibido!</h1>
-        <p>Gracias. Tu pedido fue enviado a la panadería.</p>
+        <h1>Recibimos tu pedido</h1>
+        <p>Te enviamos la confirmación por WhatsApp.</p>
       </section>
     </>
   );
