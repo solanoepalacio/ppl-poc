@@ -652,7 +652,7 @@ const orderMessage = (url: string): OutboundMessage => ({
  * misrouted message from confirming a name to whoever received it.
  */
 const ORDER_INVITATION = [
-  'Hola! 👋 Soy un agente de IA de Pannico.',
+  'Hola! 👋 Soy un agente de IA de Panico.',
   'He detectado que quieres hacer un pedido.',
   'Puedes hacerlo directamente presionando el botón abajo.',
   'Luego de confirmar el pedido te escribiré de nuevo confirmándote el pedido.',

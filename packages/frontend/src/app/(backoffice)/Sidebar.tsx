@@ -99,7 +99,7 @@ export function Sidebar({ children }: { children: ReactNode }) {
               <line x1="3" y1="18" x2="21" y2="18" />
             </svg>
           </button>
-          <span className="bo-brand">Pannico</span>
+          <span className="bo-brand">Panico</span>
         </div>
 
         <nav className="bo-nav" aria-label="Oficina de gestión">

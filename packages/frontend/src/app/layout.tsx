@@ -18,7 +18,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'Pannico',
+  title: 'Panico',
   description: 'Recepción de órdenes',
 };
 

@@ -17,7 +17,7 @@ export default function LoginPage({
   return (
     <main className="login-shell">
       <section className="login-card">
-        <h1 className="login-title">Pannico</h1>
+        <h1 className="login-title">Panico</h1>
         <p className="login-subtitle">Oficina de gestión</p>
 
         <form method="post" action="/login/submit" className="login-form">
