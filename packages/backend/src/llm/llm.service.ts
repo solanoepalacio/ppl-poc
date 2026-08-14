@@ -84,44 +84,60 @@ export class LlmService implements OnApplicationBootstrap {
   }
 
   /**
-   * Proves the configured provider actually answers, before the app serves
-   * anything — and stops the boot if it does not.
+   * Proves the configured provider answers **and that it has the configured
+   * model**, before the app serves anything — and stops the boot if not.
    *
    * This is the one check that is deliberately *not* deferred to the first
-   * message. An unreachable provider makes every classification abstain, and
-   * fail-closed renders that as an agent that has simply gone quiet: nothing
-   * errors, nobody is paged, and the failure is only visible to whoever thinks to
-   * compare the WhatsApp thread against the orders that did not arrive. Refusing
-   * to start turns a silent, deniable failure into a loud one at the moment
-   * somebody is already looking at the deployment.
+   * message. Neither failure raises anything on its own: an unreachable provider
+   * and a model that was never pulled both make every classification abstain, and
+   * fail-closed renders that as an agent that has simply gone quiet. Nothing
+   * errors, nobody is paged, and it is only visible to whoever thinks to compare
+   * the WhatsApp thread against the orders that did not arrive. Refusing to start
+   * turns a silent, deniable failure into a loud one while somebody is already
+   * looking at the deployment.
    *
-   * A cheap GET rather than a real inference: it proves DNS, TCP, TLS and — for
-   * the hosted providers — the credential, without a cold model load standing
-   * between the container and its health check.
+   * The model half matters as much as the endpoint half, and is the easier of the
+   * two to get wrong: a typo in `LLM_MODEL`, or a model named in an .env copied
+   * from a host that had it pulled, leaves a perfectly healthy server answering
+   * "no such model" to every message.
    *
-   * Nothing re-checks this afterwards. Reachability is a runtime fact that
-   * changes without a restart, so this says the provider answered at boot and
-   * nothing more; a provider that dies later is still a per-call failure, an
-   * abstain, and a trace.
+   * Still a metadata request rather than a real inference: it costs no tokens and
+   * loads no model, so nothing stands between the container and its health check.
+   * For the hosted providers it is authenticated, so a 200 also proves the key is
+   * one they accept.
+   *
+   * Nothing re-checks this afterwards. Both facts can change without a restart —
+   * a server dies, a model is deleted — so this says they held at boot and
+   * nothing more; either failing later is a per-call abstain with a trace.
    */
   async onApplicationBootstrap(): Promise<void> {
     if (!this.config.enabled) return;
 
     const config = this.config.require();
-    const { url, headers } = probeRequest(config);
+    const probe = modelProbe(config);
     const abort = new AbortController();
     const timer = setTimeout(() => abort.abort(), config.timeoutMs);
     try {
-      const res = await fetch(url, { headers, signal: abort.signal });
-      if (!res.ok) {
-        // A status means it answered — so this is a rejection, not a silence.
-        // Most often a key the provider will not accept, which would otherwise
-        // present as every message going unanswered.
-        throw new Error(
-          `it answered ${res.status} ${res.statusText}`,
-        );
+      const res = await fetch(probe.url, { ...probe.init, signal: abort.signal });
+
+      // A status means it answered, so these are rejections rather than silence,
+      // and they are kept apart because the fix differs: pull the model, fix the
+      // key, or go and look at the server.
+      if (res.status === 404) throw new Error(await this.missingModel(config));
+      if (res.status === 401 || res.status === 403) {
+        throw new Error(`it rejected the credential (${res.status})`);
       }
-      this.logger.log(`${config.provider} reachable; model ${config.model}.`);
+      if (!res.ok) throw new Error(`it answered ${res.status} ${res.statusText}`);
+
+      // A listing endpoint answers 200 whether or not it lists the model we want,
+      // so for those the body is the answer and the status is only the preamble.
+      if (probe.listsModels && !probe.listsModels(await res.json())) {
+        throw new Error(await this.missingModel(config));
+      }
+
+      this.logger.log(
+        `${config.provider} reachable and serving model ${config.model}.`,
+      );
     } catch (e) {
       const why = abort.signal.aborted
         ? `no answer within ${config.timeoutMs} ms`
@@ -134,6 +150,42 @@ export class LlmService implements OnApplicationBootstrap {
       );
     } finally {
       clearTimeout(timer);
+    }
+  }
+
+  /**
+   * The "no such model" message, with what the provider *does* have where that is
+   * cheap to find out.
+   *
+   * Worth the second request because it answers the next question immediately:
+   * a name off by a tag (`qwen3` against `qwen3:32b`) looks identical to a model
+   * that was never pulled until you can see the list beside it.
+   *
+   * Only on the way to failing, so it costs nothing in the normal case, and it
+   * cannot throw — a follow-up that fails must not replace the real error with
+   * its own.
+   */
+  private async missingModel(config: LlmConfig): Promise<string> {
+    const available = await this.availableModels(config);
+    return (
+      `it has no model named "${config.model}"` +
+      (available.length ? `; it offers: ${available.join(', ')}` : '')
+    );
+  }
+
+  /** Best-effort, and only for the provider whose catalogue is small enough to
+   * print — a hosted provider's list is hundreds of names and no help in a log. */
+  private async availableModels(config: LlmConfig): Promise<string[]> {
+    if (config.provider !== 'ollama') return [];
+    try {
+      const res = await fetch(`${trimSlash(config.baseUrl)}/api/tags`);
+      if (!res.ok) return [];
+      const body = (await res.json()) as { models?: { model?: unknown }[] };
+      return (body.models ?? [])
+        .map((m) => m.model)
+        .filter((name): name is string => typeof name === 'string');
+    } catch {
+      return [];
     }
   }
 
@@ -265,36 +317,72 @@ function buildModel(config: LlmConfig): BaseChatModel {
   });
 }
 
-/**
- * The cheapest request that proves a provider is usable.
- *
- * Each provider's model listing: it is a plain GET, costs no tokens, loads no
- * model, and for the hosted two it is authenticated — so a 200 says the endpoint
- * is up *and* the key is one they accept, which are the two ways "configured"
- * can turn out to be a lie.
- */
-function probeRequest(config: LlmConfig): {
+/** A request that answers "is this provider serving this model?". */
+type ModelProbe = {
   url: string;
-  headers: Record<string, string>;
-} {
+  init: RequestInit;
+  /**
+   * Set only for endpoints that list models rather than answering about one, so
+   * a 200 is not by itself the answer. Absent means the status *is* the answer.
+   */
+  listsModels?: (body: unknown) => boolean;
+};
+
+/**
+ * The cheapest request that proves a provider is serving the configured model.
+ *
+ * Metadata in every case: no tokens spent, no model loaded, so this adds no cold
+ * start between the container and its health check. For the hosted two it is
+ * authenticated, so a 200 also proves the key is one they accept — which is the
+ * third way "configured" can turn out to be a lie.
+ *
+ * The three differ in shape for reasons in each provider, not for want of
+ * tidying:
+ *
+ * - **ollama** has no per-model GET; `/api/show` is the equivalent and is a POST.
+ *   It resolves names exactly as an inference call would, so `qwen3` does not
+ *   match `qwen3:32b` here for the same reason it would not there.
+ * - **anthropic** is asked about the one model by path, because that resolves
+ *   aliases (`claude-sonnet-5`) that its listing does not carry as entries — a
+ *   perfectly valid alias would fail a list match.
+ * - **groq** is asked for its list instead, because its ids contain slashes
+ *   (`qwen/qwen3-32b`) and whether those survive a URL path is not something to
+ *   find out at somebody's boot.
+ */
+function modelProbe(config: LlmConfig): ModelProbe {
   switch (config.provider) {
     case 'ollama':
-      return { url: `${config.baseUrl.replace(/\/$/, '')}/api/tags`, headers: {} };
+      return {
+        url: `${trimSlash(config.baseUrl)}/api/show`,
+        init: {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: config.model }),
+        },
+      };
     case 'anthropic':
       return {
-        url: 'https://api.anthropic.com/v1/models?limit=1',
-        headers: {
-          'x-api-key': config.apiKey,
-          'anthropic-version': '2023-06-01',
+        url: `https://api.anthropic.com/v1/models/${encodeURIComponent(config.model)}`,
+        init: {
+          headers: {
+            'x-api-key': config.apiKey,
+            'anthropic-version': '2023-06-01',
+          },
         },
       };
     case 'groq':
       return {
         url: 'https://api.groq.com/openai/v1/models',
-        headers: { Authorization: `Bearer ${config.apiKey}` },
+        init: { headers: { Authorization: `Bearer ${config.apiKey}` } },
+        listsModels: (body) =>
+          ((body as { data?: { id?: unknown }[] })?.data ?? []).some(
+            (m) => m.id === config.model,
+          ),
       };
   }
 }
+
+const trimSlash = (url: string) => url.replace(/\/$/, '');
 
 /**
  * The answer text, and only that.

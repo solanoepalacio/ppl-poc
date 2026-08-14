@@ -83,16 +83,30 @@ every inbound message with `abstainReason = agent-disabled`, and does nothing
 else — no classification, no link, no reply of any kind, including to numbers it
 does not recognise. The number reads as the plain staffed inbox it was.
 
-Set, two things must hold or **the backend refuses to start**: the `LLM_*` values
-must be complete for the chosen provider, and the provider must answer a cheap
-model-listing request at startup. That check costs no tokens and loads no model,
-and for the hosted providers it also proves the key is one they accept.
+Set, three things must hold or **the backend refuses to start**:
 
-Refusing to boot is deliberate. An unreachable model makes every message abstain,
-and abstaining is silence — so without it the failure looks exactly like an agent
-nobody switched on, and stays invisible until somebody compares the WhatsApp
-thread against the orders that never arrived. Nothing re-checks afterwards: a
-provider that dies later is a per-call failure, an abstain, and a trace.
+1. the `LLM_*` values are complete for the chosen provider
+2. the provider answers
+3. **the provider is actually serving `LLM_MODEL`**
+
+The third is the easiest of the three to get wrong and the one with no other
+warning: a typo, a name off by a tag (`qwen3` where the server has `qwen3:32b`),
+or a model named in an `.env` copied from a host that had it pulled all leave a
+perfectly healthy server answering "no such model" to every customer message. On
+failure the error names the model and, for a self-hosted server, lists what it
+does have.
+
+The check is a metadata request — no tokens, no model loaded, so it adds no cold
+start between the container and its health check — and for the hosted providers
+it is authenticated, so it also catches a key they will not accept. The three
+failures are reported apart, because the fix differs for each.
+
+Refusing to boot is deliberate. None of these raise anything on their own: they
+just make every message abstain, and abstaining is silence — so without it the
+failure looks exactly like an agent nobody switched on, and stays invisible until
+somebody compares the WhatsApp thread against the orders that never arrived.
+Nothing re-checks afterwards: a server that dies or a model deleted later is a
+per-call failure, an abstain, and a trace.
 
 `packages/frontend/.env.local`:
 
