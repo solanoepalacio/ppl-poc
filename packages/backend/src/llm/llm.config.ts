@@ -21,16 +21,39 @@ export type LlmConfig = { timeoutMs: number } & (
   | { provider: 'anthropic'; model: string; apiKey: string }
 );
 
-/** LangWatch, when it is set up at all. */
+/** LangWatch, when it is switched on. */
 export type TracingConfig = { apiKey: string; endpoint?: string };
 
 const DEFAULT_TIMEOUT_MS = 60_000;
 
+/**
+ * Reads LangWatch's configuration.
+ *
+ * Tracing is off unless `LANGWATCH_ENABLED` says otherwise, so a fresh copy of
+ * `.env.example` traces nothing. Switching it on is a decision someone makes,
+ * not something a stray key turns on by being present.
+ *
+ * Switched on **without** a key throws. The operator asked for tracing and
+ * cannot have it, and the two ways of quietly proceeding are both worse: running
+ * untraced contradicts what they wrote, and there is nothing to send traces to.
+ */
 export function readTracingConfig(): TracingConfig | null {
+  if (!flag(process.env.LANGWATCH_ENABLED)) return null;
+
   const apiKey = process.env.LANGWATCH_API_KEY?.trim();
-  if (!apiKey) return null;
+  if (!apiKey) {
+    throw new Error(
+      'LANGWATCH_ENABLED is set but LANGWATCH_API_KEY is empty. Set the key, or set LANGWATCH_ENABLED=false.',
+    );
+  }
   const endpoint = process.env.LANGWATCH_ENDPOINT?.trim();
   return endpoint ? { apiKey, endpoint } : { apiKey };
+}
+
+/** `true`/`1`/`yes` switch a flag on; anything else, including absence, leaves it off. */
+function flag(raw: string | undefined): boolean {
+  const value = raw?.trim().toLowerCase();
+  return value === 'true' || value === '1' || value === 'yes';
 }
 
 @Injectable()
@@ -76,7 +99,7 @@ export class LlmConfigService {
     }
 
     if (!this.tracing) {
-      this.logger.warn('LangWatch tracing off — LANGWATCH_API_KEY not set.');
+      this.logger.warn('LangWatch tracing off — LANGWATCH_ENABLED is not set.');
     }
   }
 

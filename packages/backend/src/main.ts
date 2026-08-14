@@ -11,10 +11,10 @@ import { readTracingConfig } from './llm/llm.config';
  * exist before anything that might trace is instantiated, and a provider
  * installed afterwards is one the already-built spans never see.
  *
- * Guarded on the key and wrapped, because tracing is the one part of this that
- * must not be able to stop the app: an untraced backend still takes orders. The
- * absence of a key is the ordinary case, not a failure, and is reported by
- * `LlmConfigService` rather than shouted about here.
+ * Two different failures, handled differently. Asking for tracing without a key
+ * is a contradiction the operator wrote, and `readTracingConfig` throws it
+ * outward. A collector that refuses the connection is not: an untraced backend
+ * still takes orders, so that is logged and stepped over.
  */
 function startTracing(): void {
   const tracing = readTracingConfig();

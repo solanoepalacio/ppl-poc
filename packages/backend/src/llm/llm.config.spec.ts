@@ -9,6 +9,7 @@ const VARS = [
   'LLM_BASE_URL',
   'LLM_API_KEY',
   'LLM_TIMEOUT_MS',
+  'LANGWATCH_ENABLED',
   'LANGWATCH_API_KEY',
   'LANGWATCH_ENDPOINT',
 ] as const;
@@ -59,7 +60,7 @@ describe('LlmConfigService', () => {
         provider: 'ollama',
         model: 'gemma4:12b-it-qat',
         baseUrl: 'http://inference.test:11434',
-        timeoutMs: 10_000,
+        timeoutMs: 60_000,
       });
     });
 
@@ -71,7 +72,7 @@ describe('LlmConfigService', () => {
         provider: 'anthropic',
         model: 'claude-sonnet-5',
         apiKey: 'sk-ant-secretisimo',
-        timeoutMs: 10_000,
+        timeoutMs: 60_000,
       });
     });
 
@@ -165,24 +166,32 @@ describe('LlmConfigService', () => {
       // can never complete — so it is read as "unset" rather than obeyed.
       for (const raw of ['', 'pronto', '0', '-1', '1.5']) {
         for (const name of VARS) delete process.env[name];
-        expect(build({ ...OLLAMA, LLM_TIMEOUT_MS: raw }).require().timeoutMs).toBe(10_000);
+        expect(build({ ...OLLAMA, LLM_TIMEOUT_MS: raw }).require().timeoutMs).toBe(60_000);
       }
     });
   });
 
   describe('tracing is configured separately from the model', () => {
-    it('is off, and says so, with no key', () => {
+    it('is off, and says so, when the flag is unset', () => {
       const config = build(OLLAMA);
 
       expect(config.tracingEnabled).toBe(false);
       // Off is a warning, not an error: the model is still fully configured.
       expect(config.enabled).toBe(true);
-      expect(logs.join('\n')).toContain('LANGWATCH_API_KEY');
+      expect(logs.join('\n')).toContain('LANGWATCH_ENABLED');
     });
 
-    it('is on with a key, endpoint optional', () => {
-      expect(readTracingConfig()).toBeNull();
+    it('stays off for a key alone, without the flag', () => {
+      // The flag is the switch. A key that happens to be in the environment —
+      // shared with another project, left over from a trial — must not start
+      // shipping customers' messages somewhere on its own.
+      const config = build({ ...OLLAMA, LANGWATCH_API_KEY: 'sk-lw-1' });
 
+      expect(config.tracingEnabled).toBe(false);
+    });
+
+    it('is on with the flag and a key, endpoint optional', () => {
+      process.env.LANGWATCH_ENABLED = 'true';
       process.env.LANGWATCH_API_KEY = 'sk-lw-1';
       expect(readTracingConfig()).toEqual({ apiKey: 'sk-lw-1' });
 
@@ -193,8 +202,28 @@ describe('LlmConfigService', () => {
       });
     });
 
+    it('accepts the usual spellings of on, and nothing else', () => {
+      for (const raw of ['true', 'TRUE', '1', 'yes', ' true ']) {
+        process.env.LANGWATCH_ENABLED = raw;
+        process.env.LANGWATCH_API_KEY = 'sk-lw-1';
+        expect(readTracingConfig()).not.toBeNull();
+      }
+      for (const raw of ['false', '0', 'no', '', 'sí', 'enabled']) {
+        process.env.LANGWATCH_ENABLED = raw;
+        expect(readTracingConfig()).toBeNull();
+      }
+    });
+
+    it('refuses to start when switched on without a key', () => {
+      // Asking for tracing and giving it nothing to authenticate with is a
+      // contradiction the operator wrote. Running untraced would be ignoring it.
+      expect(() => build({ ...OLLAMA, LANGWATCH_ENABLED: 'true' })).toThrow(
+        /LANGWATCH_API_KEY/,
+      );
+    });
+
     it('does not make an otherwise inert model configured', () => {
-      const config = build({ LANGWATCH_API_KEY: 'sk-lw-1' });
+      const config = build({ LANGWATCH_ENABLED: 'true', LANGWATCH_API_KEY: 'sk-lw-1' });
 
       expect(config.tracingEnabled).toBe(true);
       expect(config.enabled).toBe(false);

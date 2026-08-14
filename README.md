@@ -49,9 +49,11 @@ yarn workspace @pannico/backend prisma:seed
   (`META_ACCESS_TOKEN`, `META_PHONE_NUMBER_ID`, `META_VERIFY_TOKEN`,
   `META_APP_SECRET`) are set.
 - `LLM_*` — the model that classifies inbound messages (see below)
-- `LANGWATCH_API_KEY` — LLM tracing. Unset means no tracing and a working
-  system; nothing fails for want of it. Optional `LANGWATCH_ENDPOINT` for a
-  self-hosted collector.
+- `LANGWATCH_ENABLED` — LLM tracing, **off by default**. Off is a working system;
+  tracing never fails an inference. On, it requires `LANGWATCH_API_KEY`: that
+  combination without a key is a contradiction, so the backend refuses to start
+  rather than run untraced. Optional `LANGWATCH_ENDPOINT` for a self-hosted
+  collector.
 
 Which values are required depends on `LLM_PROVIDER`:
 
@@ -60,7 +62,7 @@ Which values are required depends on `LLM_PROVIDER`:
 | `ollama` | `LLM_MODEL`, `LLM_BASE_URL` | `LLM_API_KEY` |
 | `anthropic` | `LLM_MODEL`, `LLM_API_KEY` | `LLM_BASE_URL` |
 
-`LLM_TIMEOUT_MS` (default `10000`) bounds every inference. It is sized for a
+`LLM_TIMEOUT_MS` (default `60000`) bounds every inference. It is sized for a
 *warm* model, and the backend pins the model in memory (`keep_alive: -1`) to keep
 it that way.
 
