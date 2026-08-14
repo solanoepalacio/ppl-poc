@@ -157,9 +157,29 @@ describe('WhatsappService', () => {
       expect(links.linkForAgent).toHaveBeenCalledWith('c1');
       const body = JSON.parse(fetchMock.mock.calls[0][1].body);
       expect(body.to).toBe('543815551234');
-      expect(body.text.body).toContain('https://t.test/order/abc');
-      // Free-form text, not a template: the customer messaged first.
-      expect(body.type).toBe('text');
+      // Free-form interactive, not a template: the customer messaged first, so
+      // the 24-hour window is open and a cta_url needs no prior approval.
+      expect(body.type).toBe('interactive');
+      expect(body.interactive.type).toBe('cta_url');
+      expect(body.interactive.action).toEqual({
+        name: 'cta_url',
+        parameters: { display_text: 'Hacer mi pedido', url: 'https://t.test/order/abc' },
+      });
+      // The URL rides on the button only — a raw copy in the body would defeat
+      // the point of the button and show a second, unstyled link.
+      expect(body.interactive.body.text).not.toContain('https://');
+    });
+
+    it('keeps the button label and body inside Meta’s limits', async () => {
+      prisma.client.findFirst.mockResolvedValue({ id: 'c1', name: 'X'.repeat(200) });
+
+      await service.handleMessage({ wamid: 'w1', from: '543815551234' });
+
+      // 20 and 1024 are hard caps: over either, the send is rejected outright
+      // rather than truncated, so the customer gets nothing at all.
+      const { interactive } = JSON.parse(fetchMock.mock.calls[0][1].body);
+      expect(interactive.action.parameters.display_text.length).toBeLessThanOrEqual(20);
+      expect(interactive.body.text.length).toBeLessThanOrEqual(1024);
     });
 
     it('matches a sender whose stored number carries the Argentine 9', async () => {

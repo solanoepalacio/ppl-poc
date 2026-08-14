@@ -15,6 +15,28 @@ const SUPPRESSION_MS = 90_000;
 /** The minimum shape we read out of a delivery; Meta sends a great deal more. */
 type InboundMessage = { wamid: string; from: string };
 
+/**
+ * The message-shaped half of a Graph send — everything but the envelope
+ * (`messaging_product`, `to`), which `send` fills in.
+ *
+ * Split out so the two replies can differ in kind without duplicating the
+ * request: the order reply is an interactive button, the courtesy reply is
+ * plain text because it has no link to put on a button.
+ */
+type OutboundMessage =
+  | { type: 'text'; text: { body: string } }
+  | {
+      type: 'interactive';
+      interactive: {
+        type: 'cta_url';
+        body: { text: string };
+        action: {
+          name: 'cta_url';
+          parameters: { display_text: string; url: string };
+        };
+      };
+    };
+
 /** What acting on a delivery did, for the log and for the tests. */
 export type InboundOutcome =
   | { kind: 'ignored'; reason: string }
@@ -132,7 +154,7 @@ export class WhatsappService {
     });
 
     if (!client) {
-      if (await this.send(sender, UNKNOWN_SENDER_TEXT)) await this.markReplied(wamid);
+      if (await this.send(sender, UNKNOWN_SENDER_MESSAGE)) await this.markReplied(wamid);
       return { kind: 'unknown-sender' };
     }
 
@@ -141,7 +163,7 @@ export class WhatsappService {
     // send that counted would suppress the customer's next message too, turning
     // one lost reply into silence for the whole window — exactly when they are
     // most likely to try again.
-    if (await this.send(sender, orderText(client.name, url))) {
+    if (await this.send(sender, orderMessage(client.name, url))) {
       await this.markReplied(wamid);
     }
     return { kind: 'replied', clientName: client.name, reused };
@@ -166,18 +188,19 @@ export class WhatsappService {
   }
 
   /**
-   * Sends a free-form text reply.
+   * Sends a free-form reply.
    *
    * Free-form rather than a template because the customer messaged first, which
    * opens the 24-hour service window: inside it this needs no approval and costs
-   * nothing.
+   * nothing. That holds for the interactive reply too — `cta_url` is a service
+   * message like any other, not a template, so it needs no prior approval.
    *
    * Best-effort by design. A failure here must not undo the order that was just
    * created — the link still works and the manager can share it by hand — so it
    * is logged and swallowed. Reports whether it went out, which is what decides
    * if the message counts as replied.
    */
-  private async send(to: string, body: string): Promise<boolean> {
+  private async send(to: string, message: OutboundMessage): Promise<boolean> {
     const { graphBaseUrl, phoneNumberId, accessToken } = this.config.require();
     try {
       const res = await fetch(`${graphBaseUrl}/${phoneNumberId}/messages`, {
@@ -188,9 +211,9 @@ export class WhatsappService {
         },
         body: JSON.stringify({
           messaging_product: 'whatsapp',
+          recipient_type: 'individual',
           to,
-          type: 'text',
-          text: { body },
+          ...message,
         }),
       });
       if (!res.ok) {
@@ -210,12 +233,43 @@ export class WhatsappService {
   }
 }
 
-/** Provisional copy, to be reworded. */
-const UNKNOWN_SENDER_TEXT =
-  'Hola! No tenemos este número registrado. Dejanos tu pedido por acá y una persona lo va a tomar.';
+/** Provisional copy, to be reworded. Plain text: there is no link to put on a
+ * button, and an interactive message without one is not a thing. */
+const UNKNOWN_SENDER_MESSAGE: OutboundMessage = {
+  type: 'text',
+  text: {
+    body: 'Hola! No tenemos este número registrado. Dejanos tu pedido por acá y una persona lo va a tomar.',
+  },
+};
 
-const orderText = (name: string, url: string) =>
-  `Hola ${name}! Hacé tu pedido acá: ${url} — válido para el bloque actual`;
+/**
+ * The order reply, as a call-to-action button rather than a bare URL.
+ *
+ * `display_text` is capped at 20 characters by Meta and the body at 1024; the
+ * copy below is well inside both, but any rewording has to stay there or the
+ * send is rejected outright.
+ *
+ * Whether tapping this opens WhatsApp's in-app browser or the phone's default
+ * one is **not** decided here — there is no flag for it. Meta gates that on the
+ * sending number's messaging tier (≥1,000 business-initiated conversations/day)
+ * and on the message kind, and their partner docs disagree about whether
+ * free-form interactive messages qualify yet or only template CTA buttons do.
+ * Below the tier this will simply open the default browser, which tells us
+ * nothing either way.
+ */
+const orderMessage = (name: string, url: string): OutboundMessage => ({
+  type: 'interactive',
+  interactive: {
+    type: 'cta_url',
+    body: {
+      text: `Hola ${name}! Tu pedido para el bloque actual está listo para cargar.`,
+    },
+    action: {
+      name: 'cta_url',
+      parameters: { display_text: 'Hacer mi pedido', url },
+    },
+  },
+});
 
 /** Keeps a customer's full number out of the logs. */
 const redact = (phone: string) => `…${phone.slice(-4)}`;
