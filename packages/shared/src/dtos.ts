@@ -25,11 +25,26 @@ export interface CreateLinkResponse {
 }
 
 /**
- * `GET /orders/by-token/:token` response. When `valid` is true the catalog is
- * present so the form can render; when false the form shows the invalid-link page.
+ * What a token is worth, from the customer's point of view.
+ *
+ * Three states rather than two, because a link that is spent has two meanings
+ * and the customer must not be shown them as one. `confirmed` is *their own*
+ * order having gone through — the link is gone because they used it — and it is
+ * the state a page reloaded after confirming lands in, which happens on its own:
+ * a phone browser restoring a tab, a pull-to-refresh, a step back. Telling that
+ * customer their link is no longer valid reads as the order having failed and
+ * invites them to place it again. `invalid` is every other way a link can be
+ * unusable: one that never existed, or one whose bloque closed before they got
+ * to it.
+ */
+export type TokenState = 'valid' | 'confirmed' | 'invalid';
+
+/**
+ * `GET /orders/by-token/:token` response. The catalog is present only for
+ * `valid`, which is the only state that renders a form to fill in.
  */
 export interface TokenValidationResponse {
-  valid: boolean;
+  state: TokenState;
   /** Display name of the client the order is for, when the token is valid. */
   clientName?: string;
   catalog?: Product[];

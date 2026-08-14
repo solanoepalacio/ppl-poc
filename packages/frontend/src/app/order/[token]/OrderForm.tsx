@@ -7,6 +7,7 @@ import { trackEvent } from '@/lib/analytics';
 import { CatalogList } from './CatalogList';
 import { BrandHeader } from './BrandHeader';
 import { InvalidLinkNotice } from './InvalidLinkNotice';
+import { OrderConfirmedNotice } from './OrderConfirmedNotice';
 
 type Outcome = 'open' | 'issued' | 'invalid';
 
@@ -194,10 +195,10 @@ export function OrderForm({
         itemCount: items.length,
         totalQuantity: items.reduce((sum, i) => sum + i.quantity, 0),
       });
-      // The success state first, the close attempt after. The order matters:
-      // `window.close()` is only honoured for a script-opened window, and
-      // WhatsApp's in-app browser is not one — so for exactly the customers this
-      // is aimed at, the screen *is* the outcome and the close is the bonus.
+      // The success state first, the close attempt after — and after a pause, so
+      // the confirmation is on screen long enough to be read. Closing instantly
+      // would be indistinguishable from the browser crashing, which is the
+      // opposite of the reassurance this screen exists to give.
       setOutcome('issued');
       closeWindow();
     } catch (e) {
@@ -218,18 +219,7 @@ export function OrderForm({
   }
 
   if (outcome === 'issued') {
-    return (
-      <>
-        <BrandHeader />
-        <section className="card outcome">
-          <span className="emoji" aria-hidden="true">
-            ✅
-          </span>
-          <h1>¡Pedido recibido!</h1>
-          <p>Gracias. Tu pedido fue enviado a la panadería.</p>
-        </section>
-      </>
-    );
+    return <OrderConfirmedNotice />;
   }
 
   const count =
@@ -353,17 +343,37 @@ const delay = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /**
+ * How long the confirmation stays up before the window is asked to close.
+ *
+ * Long enough to read four words and register the tick, short enough that
+ * nobody decides the page has hung and reaches for the back button. The
+ * customer is on their way back to a chat either way; this is the difference
+ * between arriving there having seen a confirmation and arriving there wondering
+ * what just happened.
+ */
+const CLOSE_DELAY_MS = 1_800;
+
+/**
  * Asks the browser to close the window, and does not care whether it agrees.
  *
  * Closing is only permitted for a window the page itself opened, which the
- * in-app browser a customer arrives in from a chat is not. A refusal is
- * therefore the ordinary outcome rather than an error, and there is nothing to
- * report to a customer whose order has already gone through.
+ * in-app browser a customer arrives in from a chat is not — so a refusal is the
+ * ordinary outcome rather than an error, and there is nothing to report to a
+ * customer whose order has already gone through. Where it *is* honoured, the
+ * customer is dropped back into the conversation they came from, which is the
+ * best ending this flow has.
+ *
+ * Unconditionally survivable because the success screen stays behind it, and
+ * because a reload of this page now renders that same screen from the server —
+ * so neither a refusal nor the browser reloading afterwards can turn a confirmed
+ * order into "este enlace ya no es válido".
  */
 function closeWindow() {
-  try {
-    window.close();
-  } catch {
-    /* refused; the success state is already on screen */
-  }
+  setTimeout(() => {
+    try {
+      window.close();
+    } catch {
+      /* refused; the success state is already on screen */
+    }
+  }, CLOSE_DELAY_MS);
 }

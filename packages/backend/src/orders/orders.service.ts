@@ -52,21 +52,26 @@ export class OrdersService {
 
   /**
    * Validates a token for the customer form. When valid, returns the bound
-   * client name and the catalog so the form can render; when
-   * invalid/expired/consumed, returns `{ valid: false }` and resolves no client
-   * or catalog.
+   * client name and the catalog so the form can render; otherwise resolves
+   * neither, and says which kind of unusable the link is.
+   *
+   * A spent link is reported as `confirmed` rather than `invalid`, which is what
+   * lets the page a customer reloads after ordering show them their order went
+   * through instead of telling them the link is dead. Keyed on `confirmedAt`
+   * and not `consumedAt`: consuming is what closes the single-use gate, and
+   * confirming is the thing the customer actually did.
    */
   async validateToken(token: string): Promise<TokenValidationResponse> {
     const order = await this.tokenService.findOrderByToken(token);
     if (!this.tokenService.isValid(order)) {
-      return { valid: false };
+      return { state: order?.confirmedAt ? 'confirmed' : 'invalid' };
     }
     const client = await this.prisma.client.findUnique({
       where: { id: order!.clientId },
       select: { name: true },
     });
     return {
-      valid: true,
+      state: 'valid',
       clientName: client?.name,
       catalog: await this.getCatalog(),
     };

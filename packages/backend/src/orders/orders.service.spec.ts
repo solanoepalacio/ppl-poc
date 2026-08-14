@@ -195,7 +195,7 @@ describe('OrdersService', () => {
       ]);
 
       const res = await service.validateToken('tok_valid');
-      expect(res.valid).toBe(true);
+      expect(res.state).toBe('valid');
       expect(res.clientName).toBe('Il Postino');
       expect(res.catalog).toHaveLength(1);
     });
@@ -206,7 +206,66 @@ describe('OrdersService', () => {
         slot: { status: 'closed' },
       });
       const res = await service.validateToken('tok_valid');
-      expect(res).toEqual({ valid: false });
+      expect(res).toEqual({ state: 'invalid' });
+    });
+
+    it('returns invalid for a token that does not exist', async () => {
+      prisma.order.findUnique.mockResolvedValue(null);
+
+      await expect(service.validateToken('tok_nope')).resolves.toEqual({
+        state: 'invalid',
+      });
+    });
+
+    /**
+     * The state the customer's own browser lands in when it reloads the page
+     * after they ordered — a restored tab, a pull-to-refresh, a step back. It
+     * has to be told apart from a dead link, because "este enlace ya no es
+     * válido" reads to that customer as the order having failed.
+     */
+    describe('a link spent by the customer confirming', () => {
+      const confirmedOrder = {
+        ...pendingOrder,
+        consumedAt: new Date(),
+        confirmedAt: new Date(),
+      };
+
+      it('reports it as confirmed rather than invalid', async () => {
+        prisma.order.findUnique.mockResolvedValue(confirmedOrder);
+
+        // No catalog and no client name: there is nothing left to order
+        // against, and this state renders a message rather than a form.
+        await expect(service.validateToken('tok_used')).resolves.toEqual({
+          state: 'confirmed',
+        });
+      });
+
+      it('still reports it as confirmed once its bloque has closed', async () => {
+        // The bloque closing does not un-confirm the order. Somebody reopening
+        // the link days later is still owed the truth about their own order.
+        prisma.order.findUnique.mockResolvedValue({
+          ...confirmedOrder,
+          slot: { status: 'closed' },
+        });
+
+        await expect(service.validateToken('tok_used')).resolves.toEqual({
+          state: 'confirmed',
+        });
+      });
+
+      it('reports a link consumed without a confirmation as invalid', async () => {
+        // `confirmedAt` and not `consumedAt`: consuming is what closes the
+        // single-use gate, and only confirming is something the customer did.
+        prisma.order.findUnique.mockResolvedValue({
+          ...pendingOrder,
+          consumedAt: new Date(),
+          confirmedAt: null,
+        });
+
+        await expect(service.validateToken('tok_used')).resolves.toEqual({
+          state: 'invalid',
+        });
+      });
     });
   });
 
