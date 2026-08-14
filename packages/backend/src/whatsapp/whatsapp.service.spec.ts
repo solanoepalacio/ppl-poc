@@ -600,6 +600,24 @@ describe('WhatsappService', () => {
       const { interactive } = JSON.parse(fetchMock.mock.calls[0][1].body);
       expect(interactive.action.parameters.display_text.length).toBeLessThanOrEqual(20);
       expect(interactive.body.text.length).toBeLessThanOrEqual(1024);
+      // Nothing about the client reaches the copy any more, so a message that
+      // went to the wrong number confirms no name to whoever received it.
+      expect(interactive.body.text).not.toContain('X');
+    });
+
+    it('says it is an agent, and that ignoring it still reaches a person', async () => {
+      prisma.client.findFirst.mockResolvedValue(known);
+
+      await service.processMessage(message('w1', '543815551234'));
+
+      // Two promises to the customer rather than styling, which is why they are
+      // pinned. This is an automated system speaking first in a thread they
+      // believe is staffed, and it acts on a guess about what they meant — so it
+      // says which it is, and says that a wrong guess costs them nothing.
+      const { interactive } = JSON.parse(fetchMock.mock.calls[0][1].body);
+      expect(interactive.body.text).toMatch(/agente de IA/);
+      expect(interactive.body.text).toMatch(/ignora este mensaje/);
+      expect(interactive.body.text).toMatch(/humano/);
     });
 
     it('takes the sender it was handed, already canonical', async () => {

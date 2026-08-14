@@ -358,7 +358,7 @@ export class WhatsappService {
     // the verdicts above return without reaching this, so the window is never
     // armed by a message we chose not to answer. A customer who says "gracias"
     // and then asks to order ten seconds later is served immediately.
-    if (await this.send(from, orderMessage(client.name, url))) {
+    if (await this.send(from, orderMessage(url))) {
       await this.markReplied(wamid);
     }
     return { kind: 'replied', clientName: client.name, reused };
@@ -613,19 +613,51 @@ const UNKNOWN_SENDER_MESSAGE: OutboundMessage = {
  * Below the tier this will simply open the default browser, which tells us
  * nothing either way.
  */
-const orderMessage = (name: string, url: string): OutboundMessage => ({
+const orderMessage = (url: string): OutboundMessage => ({
   type: 'interactive',
   interactive: {
     type: 'cta_url',
-    body: {
-      text: `Hola ${name}! Tu pedido para el bloque actual está listo para cargar.`,
-    },
+    body: { text: ORDER_INVITATION },
     action: {
       name: 'cta_url',
       parameters: { display_text: 'Hacer mi pedido', url },
     },
   },
 });
+
+/**
+ * What the message says, and why each line is in it.
+ *
+ * It **declares itself an agent** in the first line. This message is the first
+ * thing an automated system says in a thread the customer believes is staffed by
+ * the bakery, and letting them assume a person read their message and made this
+ * judgement would be the wrong kind of quiet.
+ *
+ * It **names what it inferred** — that they want to order — because the whole
+ * message rests on a guess, and a guess the reader can see is one they can
+ * correct.
+ *
+ * It **promises the recap**, which is safe to promise here and only here: this
+ * message is a reply to a message the customer just sent, so their own 24-hour
+ * service window is open and a free-form recap will be permitted when they
+ * confirm. The same sentence on a manager-generated link would be a promise the
+ * service window does not let us keep.
+ *
+ * It **offers a way out** in the last line. Silence is the fail-closed ending
+ * everywhere else in this flow, so on the one path where the agent does speak up
+ * uninvited, the customer is told that ignoring it costs them nothing and still
+ * reaches a person. Without that, a wrong guess reads as a demand.
+ *
+ * No client name: it greets nobody in particular now, which also keeps a
+ * misrouted message from confirming a name to whoever received it.
+ */
+const ORDER_INVITATION = [
+  'Hola! 👋 Soy un agente de IA de Pannico.',
+  'He detectado que quieres hacer un pedido.',
+  'Puedes hacerlo directamente presionando el botón abajo.',
+  'Luego de confirmar el pedido te escribiré de nuevo confirmándote el pedido.',
+  'Si no tenías intención de hacer un pedido, ignora este mensaje y un humano te contestará en cuanto pueda.',
+].join('\n');
 
 /**
  * The recap of a confirmed order.
