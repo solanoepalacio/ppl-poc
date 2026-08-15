@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { formatDateTime } from '../formatDateTime';
 import type { Product, SlotViewOrder } from '@pannico/shared';
 import { OrderActions } from './OrderActions';
 
@@ -65,7 +66,7 @@ export function OrdersTable({
               </span>
               <span className="otable-client">{order.clientName}</span>
               <span className="otable-date">
-                {new Date(order.createdAt).toLocaleString('es-AR')}
+                {formatDateTime(order.createdAt)}
               </span>
               <span className="otable-total-cell">
                 <span className="otable-total">{total}</span>

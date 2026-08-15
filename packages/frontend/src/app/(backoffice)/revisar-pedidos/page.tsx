@@ -4,6 +4,7 @@ import { AutoRefresh } from '../AutoRefresh';
 import { SlotPicker } from '../SlotPicker';
 import { ViewHeader } from '../ViewHeader';
 import { slotLabel } from '../slotLabel';
+import { formatDateTime } from '../formatDateTime';
 import { PrintButton } from './PrintButton';
 
 /** How many products share a row. The band is drawn per row, so this is markup. */
@@ -22,14 +23,7 @@ const PER_ROW = 3;
  * its output is never re-rendered by the browser, so the locale cannot resolve
  * one way on each side.
  */
-const printedAt = () =>
-  new Date().toLocaleString('es-AR', {
-    day: 'numeric',
-    month: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+const printedAt = () => formatDateTime(new Date());
 
 /** Splits a list into fixed-size chunks, the last one short. */
 function chunk<T>(list: T[], size: number): T[][] {

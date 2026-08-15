@@ -1,3 +1,5 @@
+import { formatDate } from './formatDateTime';
+
 /**
  * Human label for a production bloque, shared by the client-side bloque toolbar
  * and the server-rendered production view. Kept in a plain (non-'use client')
@@ -12,12 +14,12 @@ export function slotLabel(slot: {
   openedAt: string;
   closedAt: string | null;
 }): string {
-  const opened = new Date(slot.openedAt).toLocaleDateString('es-AR');
+  const opened = formatDate(slot.openedAt);
   if (slot.status === 'open') {
     return `Bloque #${slot.seq} · desde ${opened} (abierto)`;
   }
   const closed = slot.closedAt
-    ? new Date(slot.closedAt).toLocaleDateString('es-AR')
+    ? formatDate(slot.closedAt)
     : '';
   return `Bloque #${slot.seq} · ${opened} – ${closed}`;
 }

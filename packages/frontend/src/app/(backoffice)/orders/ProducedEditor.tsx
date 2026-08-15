@@ -11,6 +11,7 @@ import { setSlotProduced } from '@/lib/api';
 import { trackEvent } from '@/lib/analytics';
 import { ProductPicker, itemsFromQuantities } from './ProductPicker';
 import { Modal } from './Modal';
+import { formatDateTime } from '../formatDateTime';
 
 /** One entry as the dialog holds it: `id` absent means it has not been saved yet. */
 type DraftEntry = { id?: string; quantity: number; createdAt?: string };
@@ -374,14 +375,7 @@ function draftFrom(current: ProducedProduct[]): Draft {
  */
 function formatWhen(createdAt?: string): string {
   if (!createdAt) return 'Sin guardar';
-  const d = new Date(createdAt);
-  return `${d.toLocaleDateString('es-AR', {
-    day: '2-digit',
-    month: '2-digit',
-  })} ${d.toLocaleTimeString('es-AR', {
-    hour: '2-digit',
-    minute: '2-digit',
-  })}`;
+  return formatDateTime(createdAt);
 }
 
 function TrashIcon() {
