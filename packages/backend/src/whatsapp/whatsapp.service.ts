@@ -12,13 +12,6 @@ import {
 import { WhatsappConfigService } from './whatsapp.config';
 
 /**
- * Several messages from one sender inside this window are answered once. Long
- * enough to absorb "hola" / "quiero pedir" / "?" typed in a row, short enough
- * that a customer who comes back later is not ignored.
- */
-const SUPPRESSION_MS = 90_000;
-
-/**
  * Meta's service window: how long after a customer's own message we may still
  * send them free-form text. Fixed by the platform, not by us — outside it a
  * free-form send is rejected rather than delivered, and only an approved
@@ -125,7 +118,6 @@ type OutboundMessage =
  */
 export type InboundOutcome =
   | { kind: 'agent-disabled' }
-  | { kind: 'suppressed' }
   | { kind: 'unknown-sender' }
   | { kind: 'not-order'; clientName: string }
   | { kind: 'abstain'; clientName: string; reason: AbstainReason }
@@ -298,10 +290,10 @@ export class WhatsappService {
   async processMessage(message: RecordedMessage): Promise<InboundOutcome> {
     const { wamid, from, text } = message;
 
-    // With the agent switched off the webhook does nothing but remember. Before
-    // the suppression check and before the client lookup, because neither
-    // question has an answer worth having when nothing is going to be sent
-    // either way. The number reads as the plain staffed inbox it was.
+    // With the agent switched off the webhook does nothing but remember.
+    // Before the client lookup, because who wrote has no answer worth having
+    // when nothing is going to be sent either way. The number reads as the plain
+    // staffed inbox it was.
     //
     // The row is still written, with the reason on it, so a message that arrived
     // while the agent was off is not indistinguishable from one it read and
@@ -314,10 +306,17 @@ export class WhatsappService {
       return { kind: 'agent-disabled' };
     }
 
-    if (await this.recentlyReplied(from)) {
-      return { kind: 'suppressed' };
-    }
-
+    // Every message gets read on its own merits, however many arrive together.
+    //
+    // There used to be a rate limit here: one reply per sender per 90 seconds,
+    // and anything inside that window returned before it was ever classified.
+    // It was aimed at a burst like "hola" / "quiero pedir" / "?", but it could
+    // not tell that burst from three different things typed in a row, because
+    // it decided before reading any of them. Dropping a message unread to avoid
+    // answering it twice is the wrong trade: deduplication is the `wamid`
+    // primary key at intake, which removes the message that genuinely *is* a
+    // repeat, and nothing else here should be second-guessing what a customer
+    // meant by how fast they typed it.
     const client = await this.prisma.client.findFirst({
       where: { phone: from, active: true },
       select: { id: true, name: true },
@@ -361,15 +360,10 @@ export class WhatsappService {
     }
 
     const { url, reused } = await this.links.linkForAgent(client.id);
-    // Only a reply that actually went out marks the message replied. A failed
-    // send that counted would suppress the customer's next message too, turning
-    // one lost reply into silence for the whole window — exactly when they are
-    // most likely to try again.
-    //
-    // The same rule is what leaves an *unanswered* message consuming nothing:
-    // the verdicts above return without reaching this, so the window is never
-    // armed by a message we chose not to answer. A customer who says "gracias"
-    // and then asks to order ten seconds later is served immediately.
+    // Only a reply that actually went out marks the message replied. Nothing
+    // gates on that column now that the rate limit is gone — it is there to be
+    // read, and a row claiming a reply that Meta rejected would be a lie told to
+    // whoever is working out why a customer says they got nothing.
     if (await this.send(from, orderMessage(url))) {
       await this.markReplied(wamid);
     }
@@ -465,17 +459,9 @@ export class WhatsappService {
     return recent !== null;
   }
 
-  /** True when this sender was answered inside the window. Keyed on the canonical
-   * identity, so the same person reaching us in two shapes is still one sender. */
-  private async recentlyReplied(from: string): Promise<boolean> {
-    const since = new Date(Date.now() - SUPPRESSION_MS);
-    const recent = await this.prisma.whatsappInbound.findFirst({
-      where: { from, replied: true, receivedAt: { gte: since } },
-      select: { wamid: true },
-    });
-    return recent !== null;
-  }
-
+  /** Records that a reply went out. Read by people, not by code: nothing
+   * branches on it, and the one thing that used to — a per-sender rate limit —
+   * is gone. */
   private async markReplied(wamid: string): Promise<void> {
     await this.prisma.whatsappInbound.update({
       where: { wamid },

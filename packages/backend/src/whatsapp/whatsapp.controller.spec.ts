@@ -47,7 +47,7 @@ describe('WhatsappController', () => {
       verifySignature: jest.fn().mockReturnValue(true),
       extractMessages: jest.fn().mockReturnValue([]),
       recordMessage: jest.fn(async (m: InboundMessage) => recorded(m.wamid)),
-      processMessage: jest.fn().mockResolvedValue({ kind: 'suppressed' }),
+      processMessage: jest.fn().mockResolvedValue({ kind: 'unknown-sender' }),
     };
     controller = new WhatsappController(
       { enabled: true } as unknown as WhatsappConfigService,

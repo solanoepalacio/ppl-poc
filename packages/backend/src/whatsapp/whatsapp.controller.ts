@@ -171,8 +171,6 @@ const describe = (o: Awaited<ReturnType<WhatsappService['processMessage']>>) => 
   switch (o.kind) {
     case 'agent-disabled':
       return 'agente deshabilitado, mensaje registrado sin responder';
-    case 'suppressed':
-      return 'suprimido (respuesta reciente al mismo remitente)';
     case 'unknown-sender':
       return 'remitente desconocido, sin respuesta';
     // The two classified silences, kept apart. Both leave the message to a

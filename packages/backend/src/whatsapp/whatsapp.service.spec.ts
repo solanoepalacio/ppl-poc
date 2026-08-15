@@ -545,49 +545,83 @@ describe('WhatsappService', () => {
         expect(written()).toEqual({ intent: 'abstain', abstainReason: 'timeout' });
       });
 
-      it('records nothing for a message that never reached the classifier', async () => {
-        // A message answered inside the suppression window: null reads as "we
-        // did not record it", which is true, and is not a verdict we never
-        // reached. The other silent endings do write a reason.
-        prisma.whatsappInbound.findFirst.mockResolvedValue({ wamid: 'w0' });
+      it('leaves no processed message without a verdict on it', async () => {
+        // Every ending writes one now that nothing returns before the row is
+        // updated, so a null verdict means processing stopped somewhere it was
+        // not supposed to. There is no innocent reading of one left.
+        const endings = [
+          { setup: () => { intent.enabled = false; }, reason: 'agent-disabled' },
+          { setup: () => prisma.client.findFirst.mockResolvedValue(null), reason: 'unknown-sender' },
+          {
+            setup: () => {
+              prisma.client.findFirst.mockResolvedValue(known);
+              classifiesAs({ intent: 'abstain', reason: 'timeout' });
+            },
+            reason: 'timeout',
+          },
+        ];
 
-        await service.processMessage(message('w1', '543815551234'));
+        for (const [i, ending] of endings.entries()) {
+          intent.enabled = true;
+          prisma.whatsappInbound.update.mockClear();
+          ending.setup();
 
-        expect(intent.classify).not.toHaveBeenCalled();
-        expect(prisma.whatsappInbound.update).not.toHaveBeenCalled();
+          await service.processMessage(message(`w${i}`, '543815551234'));
+
+          expect(prisma.whatsappInbound.update.mock.calls[0][0].data).toEqual({
+            intent: 'abstain',
+            abstainReason: ending.reason,
+          });
+        }
       });
     });
 
-    describe('an unanswered message consumes nothing', () => {
-      it('does not arm the suppression window', async () => {
+    /**
+     * Ten messages are ten messages. Nothing here decides what a customer meant
+     * by how fast they typed it, because the one thing that used to — a
+     * per-sender rate limit — returned before reading any of them, and could not
+     * tell a burst of one thought from three different ones.
+     */
+    describe('every message is read on its own merits', () => {
+      it('reaches the classifier however recently the sender was answered', async () => {
         prisma.client.findFirst.mockResolvedValue(known);
-        classifiesAs({ intent: 'not-order' });
+        classifiesAs({ intent: 'order' });
 
-        await service.processMessage(message('w1', '543815551234', 'gracias!'));
+        for (const wamid of ['w1', 'w2', 'w3']) {
+          await service.processMessage(message(wamid, '543815551234'));
+        }
 
-        // `markReplied` is tied to a reply that went out, and none did. The
-        // window exists to stop *us* answering three times; a message we chose
-        // not to answer is not an answer.
-        expect(markedReplied()).toBe(false);
+        // The one before it having been answered is not a reason to skip this
+        // one: we do not know which of them is the one asking to order.
+        expect(intent.classify).toHaveBeenCalledTimes(3);
       });
 
-      it('answers the order that follows a greeting moments later', async () => {
+      it('answers the order buried in the middle of a burst', async () => {
         prisma.client.findFirst.mockResolvedValue(known);
+
         classifiesAs({ intent: 'not-order' });
         await service.processMessage(message('w1', '543815551234', 'hola'));
-
-        // Nothing was marked replied, so the window is still shut — the same
-        // customer asking to order ten seconds later is served immediately
-        // rather than met with silence for the rest of it.
         classifiesAs({ intent: 'order' });
         const out = await service.processMessage(
           message('w2', '543815551234', 'quiero 3 docenas de facturas'),
         );
+        classifiesAs({ intent: 'not-order' });
+        await service.processMessage(message('w3', '543815551234', 'gracias!'));
 
         expect(out).toEqual({ kind: 'replied', clientName: 'Alo Bar', reused: false });
         expect(fetchMock).toHaveBeenCalledTimes(1);
       });
 
+      it('does not mark a message replied when nothing was sent', async () => {
+        prisma.client.findFirst.mockResolvedValue(known);
+        classifiesAs({ intent: 'not-order' });
+
+        await service.processMessage(message('w1', '543815551234', 'gracias!'));
+
+        // Nothing branches on the column any more, but it is read by people
+        // working out why a customer says they got nothing, so it has to be true.
+        expect(markedReplied()).toBe(false);
+      });
     });
 
     it('keeps the button label and body inside Meta’s limits', async () => {
@@ -658,20 +692,17 @@ describe('WhatsappService', () => {
         expect(links.linkForAgent).not.toHaveBeenCalled();
       });
 
-      it('does not arm the suppression window', async () => {
+      it('does not claim a reply went out', async () => {
         await service.processMessage(message('w1', '999'));
 
-        // Nothing went out, so nothing is owed. A real customer writing from a
-        // second phone must not be met with silence for the rest of the window
-        // on top of not being recognised.
         expect(markedReplied()).toBe(false);
       });
 
       it('says on the row why it was left alone', async () => {
         await service.processMessage(message('w1', '999'));
 
-        // Otherwise the row is indistinguishable from one suppressed inside the
-        // window, and this is the queue a person is meant to work through.
+        // This is the queue a person is meant to work through, so the row has
+        // to say why it is sitting in it.
         expect(prisma.whatsappInbound.update).toHaveBeenCalledWith({
           where: { wamid: 'w1' },
           data: { intent: 'abstain', abstainReason: 'unknown-sender' },
@@ -679,26 +710,18 @@ describe('WhatsappService', () => {
       });
     });
 
-    it('suppresses a second reply to a sender answered moments ago', async () => {
+    it('reads nothing about the sender’s recent history', async () => {
+      prisma.client.findFirst.mockResolvedValue(known);
+      // A row that the old rate limit would have tripped over.
       prisma.whatsappInbound.findFirst.mockResolvedValue({ wamid: 'w0' });
 
       const out = await service.processMessage(message('w1', '543815551234'));
 
-      expect(out).toEqual({ kind: 'suppressed' });
-      expect(fetchMock).not.toHaveBeenCalled();
-      expect(links.linkForAgent).not.toHaveBeenCalled();
-      // The window looks only at messages actually replied to.
-      expect(prisma.whatsappInbound.findFirst.mock.calls[0][0].where.replied).toBe(true);
-    });
-
-    it('suppresses on the canonical sender', async () => {
-      prisma.client.findFirst.mockResolvedValue(known);
-
-      await service.processMessage(message('w1', '543815551234'));
-
-      // The same person reaching us with and without the Argentine 9 arrives
-      // here as one sender, so one of the two cannot slip past the window.
-      expect(prisma.whatsappInbound.findFirst.mock.calls[0][0].where.from).toBe('543815551234');
+      // Deduplication is the `wamid` primary key at intake, and that is the only
+      // thing entitled to drop a message. Nothing in here re-reads the table to
+      // decide whether this one is worth answering.
+      expect(out).toEqual({ kind: 'replied', clientName: 'Alo Bar', reused: false });
+      expect(prisma.whatsappInbound.findFirst).not.toHaveBeenCalled();
     });
 
     it('reports a reused link as reused', async () => {
@@ -720,8 +743,8 @@ describe('WhatsappService', () => {
       // would only make Meta redeliver and mint another.
       expect(out).toEqual({ kind: 'replied', clientName: 'Alo Bar', reused: false });
       expect(links.linkForAgent).toHaveBeenCalled();
-      // Not marked replied: a send that failed must not suppress the customer's
-      // next message, which is when they are most likely to try again.
+      // Not marked replied: the column is read by somebody working out why a
+      // customer says they got nothing, so a failed send must not claim one.
       expect(markedReplied()).toBe(false);
     });
 
