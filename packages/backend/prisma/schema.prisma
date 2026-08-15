@@ -30,6 +30,10 @@ model Product {
   /// what customers asked for", which is what every product did before this
   /// existed. Never negative; enforced in the service.
   threshold Int    @default(0)
+  /// How many units make up one pack of this product. `0` — the default — means
+  /// it has no pack and is ordered by the unit, which is every product until
+  /// somebody says otherwise. Never negative; enforced in the service.
+  packSize  Int    @default(0)
 
   orderItems OrderItem[]
   existence  SlotExistence[]

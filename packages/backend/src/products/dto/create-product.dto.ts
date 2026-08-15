@@ -29,6 +29,12 @@ export class CreateProductDto implements CreateProductRequest {
   @IsInt()
   @Min(0)
   threshold?: number;
+
+  /** Absent means zero: the product has no pack and is ordered by the unit. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  packSize?: number;
 }
 
 /** `PATCH /products/:id` body — every field optional. */
@@ -47,6 +53,11 @@ export class UpdateProductDto {
   @IsInt()
   @Min(0)
   threshold?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  packSize?: number;
 
   @IsOptional()
   @IsBoolean()

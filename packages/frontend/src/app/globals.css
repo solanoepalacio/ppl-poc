@@ -1628,7 +1628,7 @@ select {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: 10px;
   padding: 12px 0;
   border-bottom: 1px solid #eee6d8;
 }
@@ -1999,6 +1999,7 @@ code {
 /* A threshold of zero shows as an em dash: there zero means "not set". The stock
    actual next to it prints its 0, because there zero is a measurement. */
 .product-threshold,
+.product-pack,
 .product-stock {
   flex: 0 1 110px;
   font-variant-numeric: tabular-nums;
@@ -2036,11 +2037,12 @@ code {
 .product-list {
   display: grid;
   grid-template-columns:
-    minmax(180px, 380px) /* nombre — capped, see below */
-    110px /* categoría */
-    90px /* umbral */
-    110px /* stock actual */
-    80px /* pedidos */
+    minmax(160px, 340px) /* nombre — capped, see below */
+    105px /* categoría */
+    85px /* umbral */
+    85px /* paquete */
+    105px /* stock actual */
+    75px /* pedidos */
     minmax(max-content, 1fr); /* acciones: at least the buttons — a retired
                                  product has three where an active one has two —
                                  and the leftover width on top */
@@ -2057,6 +2059,7 @@ code {
    up on its units, and the heading sits over the digits rather than over the
    whitespace they left. */
 .client-row.product-row .product-threshold,
+.client-row.product-row .product-pack,
 .client-row.product-row .product-stock,
 .client-row.product-row .client-orders {
   text-align: right;
@@ -2105,6 +2108,7 @@ code {
     display: flex;
   }
   .client-row.product-row .product-threshold,
+  .client-row.product-row .product-pack,
   .client-row.product-row .product-stock,
   .client-row.product-row .client-orders {
     text-align: left;
@@ -2367,3 +2371,53 @@ code {
   }
 }
 
+
+/* ── Ordering by the pack ─────────────────────────────────────────────────── */
+/* The measure sits with the quantity, not with the name: it is what the number
+   means, and reading "4" then hunting for its unit is the confusion this whole
+   control exists to remove. */
+.item-measure {
+  flex-shrink: 0;
+  /* Sized to the longer of its two words and nothing more. The row already
+     carries a name, a number and a clear button on a phone screen; a control
+     wide enough to be comfortable is a control that pushes the rest off the
+     edge. */
+  min-width: 88px;
+  font-size: 13.5px;
+  font-family: inherit;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 2px 7px 5px;
+  background: #fff;
+}
+/* A product with no pack gets a label, never a disabled select — a control that
+   cannot be used invites the customer to try it and wonder what is broken. It
+   keeps the select's box so the column stays a column. */
+.item-measure--fixed {
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-muted);
+  /* Keeps the select's width so the quantity fields stay in one column down the
+     list, whether or not a given product has a pack. */
+  text-align: center;
+  padding: 7px 2px;
+}
+/* Says what a pack is worth, beside the name: it describes the product, not the
+   control. The select alone says a pack exists, which is not enough to choose
+   with — five and fifty are the same control. */
+.item-pack-hint {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--ink-muted);
+}
+/* The unit total of a line ordered in packs, under it rather than beside it:
+   what the customer chose reads first, what the bakery will bake reads second. */
+.order-summary-units {
+  display: block;
+  font-size: 12.5px;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}

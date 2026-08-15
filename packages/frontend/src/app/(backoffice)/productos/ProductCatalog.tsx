@@ -6,7 +6,12 @@ import type { ManagedProduct, ProductCategory } from '@pannico/shared';
 import { createProduct, deleteProduct, updateProduct } from '@/lib/api';
 
 /** The row being edited, held apart from the server list until it is saved. */
-type EditDraft = { name: string; category: ProductCategory; threshold: string };
+type EditDraft = {
+  name: string;
+  category: ProductCategory;
+  threshold: string;
+  packSize: string;
+};
 
 const LINE: Record<ProductCategory, string> = {
   salty: 'Salados',
@@ -45,6 +50,7 @@ export function ProductCatalog({
   const [newName, setNewName] = useState('');
   const [newCategory, setNewCategory] = useState<ProductCategory>('salty');
   const [newThreshold, setNewThreshold] = useState('');
+  const [newPackSize, setNewPackSize] = useState('');
   const [addError, setAddError] = useState<string | null>(null);
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -52,6 +58,7 @@ export function ProductCatalog({
     name: '',
     category: 'salty',
     threshold: '',
+    packSize: '',
   });
   /** Keyed by product, so one row's failure never appears on another. */
   const [rowError, setRowError] = useState<Record<string, string>>({});
@@ -68,9 +75,8 @@ export function ProductCatalog({
     else setRowError((prev) => ({ ...prev, [id]: message }));
   }
 
-  /** A blank threshold means zero; anything unparseable is left to the server. */
-  const parseThreshold = (raw: string) =>
-    raw.trim() === '' ? 0 : Number(raw.trim());
+  /** A blank figure means zero; anything unparseable is left to the server. */
+  const parseCount = (raw: string) => (raw.trim() === '' ? 0 : Number(raw.trim()));
 
   async function add() {
     setAddError(null);
@@ -79,10 +85,12 @@ export function ProductCatalog({
       await createProduct({
         name: newName,
         category: newCategory,
-        threshold: parseThreshold(newThreshold),
+        threshold: parseCount(newThreshold),
+        packSize: parseCount(newPackSize),
       });
       setNewName('');
       setNewThreshold('');
+      setNewPackSize('');
       refresh();
     } catch (e) {
       fail(null, e, 'No se pudo agregar el producto.');
@@ -97,6 +105,7 @@ export function ProductCatalog({
       name: product.name,
       category: product.category,
       threshold: product.threshold === 0 ? '' : String(product.threshold),
+      packSize: product.packSize === 0 ? '' : String(product.packSize),
     });
     setRowError(({ [product.id]: _dropped, ...rest }) => rest);
   }
@@ -107,7 +116,8 @@ export function ProductCatalog({
       await updateProduct(id, {
         name: draft.name,
         category: draft.category,
-        threshold: parseThreshold(draft.threshold),
+        threshold: parseCount(draft.threshold),
+        packSize: parseCount(draft.packSize),
       });
       setEditingId(null);
       refresh();
@@ -192,6 +202,21 @@ export function ProductCatalog({
               if (e.key === 'Enter' && newName.trim() !== '') void add();
             }}
           />
+          <input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            step={1}
+            className="client-input product-threshold-input"
+            aria-label="Unidades por paquete (opcional)"
+            placeholder="Paquete"
+            value={newPackSize}
+            disabled={locked}
+            onChange={(e) => setNewPackSize(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && newName.trim() !== '') void add();
+            }}
+          />
           <button
             type="button"
             className="btn-modal-primary"
@@ -202,8 +227,9 @@ export function ProductCatalog({
           </button>
         </div>
         <p className="muted product-add-hint">
-          El umbral es cuánto querés tener en góndola aunque nadie lo pida. En
-          blanco o cero se produce solo lo que se pidió.
+          El umbral es cuánto querés tener en góndola aunque nadie lo pida. El
+          paquete es cuántas unidades trae, y es lo que habilita al cliente a
+          pedirlo por paquete. En blanco o cero, ninguno de los dos se aplica.
         </p>
         {addError && <p className="error">{addError}</p>}
       </section>
@@ -220,6 +246,7 @@ export function ProductCatalog({
             <span className="client-name">Nombre</span>
             <span className="product-line">Categoría</span>
             <span className="product-threshold">Umbral</span>
+            <span className="product-pack">Paquete</span>
             <span className="product-stock">Stock actual</span>
             <span className="client-orders">Pedidos</span>
             <span className="client-actions" />
@@ -277,6 +304,20 @@ export function ProductCatalog({
                         setDraft((d) => ({ ...d, threshold: e.target.value }))
                       }
                     />
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      step={1}
+                      className="client-input product-threshold-input"
+                      aria-label={`Unidades por paquete de ${product.name}`}
+                      placeholder="Paquete"
+                      value={draft.packSize}
+                      disabled={locked}
+                      onChange={(e) =>
+                        setDraft((d) => ({ ...d, packSize: e.target.value }))
+                      }
+                    />
                     <button
                       type="button"
                       className="btn-modal-primary"
@@ -310,6 +351,15 @@ export function ProductCatalog({
                     <span className="product-threshold">
                       {product.threshold > 0 ? (
                         <strong>{product.threshold}</strong>
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
+                    </span>
+                    {/* Zero is an em dash here too: no pack is a state, not a
+                        pack of none. */}
+                    <span className="product-pack">
+                      {product.packSize > 0 ? (
+                        <strong>{product.packSize}</strong>
                       ) : (
                         <span className="muted">—</span>
                       )}

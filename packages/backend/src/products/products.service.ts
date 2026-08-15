@@ -56,13 +56,14 @@ export class ProductsService {
   async create(input: CreateProductRequest): Promise<Product> {
     const name = this.cleanName(input.name);
     const category = this.cleanCategory(input.category);
-    const threshold = this.cleanThreshold(input.threshold) ?? 0;
+    const threshold = this.cleanCount(input.threshold, 'umbral') ?? 0;
+    const packSize = this.cleanCount(input.packSize, 'paquete') ?? 0;
 
     await this.assertNameFree(name);
 
     return this.map(
       await this.prisma.product.create({
-        data: { name, category, threshold, active: true },
+        data: { name, category, threshold, packSize, active: true },
       }),
     );
   }
@@ -77,6 +78,7 @@ export class ProductsService {
       name?: string;
       category?: string;
       threshold?: number;
+      packSize?: number;
       active?: boolean;
     } = {};
 
@@ -91,7 +93,10 @@ export class ProductsService {
       data.category = this.cleanCategory(input.category);
     }
     if (input.threshold !== undefined) {
-      data.threshold = this.cleanThreshold(input.threshold) ?? 0;
+      data.threshold = this.cleanCount(input.threshold, 'umbral') ?? 0;
+    }
+    if (input.packSize !== undefined) {
+      data.packSize = this.cleanCount(input.packSize, 'paquete') ?? 0;
     }
     if (input.active !== undefined) {
       data.active = input.active;
@@ -151,15 +156,21 @@ export class ProductsService {
   }
 
   /**
-   * A threshold is a count of units on a shelf, so it is a whole number and
-   * cannot be negative. Rejected rather than clamped: a negative one is somebody
-   * meaning something else, and silently reading it as zero would hide that.
+   * Both the threshold and the pack size are counts of units, so both are whole
+   * numbers and neither can be negative. Rejected rather than clamped: a negative
+   * one is somebody meaning something else, and silently reading it as zero would
+   * hide that.
    */
-  private cleanThreshold(raw: number | undefined): number | undefined {
+  private cleanCount(
+    raw: number | undefined,
+    field: 'umbral' | 'paquete',
+  ): number | undefined {
     if (raw === undefined) return undefined;
     if (!Number.isInteger(raw) || raw < 0) {
       throw new BadRequestException(
-        'El umbral debe ser un número entero de cero o más.',
+        field === 'umbral'
+          ? 'El umbral debe ser un número entero de cero o más.'
+          : 'Las unidades por paquete deben ser un número entero de cero o más.',
       );
     }
     return raw;
@@ -186,6 +197,7 @@ export class ProductsService {
     active: boolean;
     category: string;
     threshold: number;
+    packSize: number;
   }): Product {
     return { ...row, category: row.category as Product['category'] };
   }

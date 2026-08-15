@@ -35,10 +35,21 @@ export interface TokenValidationResponse {
   catalog?: Product[];
 }
 
-/** A single chosen line in a confirm-order submission. */
+/** What a submitted quantity is counted in. */
+export type OrderMeasure = 'unit' | 'pack';
+
+/**
+ * A single chosen line in a confirm-order submission.
+ *
+ * `measure` is what the customer picked, not what gets stored: an order is
+ * recorded in units, and a quantity in packs is multiplied by the product's pack
+ * size on the way in. Optional, and absent means units — so every caller that
+ * predates packs, and every one that never offers them, keeps working untouched.
+ */
 export interface ConfirmOrderItem {
   productId: string;
   quantity: number;
+  measure?: OrderMeasure;
 }
 
 /** `POST /orders/by-token/:token/confirm` request. */
@@ -325,6 +336,8 @@ export interface CreateProductRequest {
   category: ProductCategory;
   /** Absent means zero: produce only what customers order. */
   threshold?: number;
+  /** Absent means zero: no pack, so the product is ordered by the unit. */
+  packSize?: number;
 }
 
 /**
@@ -335,6 +348,7 @@ export interface UpdateProductRequest {
   name?: string;
   category?: ProductCategory;
   threshold?: number;
+  packSize?: number;
   /** `false` retires the product, `true` reinstates it. */
   active?: boolean;
 }

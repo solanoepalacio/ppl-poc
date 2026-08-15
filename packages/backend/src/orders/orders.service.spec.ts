@@ -119,6 +119,60 @@ describe('OrdersService', () => {
       expect(prisma.order.update).not.toHaveBeenCalled();
     });
 
+    it('records a quantity in packs as units', async () => {
+      prisma.order.findUnique.mockResolvedValue({ ...pendingOrder });
+      prisma.product.findMany.mockResolvedValue([{ id: 'p1', packSize: 5 }]);
+
+      await service.confirm('tok_valid', [
+        { productId: 'p1', quantity: 4, measure: 'pack' },
+      ]);
+
+      // 4 packs of 5 is 20 units, and units is all the order knows.
+      expect(prisma.orderItem.createMany).toHaveBeenCalledWith({
+        data: [{ orderId: 'order_1', productId: 'p1', quantity: 20 }],
+      });
+    });
+
+    it('records a quantity in units untouched, pack or no pack', async () => {
+      prisma.order.findUnique.mockResolvedValue({ ...pendingOrder });
+      prisma.product.findMany.mockResolvedValue([{ id: 'p1', packSize: 5 }]);
+
+      await service.confirm('tok_valid', [
+        { productId: 'p1', quantity: 4, measure: 'unit' },
+      ]);
+
+      expect(prisma.orderItem.createMany).toHaveBeenCalledWith({
+        data: [{ orderId: 'order_1', productId: 'p1', quantity: 4 }],
+      });
+    });
+
+    it('takes an item with no measure as units', async () => {
+      // What every caller that predates packs sends, and what the back office
+      // still sends: the field is absent and nothing converts.
+      prisma.order.findUnique.mockResolvedValue({ ...pendingOrder });
+      prisma.product.findMany.mockResolvedValue([{ id: 'p1', packSize: 5 }]);
+
+      await service.confirm('tok_valid', [{ productId: 'p1', quantity: 4 }]);
+
+      expect(prisma.orderItem.createMany).toHaveBeenCalledWith({
+        data: [{ orderId: 'order_1', productId: 'p1', quantity: 4 }],
+      });
+    });
+
+    it('rejects packs of a product that has none, leaving the link usable', async () => {
+      prisma.order.findUnique.mockResolvedValue({ ...pendingOrder });
+      prisma.product.findMany.mockResolvedValue([{ id: 'p1', packSize: 0 }]);
+
+      await expect(
+        service.confirm('tok_valid', [
+          { productId: 'p1', quantity: 4, measure: 'pack' },
+        ]),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      // Rejected before the write, so the customer can still fix and resend.
+      expect(prisma.orderItem.createMany).not.toHaveBeenCalled();
+      expect(prisma.order.update).not.toHaveBeenCalled();
+    });
+
     it('rejects an out-of-catalog item and leaves the link usable', async () => {
       prisma.order.findUnique.mockResolvedValue({ ...pendingOrder });
       prisma.product.findMany.mockResolvedValue([{ id: 'p1' }]); // p9 missing

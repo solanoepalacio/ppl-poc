@@ -1,7 +1,11 @@
 'use client';
 
 import { useMemo } from 'react';
-import { normalizeForSearch, type Product } from '@pannico/shared';
+import {
+  normalizeForSearch,
+  type OrderMeasure,
+  type Product,
+} from '@pannico/shared';
 
 import { useSelectAllOnFocus } from '../../../lib/selectAllOnFocus';
 
@@ -12,17 +16,28 @@ import { useSelectAllOnFocus } from '../../../lib/selectAllOnFocus';
  * narrows which rows render (accent/case-insensitive on the name) and nothing
  * else: a row hidden by the filter keeps its quantity and still counts toward
  * the order. Pure presentational — quantities live in the parent.
+ *
+ * A product sold by the pack also carries a choice of measure, defaulting to
+ * unidad. One without a pack shows a plain label instead of a disabled control:
+ * a control that cannot be used invites the customer to try it and wonder what
+ * is wrong, while the label answers the same question — *in what?* — and offers
+ * nothing.
  */
 export function CatalogList({
   products,
   quantities,
+  measures,
   onChange,
+  onMeasureChange,
   filter,
   disabled,
 }: {
   products: Product[];
   quantities: Record<string, number>;
+  /** What each product's quantity is counted in. Absent means units. */
+  measures: Record<string, OrderMeasure>;
   onChange: (productId: string, quantity: number) => void;
+  onMeasureChange: (productId: string, measure: OrderMeasure) => void;
   filter: string;
   disabled?: boolean;
 }) {
@@ -48,10 +63,18 @@ export function CatalogList({
     <ul className="item-fields item-fields--order">
       {visible.map((p) => {
         const value = quantities[p.id] ?? 0;
+        const byPack = p.packSize > 0;
+        const measure = measures[p.id] ?? 'unit';
         return (
           <li key={p.id} data-product-id={p.id} className="item-field">
             <span className="item-field-name">
               <label htmlFor={`qty-${p.id}`}>{p.name}</label>
+              {byPack ? (
+                <span className="item-pack-hint">
+                  El paquete trae {p.packSize}{' '}
+                  {p.packSize === 1 ? 'unidad' : 'unidades'}
+                </span>
+              ) : null}
             </span>
             <div className="item-qty">
               <input
@@ -103,6 +126,22 @@ export function CatalogList({
                     <line x1="18" y1="6" x2="6" y2="18" />
                   </svg>
                 </button>
+              )}
+              {byPack ? (
+                <select
+                  className="item-measure"
+                  aria-label={`Pedir ${p.name} por unidad o por paquete`}
+                  value={measure}
+                  disabled={disabled}
+                  onChange={(e) =>
+                    onMeasureChange(p.id, e.target.value as OrderMeasure)
+                  }
+                >
+                  <option value="unit">unidad</option>
+                  <option value="pack">paquete</option>
+                </select>
+              ) : (
+                <span className="item-measure item-measure--fixed">unidad</span>
               )}
             </div>
           </li>

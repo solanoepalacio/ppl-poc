@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Product } from '@pannico/shared';
+import type { OrderMeasure, Product } from '@pannico/shared';
 import { ApiError, confirmOrder } from '@/lib/api';
 import { trackEvent } from '@/lib/analytics';
 import { CatalogList } from './CatalogList';
@@ -12,7 +12,7 @@ type Outcome = 'open' | 'issued' | 'invalid';
 
 const COPY = {
   title: 'Tu pedido',
-  unitNotice: 'IMPORTANTE: LOS PEDIDOS SE TOMAN POR UNIDAD, NO POR PAQUETE',
+  unitNotice: 'IMPORTANTE: REVISÁ SI ESTÁS PIDIENDO POR UNIDAD O POR PAQUETE',
   filterLabel: 'Filtrar productos',
   filterPlaceholder: 'Filtrá por nombre…',
   clearFilter: 'Limpiar',
@@ -72,6 +72,12 @@ export function OrderForm({
    * new entry and belongs at the end.
    */
   const [entryOrder, setEntryOrder] = useState<string[]>([]);
+  /**
+   * What each product's quantity is counted in. Only products sold by the pack
+   * ever appear here; everything absent is units, which is both the default and
+   * what every product was before packs existed.
+   */
+  const [measures, setMeasures] = useState<Record<string, OrderMeasure>>({});
   const [filter, setFilter] = useState('');
   const [showSummary, setShowSummary] = useState(false);
   const [outcome, setOutcome] = useState<Outcome>('open');
@@ -120,22 +126,57 @@ export function OrderForm({
   const chosen = useMemo(
     () =>
       entryOrder
-        .map((id) => ({ product: byId.get(id), quantity: quantities[id] ?? 0 }))
+        .map((id) => ({
+          product: byId.get(id),
+          quantity: quantities[id] ?? 0,
+          measure: measures[id] ?? ('unit' as OrderMeasure),
+        }))
         .filter(
-          (row): row is { product: Product; quantity: number } =>
-            row.product !== undefined && row.quantity > 0,
+          (row): row is {
+            product: Product;
+            quantity: number;
+            measure: OrderMeasure;
+          } => row.product !== undefined && row.quantity > 0,
         ),
-    [entryOrder, quantities, byId],
+    [entryOrder, quantities, measures, byId],
   );
 
   const items = useMemo(
     () =>
-      chosen.map(({ product, quantity }) => ({
+      chosen.map(({ product, quantity, measure }) => ({
         productId: product.id,
         quantity,
+        measure,
       })),
     [chosen],
   );
+
+  /**
+   * What the order comes to in units — packs multiplied out.
+   *
+   * Only for reporting: the conversion that counts is the server's, against the
+   * pack size it holds. Summing the raw quantities would add packs to units and
+   * report a number that is neither.
+   */
+  const totalUnits = useMemo(
+    () =>
+      chosen.reduce(
+        (sum, { product, quantity, measure }) =>
+          sum + quantity * (measure === 'pack' ? product.packSize : 1),
+        0,
+      ),
+    [chosen],
+  );
+
+  /**
+   * Changing the measure leaves the typed quantity alone: "4" stays 4, and what
+   * changes is what 4 means. Converting it would be guessing at an intent the
+   * customer has not expressed — they typed a number for the measure they were
+   * about to pick as often as for the one they had.
+   */
+  function setMeasure(productId: string, measure: OrderMeasure) {
+    setMeasures((prev) => ({ ...prev, [productId]: measure }));
+  }
 
   function setQty(productId: string, value: number) {
     const quantity = Math.max(0, value);
@@ -180,7 +221,9 @@ export function OrderForm({
       await confirmOrder(token, items);
       trackEvent('order_confirmed', {
         itemCount: items.length,
-        totalQuantity: items.reduce((sum, i) => sum + i.quantity, 0),
+        // Units, not the raw figures: with two measures in play, summing what
+        // was typed would add packs to units and mean nothing.
+        totalQuantity: totalUnits,
       });
       setOutcome('issued');
     } catch (e) {
@@ -203,7 +246,7 @@ export function OrderForm({
     // submit — which is the behaviour the pause was added to produce.
     trackEvent('order_review_raised', {
       itemCount: items.length,
-      totalQuantity: items.reduce((sum, i) => sum + i.quantity, 0),
+      totalQuantity: totalUnits,
       // The summary was already open, so the gate only added the pause.
       summaryWasOpen: showSummary,
     });
@@ -294,7 +337,9 @@ export function OrderForm({
         <CatalogList
           products={catalog}
           quantities={quantities}
+          measures={measures}
           onChange={setQty}
+          onMeasureChange={setMeasure}
           filter={filter}
           disabled={busy}
         />
@@ -313,10 +358,19 @@ export function OrderForm({
             )}
             <h2 className="order-summary-title">{COPY.summaryTitle}</h2>
             <ul className="order-summary-list">
-              {chosen.map(({ product, quantity }) => (
+              {chosen.map(({ product, quantity, measure }) => (
                 <li className="order-summary-row" key={product.id}>
                   {product.name}{' '}
-                  <span className="order-summary-qty">x {quantity}</span>
+                  <span className="order-summary-qty">
+                    x {quantity} {measureLabel(measure, quantity)}
+                  </span>
+                  {/* What the bakery will actually bake, which is what the
+                      customer is being asked to confirm. */}
+                  {measure === 'pack' && (
+                    <span className="order-summary-units">
+                      = {quantity * product.packSize} unidades
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>
@@ -363,4 +417,10 @@ export function OrderForm({
       </div>
     </div>
   );
+}
+
+/** Names the measure, singular or plural, so the line reads as a sentence. */
+function measureLabel(measure: OrderMeasure, quantity: number): string {
+  if (measure === 'pack') return quantity === 1 ? 'paquete' : 'paquetes';
+  return quantity === 1 ? 'unidad' : 'unidades';
 }

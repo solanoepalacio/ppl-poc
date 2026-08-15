@@ -81,14 +81,19 @@ export class OrdersService {
     if (!Array.isArray(items) || items.length === 0) {
       throw new BadRequestException('An order must contain at least one item.');
     }
-    await this.validateItemsAgainstCatalog(items);
+    const packSizes = await this.validateItemsAgainstCatalog(items);
+    // Converted before anything is written, so a line asking for packs of a
+    // product that has none fails with the link still usable. What lands in the
+    // database is units and only units: nothing downstream of here — production,
+    // stock, the review view — has to know that packs exist.
+    const lines = this.toUnits(items, packSizes);
 
     // Record items and consume the link atomically. `confirmedAt` marks the
     // customer confirmation; `consumedAt` closes the single-use gate.
     const now = new Date();
     await this.prisma.$transaction([
       this.prisma.orderItem.createMany({
-        data: items.map((i) => ({
+        data: lines.map((i) => ({
           orderId: order.id,
           productId: i.productId,
           quantity: i.quantity,
@@ -222,14 +227,14 @@ export class OrdersService {
    */
   private async validateItemsAgainstCatalog(
     items: ConfirmOrderItem[],
-  ): Promise<void> {
+  ): Promise<Map<string, number>> {
     if (items.length === 0) {
-      return;
+      return new Map();
     }
     const productIds = [...new Set(items.map((i) => i.productId))];
     const products = await this.prisma.product.findMany({
       where: { id: { in: productIds }, active: true },
-      select: { id: true },
+      select: { id: true, packSize: true },
     });
     const validIds = new Set(products.map((p) => p.id));
     for (const item of items) {
@@ -244,6 +249,44 @@ export class OrdersService {
         );
       }
     }
+    // Returned rather than discarded so the caller that needs to convert packs
+    // does not query the same rows again — and so the conversion can only ever
+    // use a pack size that was just validated as belonging to an active product.
+    return new Map(products.map((p) => [p.id, p.packSize]));
+  }
+
+  /**
+   * Turns what the customer chose into what the bakery counts: units.
+   *
+   * The pack size comes from the database, never from the submission. A pack is
+   * the bakery's definition of its own product, and a client trusted to send its
+   * own conversion could claim any number of units for any quantity.
+   *
+   * Only the customer form ever sets a measure. The back-office paths work in
+   * units and pass items straight through — see `confirm`, which is the one
+   * caller that converts.
+   */
+  private toUnits(
+    items: ConfirmOrderItem[],
+    packSizes: Map<string, number>,
+  ): { productId: string; quantity: number }[] {
+    return items.map((item) => {
+      if (item.measure !== 'pack') {
+        return { productId: item.productId, quantity: item.quantity };
+      }
+      const packSize = packSizes.get(item.productId) ?? 0;
+      if (packSize < 1) {
+        // The form cannot offer packs for this product, so a submission asking
+        // for them did not come from the form.
+        throw new BadRequestException(
+          `Product ${item.productId} is not sold by the pack.`,
+        );
+      }
+      return {
+        productId: item.productId,
+        quantity: item.quantity * packSize,
+      };
+    });
   }
 
   /**

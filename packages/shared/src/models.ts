@@ -13,6 +13,12 @@ export interface Product {
    * what customers asked for".
    */
   threshold: number;
+  /**
+   * How many units make up one pack. `0` — the default — means the product has
+   * no pack and is ordered by the unit, and is what decides whether the customer
+   * form offers a choice of measure at all.
+   */
+  packSize: number;
 }
 
 /**
