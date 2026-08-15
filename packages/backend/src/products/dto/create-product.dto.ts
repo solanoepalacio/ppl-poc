@@ -35,6 +35,12 @@ export class CreateProductDto implements CreateProductRequest {
   @IsInt()
   @Min(0)
   packSize?: number;
+
+  /** Absent means zero: no receta recorded, so the views show none. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  recipeSize?: number;
 }
 
 /** `PATCH /products/:id` body — every field optional. */
@@ -58,6 +64,11 @@ export class UpdateProductDto {
   @IsInt()
   @Min(0)
   packSize?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  recipeSize?: number;
 
   @IsOptional()
   @IsBoolean()

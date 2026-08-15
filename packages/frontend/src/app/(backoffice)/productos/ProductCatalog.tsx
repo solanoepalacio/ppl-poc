@@ -11,6 +11,7 @@ type EditDraft = {
   category: ProductCategory;
   threshold: string;
   packSize: string;
+  recipeSize: string;
 };
 
 const LINE: Record<ProductCategory, string> = {
@@ -51,6 +52,7 @@ export function ProductCatalog({
   const [newCategory, setNewCategory] = useState<ProductCategory>('salty');
   const [newThreshold, setNewThreshold] = useState('');
   const [newPackSize, setNewPackSize] = useState('');
+  const [newRecipeSize, setNewRecipeSize] = useState('');
   const [addError, setAddError] = useState<string | null>(null);
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -59,6 +61,7 @@ export function ProductCatalog({
     category: 'salty',
     threshold: '',
     packSize: '',
+    recipeSize: '',
   });
   /** Keyed by product, so one row's failure never appears on another. */
   const [rowError, setRowError] = useState<Record<string, string>>({});
@@ -87,10 +90,12 @@ export function ProductCatalog({
         category: newCategory,
         threshold: parseCount(newThreshold),
         packSize: parseCount(newPackSize),
+        recipeSize: parseCount(newRecipeSize),
       });
       setNewName('');
       setNewThreshold('');
       setNewPackSize('');
+      setNewRecipeSize('');
       refresh();
     } catch (e) {
       fail(null, e, 'No se pudo agregar el producto.');
@@ -106,6 +111,7 @@ export function ProductCatalog({
       category: product.category,
       threshold: product.threshold === 0 ? '' : String(product.threshold),
       packSize: product.packSize === 0 ? '' : String(product.packSize),
+      recipeSize: product.recipeSize === 0 ? '' : String(product.recipeSize),
     });
     setRowError(({ [product.id]: _dropped, ...rest }) => rest);
   }
@@ -118,6 +124,7 @@ export function ProductCatalog({
         category: draft.category,
         threshold: parseCount(draft.threshold),
         packSize: parseCount(draft.packSize),
+        recipeSize: parseCount(draft.recipeSize),
       });
       setEditingId(null);
       refresh();
@@ -217,6 +224,21 @@ export function ProductCatalog({
               if (e.key === 'Enter' && newName.trim() !== '') void add();
             }}
           />
+          <input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            step={1}
+            className="client-input product-threshold-input"
+            aria-label="Unidades por receta (opcional)"
+            placeholder="Receta"
+            value={newRecipeSize}
+            disabled={locked}
+            onChange={(e) => setNewRecipeSize(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && newName.trim() !== '') void add();
+            }}
+          />
           <button
             type="button"
             className="btn-modal-primary"
@@ -229,7 +251,9 @@ export function ProductCatalog({
         <p className="muted product-add-hint">
           El umbral es cuánto querés tener en góndola aunque nadie lo pida. El
           paquete es cuántas unidades trae, y es lo que habilita al cliente a
-          pedirlo por paquete. En blanco o cero, ninguno de los dos se aplica.
+          pedirlo por paquete. La receta es cuántas unidades salen de una, y es
+          lo que las pantallas de producción muestran además de la cantidad. En
+          blanco o cero, no se aplica.
         </p>
         {addError && <p className="error">{addError}</p>}
       </section>
@@ -247,6 +271,7 @@ export function ProductCatalog({
             <span className="product-line">Categoría</span>
             <span className="product-threshold">Umbral</span>
             <span className="product-pack">Paquete</span>
+            <span className="product-pack">Receta</span>
             <span className="product-stock">Stock actual</span>
             <span className="client-orders">Pedidos</span>
             <span className="client-actions" />
@@ -318,6 +343,20 @@ export function ProductCatalog({
                         setDraft((d) => ({ ...d, packSize: e.target.value }))
                       }
                     />
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      step={1}
+                      className="client-input product-threshold-input"
+                      aria-label={`Unidades por receta de ${product.name}`}
+                      placeholder="Receta"
+                      value={draft.recipeSize}
+                      disabled={locked}
+                      onChange={(e) =>
+                        setDraft((d) => ({ ...d, recipeSize: e.target.value }))
+                      }
+                    />
                     <button
                       type="button"
                       className="btn-modal-primary"
@@ -360,6 +399,13 @@ export function ProductCatalog({
                     <span className="product-pack">
                       {product.packSize > 0 ? (
                         <strong>{product.packSize}</strong>
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
+                    </span>
+                    <span className="product-pack">
+                      {product.recipeSize > 0 ? (
+                        <strong>{product.recipeSize}</strong>
                       ) : (
                         <span className="muted">—</span>
                       )}

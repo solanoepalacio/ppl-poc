@@ -373,6 +373,16 @@ export class OrdersService {
       if (!rows.has(p.id)) rows.set(p.id, { name: p.name, demand: 0 });
     }
 
+    // Read once the row set is settled, and by id rather than by any filter: a
+    // product can be in the totals through demand alone, including one that has
+    // since been retired, and the view still has to be able to say how many
+    // recetas its outstanding work comes to.
+    const recipeRows = await this.prisma.product.findMany({
+      where: { id: { in: [...rows.keys()] } },
+      select: { id: true, recipeSize: true },
+    });
+    const recipeSizes = new Map(recipeRows.map((p) => [p.id, p.recipeSize]));
+
     const items = [...rows.entries()]
       .map(([productId, { name, demand }]) => {
         const inStock = existence.get(productId) ?? 0;
@@ -384,6 +394,7 @@ export class OrdersService {
           demand,
           existence: inStock,
           produced: alreadyMade,
+          recipeSize: recipeSizes.get(productId) ?? 0,
           // Threshold and demand add rather than compete: the units a customer
           // ordered leave the shelf, so covering the order and holding the
           // threshold are both work to be done. With a threshold of zero this is

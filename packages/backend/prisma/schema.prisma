@@ -34,6 +34,10 @@ model Product {
   /// it has no pack and is ordered by the unit, which is every product until
   /// somebody says otherwise. Never negative; enforced in the service.
   packSize  Int    @default(0)
+  /// How many units one receta of this product yields. `0` — the default —
+  /// means no receta is recorded. A lens for the production views only: nothing
+  /// is ever stored in recetas, so changing this never rewrites a past bloque.
+  recipeSize Int   @default(0)
 
   orderItems OrderItem[]
   existence  SlotExistence[]

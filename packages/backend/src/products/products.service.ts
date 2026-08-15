@@ -58,12 +58,13 @@ export class ProductsService {
     const category = this.cleanCategory(input.category);
     const threshold = this.cleanCount(input.threshold, 'umbral') ?? 0;
     const packSize = this.cleanCount(input.packSize, 'paquete') ?? 0;
+    const recipeSize = this.cleanCount(input.recipeSize, 'receta') ?? 0;
 
     await this.assertNameFree(name);
 
     return this.map(
       await this.prisma.product.create({
-        data: { name, category, threshold, packSize, active: true },
+        data: { name, category, threshold, packSize, recipeSize, active: true },
       }),
     );
   }
@@ -79,6 +80,7 @@ export class ProductsService {
       category?: string;
       threshold?: number;
       packSize?: number;
+      recipeSize?: number;
       active?: boolean;
     } = {};
 
@@ -97,6 +99,9 @@ export class ProductsService {
     }
     if (input.packSize !== undefined) {
       data.packSize = this.cleanCount(input.packSize, 'paquete') ?? 0;
+    }
+    if (input.recipeSize !== undefined) {
+      data.recipeSize = this.cleanCount(input.recipeSize, 'receta') ?? 0;
     }
     if (input.active !== undefined) {
       data.active = input.active;
@@ -163,14 +168,16 @@ export class ProductsService {
    */
   private cleanCount(
     raw: number | undefined,
-    field: 'umbral' | 'paquete',
+    field: 'umbral' | 'paquete' | 'receta',
   ): number | undefined {
     if (raw === undefined) return undefined;
     if (!Number.isInteger(raw) || raw < 0) {
       throw new BadRequestException(
         field === 'umbral'
           ? 'El umbral debe ser un número entero de cero o más.'
-          : 'Las unidades por paquete deben ser un número entero de cero o más.',
+          : field === 'paquete'
+            ? 'Las unidades por paquete deben ser un número entero de cero o más.'
+            : 'Las unidades por receta deben ser un número entero de cero o más.',
       );
     }
     return raw;
@@ -198,6 +205,7 @@ export class ProductsService {
     category: string;
     threshold: number;
     packSize: number;
+    recipeSize: number;
   }): Product {
     return { ...row, category: row.category as Product['category'] };
   }

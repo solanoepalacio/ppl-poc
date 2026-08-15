@@ -19,6 +19,12 @@ export interface Product {
    * form offers a choice of measure at all.
    */
   packSize: number;
+  /**
+   * How many units one receta yields. `0` means none is recorded. A reading lens
+   * for the production views — nothing is ever stored in recetas, so changing it
+   * never alters what a past bloque recorded.
+   */
+  recipeSize: number;
 }
 
 /**

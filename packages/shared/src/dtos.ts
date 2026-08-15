@@ -135,6 +135,14 @@ export interface ProductionTotalItem {
    * shows 0, never a negative surplus.
    */
   toProduce: number;
+  /**
+   * Units one receta of this product yields; 0 when none is recorded.
+   *
+   * The divisor rather than the division: the endpoint reports quantities, and
+   * how many batches that comes to is a way of reading them. Carried here so the
+   * production views can do it without a second call per product.
+   */
+  recipeSize: number;
 }
 
 /**
@@ -338,6 +346,8 @@ export interface CreateProductRequest {
   threshold?: number;
   /** Absent means zero: no pack, so the product is ordered by the unit. */
   packSize?: number;
+  /** Absent means zero: no receta recorded for this product. */
+  recipeSize?: number;
 }
 
 /**
@@ -349,6 +359,7 @@ export interface UpdateProductRequest {
   category?: ProductCategory;
   threshold?: number;
   packSize?: number;
+  recipeSize?: number;
   /** `false` retires the product, `true` reinstates it. */
   active?: boolean;
 }

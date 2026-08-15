@@ -561,7 +561,7 @@ describe('OrdersService', () => {
 
       expect(res.slot.id).toBe('slot_open');
       expect(res.items).toEqual([
-        { productId: 'p1', name: 'Croissant', demand: 5, existence: 0, produced: 0, toProduce: 5 },
+        { productId: 'p1', name: 'Croissant', demand: 5, existence: 0, produced: 0, toProduce: 5, recipeSize: 0 },
       ]);
     });
 
@@ -575,7 +575,7 @@ describe('OrdersService', () => {
 
       expect(slots.getExistenceMap).toHaveBeenCalledWith('slot_open');
       expect(res.items).toEqual([
-        { productId: 'p1', name: 'Croissant', demand: 8, existence: 3, produced: 0, toProduce: 5 },
+        { productId: 'p1', name: 'Croissant', demand: 8, existence: 3, produced: 0, toProduce: 5, recipeSize: 0 },
       ]);
     });
 
@@ -596,8 +596,8 @@ describe('OrdersService', () => {
       const res = await service.getProductionTotals('slot_open');
 
       expect(res.items).toEqual([
-        { productId: 'p2', name: 'Baguette', demand: 4, existence: 4, produced: 0, toProduce: 0 },
-        { productId: 'p1', name: 'Croissant', demand: 8, existence: 10, produced: 0, toProduce: 0 },
+        { productId: 'p2', name: 'Baguette', demand: 4, existence: 4, produced: 0, toProduce: 0, recipeSize: 0 },
+        { productId: 'p1', name: 'Croissant', demand: 8, existence: 10, produced: 0, toProduce: 0, recipeSize: 0 },
       ]);
     });
 
@@ -611,7 +611,7 @@ describe('OrdersService', () => {
 
       expect(slots.getProducedMap).toHaveBeenCalledWith('slot_open');
       expect(res.items).toEqual([
-        { productId: 'p1', name: 'Croissant', demand: 8, existence: 0, produced: 3, toProduce: 5 },
+        { productId: 'p1', name: 'Croissant', demand: 8, existence: 0, produced: 3, toProduce: 5, recipeSize: 0 },
       ]);
     });
 
@@ -625,7 +625,7 @@ describe('OrdersService', () => {
       const res = await service.getProductionTotals('slot_open');
 
       expect(res.items).toEqual([
-        { productId: 'p1', name: 'Croissant', demand: 10, existence: 2, produced: 6, toProduce: 2 },
+        { productId: 'p1', name: 'Croissant', demand: 10, existence: 2, produced: 6, toProduce: 2, recipeSize: 0 },
       ]);
     });
 
@@ -641,7 +641,7 @@ describe('OrdersService', () => {
       // Overproduction shows 0, never a negative surplus, and the product stays
       // on the list because it still has demand.
       expect(res.items).toEqual([
-        { productId: 'p1', name: 'Croissant', demand: 4, existence: 3, produced: 5, toProduce: 0 },
+        { productId: 'p1', name: 'Croissant', demand: 4, existence: 3, produced: 5, toProduce: 0, recipeSize: 0 },
       ]);
     });
 
@@ -654,7 +654,7 @@ describe('OrdersService', () => {
       const res = await service.getProductionTotals('slot_open');
 
       expect(res.items).toEqual([
-        { productId: 'p1', name: 'Croissant', demand: 12, existence: 0, produced: 12, toProduce: 0 },
+        { productId: 'p1', name: 'Croissant', demand: 12, existence: 0, produced: 12, toProduce: 0, recipeSize: 0 },
       ]);
     });
 
@@ -722,7 +722,7 @@ describe('OrdersService', () => {
       const res = await service.getProductionTotals('slot_7', 'salty');
 
       expect(res.items).toEqual([
-        { productId: 'p1', name: 'Ciabatta', demand: 2, existence: 0, produced: 0, toProduce: 2 },
+        { productId: 'p1', name: 'Ciabatta', demand: 2, existence: 0, produced: 0, toProduce: 2, recipeSize: 0 },
       ]);
     });
 
@@ -762,6 +762,7 @@ describe('OrdersService', () => {
             existence: 50,
             produced: 0,
             toProduce: 50,
+            recipeSize: 0,
           },
         ]);
       });
@@ -799,6 +800,34 @@ describe('OrdersService', () => {
         const res = await service.getProductionTotals('slot_7');
 
         expect(res.items[0].toProduce).toBe(70);
+      });
+
+      it('carries each product\'s receta size', async () => {
+        stubDemand([
+          orderWith([{ productId: 'p1', name: 'Baguettin', quantity: 120 }]),
+        ]);
+        // The same mock answers both reads; the receta lookup is the one that
+        // matters here.
+        prisma.product.findMany.mockResolvedValue([
+          { id: 'p1', name: 'Baguettin', recipeSize: 40 },
+        ]);
+
+        const res = await service.getProductionTotals('slot_7');
+
+        expect(res.items[0]).toMatchObject({ toProduce: 120, recipeSize: 40 });
+      });
+
+      it('reports a product with no receta as having none', async () => {
+        stubDemand([
+          orderWith([{ productId: 'p1', name: 'Ciabatta', quantity: 10 }]),
+        ]);
+        stubThresholds([]);
+
+        const res = await service.getProductionTotals('slot_7');
+
+        // Zero rather than absent: the view decides what to print for it, and a
+        // missing field would make that decision twice.
+        expect(res.items[0].recipeSize).toBe(0);
       });
 
       it('omits a product with neither demand nor a threshold', async () => {

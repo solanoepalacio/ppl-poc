@@ -1082,17 +1082,28 @@ select {
   /* Narrower numeric column than the old full-width table: each of the two
      tables now gets half the screen. Sized off the quantity type so a big
      number never crowds the product name. */
-  grid-template-columns: minmax(0, 1fr) minmax(
-      calc(var(--prod-qty-size) * 2.4),
-      calc(var(--prod-qty-size) * 3)
-    );
+  /* Name, units, recetas. The receta column is narrower than the unit one: it
+     holds "0,25" rather than a three-digit count, and the two tables sit side by
+     side, so every point it takes comes off the product name. */
+  grid-template-columns:
+    minmax(0, 1fr)
+    minmax(calc(var(--prod-qty-size) * 2.3), calc(var(--prod-qty-size) * 2.8))
+    minmax(calc(var(--prod-qty-size) * 3.1), calc(var(--prod-qty-size) * 3.7));
   align-items: center;
+  /* Each figure is flush right inside its own column, so without a gap the two
+     pills end up touching and read as one wide badge. Scaled with the type, like
+     the columns themselves, so the separation holds on any screen. */
+  column-gap: calc(var(--prod-qty-size) * 0.34);
+  padding-right: calc(var(--prod-qty-size) * 0.34);
 }
 .ptable-head {
   background: #f6f1e8;
 }
 .ptable-head > div {
   padding: 14px 24px;
+  /* The headings name columns sized for their figures, not for their own words:
+     let one wrap and the header grows a line taller than the rows it labels. */
+  white-space: nowrap;
   font-family: var(--font-display);
   font-weight: 500;
   font-size: 13px;
@@ -1119,6 +1130,10 @@ select {
   font-size: var(--prod-name-size);
   font-weight: 600;
   line-height: 1.15;
+  /* The name is what gives way. A long one wrapping costs a taller row; a figure
+     that does not fit is either clipped or pushed into its neighbour, and both
+     are unreadable from across the room. */
+  overflow-wrap: anywhere;
 }
 .ptable-split .ptable-qty {
   min-width: 0;
@@ -1126,8 +1141,46 @@ select {
   font-size: var(--prod-qty-size);
   line-height: 1.1;
 }
+/* Same pill as the unit count, in the brand's other colour. Both figures are
+   answers to "how much", read from the same distance, so giving one of them a
+   quieter treatment made it look like a footnote to the other.
+   Amber with dark text rather than white: white on this amber measures about
+   2.2:1, which fails even the relaxed threshold large text gets. */
+.ptable-recipes {
+  display: inline-block;
+  min-width: 52px;
+  padding: 6px 16px;
+  border-radius: var(--radius-pill);
+  background: var(--brand-amber);
+  color: var(--brand-slate-700);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+.ptable-split .ptable-recipes {
+  min-width: 0;
+  padding: 6px 18px;
+  font-size: var(--prod-qty-size);
+  line-height: 1.1;
+}
+/* No receta recorded: quiet, and not a pill. Muted rather than absent so the
+   column still has a floor to read along — an empty cell looks like a rendering
+   fault, and this is a screen nobody is standing next to. */
+.ptable-recipes-none {
+  color: var(--ink-muted);
+  font-size: 17px;
+}
+.ptable-split .ptable-recipes-none {
+  font-size: calc(var(--prod-qty-size) * 0.6);
+}
 .ptable-split .ptable-head > div {
   font-size: 15px;
+  /* The columns are sized in vh and the headings in px, so on a short screen the
+     columns shrink under headings that do not. Less padding is what keeps the
+     two labels from running into each other before the screen is tall enough for
+     the figures they name. */
+  padding: 12px 12px;
 }
 .ptable-qty-cell {
   padding: 15px 24px;
@@ -2037,12 +2090,13 @@ code {
 .product-list {
   display: grid;
   grid-template-columns:
-    minmax(160px, 340px) /* nombre — capped, see below */
-    105px /* categoría */
-    85px /* umbral */
-    85px /* paquete */
-    105px /* stock actual */
-    75px /* pedidos */
+    minmax(150px, 300px) /* nombre — capped, see below */
+    100px /* categoría */
+    80px /* umbral */
+    80px /* paquete */
+    80px /* receta */
+    100px /* stock actual */
+    70px /* pedidos */
     minmax(max-content, 1fr); /* acciones: at least the buttons — a retired
                                  product has three where an active one has two —
                                  and the leftover width on top */

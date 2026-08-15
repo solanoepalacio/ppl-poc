@@ -18,6 +18,29 @@ const TITLE: Record<ProductCategory, string> = {
 const SUBTITLE = 'Cantidades a producir';
 
 /**
+ * How many recetas a quantity comes to, for the line to read instead of dividing
+ * in their heads — which is what they do today, product by product, off a screen
+ * across the room.
+ *
+ * An em dash when the product has no receta recorded. A zero would read as "no
+ * work", which is the opposite of what a row on this screen means: every row here
+ * is something still to bake.
+ *
+ * Two decimals, es-AR, and formatted on the server — this is a Server Component,
+ * so the locale cannot resolve one way in Node and another in the browser. A
+ * fraction is shown rather than rounded up to a whole receta: a quarter batch is
+ * something the person at the mixer already knows how to make, and rounding up
+ * would invent units that nothing downstream accounts for.
+ */
+function recipesOf(toProduce: number, recipeSize: number): string | null {
+  if (recipeSize <= 0) return null;
+  return (toProduce / recipeSize).toLocaleString('es-AR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+/**
  * One half of the split layout. Rows alternate their text colour by position
  * *within this table*, so both halves start on the same colour and stay in step
  * across the screen — keying off the global index would put them out of phase
@@ -33,6 +56,7 @@ function ProductionTable({ items }: { items: ProductionTotalItem[] }) {
       <div className="ptable-head" role="row">
         <div>Producto</div>
         <div className="col-right">A producir</div>
+        <div className="col-right">Recetas</div>
       </div>
       {items.map((item, i) => (
         <div
@@ -43,6 +67,21 @@ function ProductionTable({ items }: { items: ProductionTotalItem[] }) {
           <div className="ptable-name">{item.name}</div>
           <div className="ptable-qty-cell">
             <span className="ptable-qty">{item.toProduce}</span>
+          </div>
+          {/* Beside the units, not instead of them: the order was placed in
+              units and the stock is counted in units, so a line that only had
+              recetas could not check its work against anything else. */}
+          <div className="ptable-qty-cell">
+            {/* The pill is the figure's treatment, so a product with no receta
+                gets no pill: a filled one holding a dash reads as a control with
+                nothing in it rather than as an absence. */}
+            {recipesOf(item.toProduce, item.recipeSize) === null ? (
+              <span className="ptable-recipes-none">—</span>
+            ) : (
+              <span className="ptable-recipes">
+                {recipesOf(item.toProduce, item.recipeSize)}
+              </span>
+            )}
           </div>
         </div>
       ))}
