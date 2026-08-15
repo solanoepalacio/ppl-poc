@@ -169,9 +169,9 @@ asked for.
 - **WHEN** the view is opened on a phone-sized viewport
 - **THEN** its type falls back to ordinary back-office sizes
 
-### Requirement: The review view keeps itself current and cycles when it overflows
+### Requirement: The review view keeps itself current
 The view is shown on screens nobody touches, so it SHALL NOT depend on anyone
-refreshing or scrolling it.
+refreshing it.
 
 It SHALL re-read the bloque periodically, so orders placed after the screen was
 opened appear on their own. It SHALL do so without reloading the page, so the
@@ -179,21 +179,18 @@ scroll position and anything else on screen survive the update, and it SHALL NOT
 poll while the view is not visible, refreshing instead when it becomes visible
 again so nobody returns to figures from before they left.
 
-When there are more clients than fit, the view SHALL cycle through them —
-holding, moving to the end, holding, returning — so the clients at the bottom
-are not permanently unread. When everything already fits it SHALL NOT move:
-motion with nothing to reveal is a distraction on a screen people glance at.
+The view SHALL NOT scroll itself. Unlike the production views, this one is looked
+*up* in: someone is reading a particular client's row, and a page that moves under
+them while they read costs more than reaching the bottom of a long list by hand.
+A list longer than the screen is scrolled by whoever is reading it.
 
 #### Scenario: A new order appears without anyone touching the screen
 - **WHEN** an order is placed after the view was opened
 - **THEN** the view shows it within its refresh interval
 - **AND** the page is not reloaded to do so
 
-#### Scenario: An overflowing list cycles
+#### Scenario: The view never scrolls on its own
 - **WHEN** the bloque holds more clients than fit on the screen
-- **THEN** the view moves through the list and returns to the top, repeatedly
-
-#### Scenario: A list that fits does not move
-- **WHEN** every client already fits on the screen
-- **THEN** the view does not scroll on its own
+- **THEN** the view stays where the reader left it
+- **AND** does not move through the list on its own
 

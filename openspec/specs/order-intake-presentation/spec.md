@@ -268,18 +268,22 @@ SHALL put the summary on screen and mark it for review:
 
 - The summary SHALL be expanded if it is collapsed. If it is already open it stays
   open and is not re-rendered or scrolled away.
-- A notice SHALL appear with the summary, telling the customer in Spanish to
-  review their order before confirming. When the summary was already open the
-  notice is the only thing added, since there is nothing left to expand.
+- A notice SHALL already be on the summary, telling the customer in Spanish to
+  review their order before confirming — it is part of the summary rather than
+  something the confirm raises, so it is read while the order is still being
+  built rather than after the customer has decided. It SHALL be presented in the
+  same alert treatment as the by-unit notice in the header, so the two read as
+  the same kind of instruction.
 - The primary action SHALL be relabelled to name the review and SHALL be disabled
-  for **5 seconds**, so the screen cannot be dismissed by a second reflexive tap
-  on a control the customer's finger is already over.
+  for **3 seconds**, so the screen cannot be dismissed by a second reflexive tap
+  on a control the customer's finger is already over. Three rather than five: the
+  notice is no longer the first the customer hears of it, so the pause has less
+  to buy.
 - That label SHALL carry the **whole seconds remaining**, counting down until the
-  action returns. A control that is merely relabelled and dead for five seconds
-  reads as broken; the count is what distinguishes a wait from a fault, and it
+  action returns. A control that is merely relabelled and dead reads as broken; the count is what distinguishes a wait from a fault, and it
   tells the customer how long they have rather than leaving them to guess.
 
-When the 5 seconds elapse the primary action SHALL return to its normal confirm
+When the 3 seconds elapse the primary action SHALL return to its normal confirm
 label and become enabled again, and activating it SHALL submit the order exactly
 as it did before this gate existed. The gate is a pause before the first
 submission, not a confirmation dialog and not a second step to complete.
@@ -303,7 +307,7 @@ signalled by color or by the button's state alone.
   action for the first time
 - **THEN** the order is not submitted
 - **AND** the summary stays open
-- **AND** the review notice is shown
+- **AND** the review notice is still shown, as it was before the confirm
 
 #### Scenario: The action is relabelled and disabled during the pause
 - **WHEN** the review pause is running
@@ -312,12 +316,12 @@ signalled by color or by the button's state alone.
 
 #### Scenario: The label counts the seconds down
 - **WHEN** the review pause begins and runs to its end
-- **THEN** the primary action's label shows 5 seconds remaining, then 4, 3, 2 and 1
+- **THEN** the primary action's label shows 3 seconds remaining, then 2 and 1
 - **AND** it is disabled throughout
 - **AND** the count is gone once the confirm label returns
 
 #### Scenario: The action returns after the pause
-- **WHEN** 5 seconds have elapsed since the review pause began
+- **WHEN** 3 seconds have elapsed since the review pause began
 - **THEN** the primary action shows the confirm label again
 - **AND** it is enabled
 
@@ -337,27 +341,80 @@ signalled by color or by the button's state alone.
 - **THEN** it is readable as text
 - **AND** it is exposed to assistive technology as a live announcement
 
-### Requirement: The order screen states that quantities are units
-The order entry screen SHALL display, in its header area above the catalog, a
-notice telling the customer that orders are taken **by unit, not by package**.
-The quantity typed against a product is a count of individual items, and a
-customer used to buying by the tray or the bag has no way to tell from the field
-itself; the notice removes an ambiguity whose cost lands on the bakery after the
-order is baked.
+#### Scenario: The notice is on the summary before any confirm
+- **WHEN** the customer opens the summary without having activated the confirm
+  action
+- **THEN** the review notice is already shown with it
 
-The notice SHALL be shown on the order entry screen only. The order-received and
-invalid-link states carry no quantities to misread.
+### Requirement: The customer chooses the measure of each product
+A product that has a pack SHALL offer the customer a choice, beside its quantity,
+between ordering **by unit** and **by pack**. It SHALL start on **unidad**: units
+are what every product could always be ordered in, so the default is the
+behaviour the customer had before, and a default of packs would multiply an
+unread choice by five.
 
-It SHALL be presented as an alert — coloured and emphasised so it is read before
-the catalog is — because the cost of missing it lands on the bakery after the
-order is baked, not on the customer while they can still fix it.
+A product with no pack SHALL show a plain, non-interactive **unidad** label in the
+same position. A disabled control invites the customer to try it and wonder what
+is wrong; a label answers the same question — *in what?* — without offering
+anything.
 
-#### Scenario: The notice is on the entry screen
+Beside the product name SHALL sit a short note, in small type, saying how many
+units its pack holds. The choice by itself says a pack exists but not what it is
+worth, and a customer who cannot tell whether a pack is five or fifty cannot use
+it. It belongs with the name rather than with the control because it describes
+the product and does not change when the customer picks something.
+
+Nothing else SHALL be added under the control. The row already carries a name, a
+figure and a choice; a line explaining the choice is a fourth thing to read on
+every product in a long list, and the choice is legible without it.
+
+The screen SHALL carry, in its header area above the catalog, a notice telling
+the customer to check whether they are ordering by unit or by pack. It SHALL be
+presented as an alert — coloured and emphasised so it is read before the catalog
+is — because the cost of getting it wrong lands on the bakery after the order is
+baked, not on the customer while they can still fix it. The notice SHALL be shown
+on the order entry screen only; the order-received and invalid-link states carry
+no quantities to misread.
+
+#### Scenario: A product with a pack offers the choice
+- **WHEN** the customer opens the form and a listed product has a pack size
+- **THEN** that product shows a control offering unidad and paquete
+- **AND** it is set to unidad
+
+#### Scenario: A product without a pack offers nothing to choose
+- **WHEN** a listed product has no pack size
+- **THEN** it shows a plain unidad label
+- **AND** there is no control to change it
+
+#### Scenario: The product says what its pack is worth
+- **WHEN** a product has a pack
+- **THEN** a note beside its name states how many units the pack holds
+
+#### Scenario: The header notice is about the choice
 - **WHEN** the customer opens the order form with a valid token
-- **THEN** a notice stating that orders are taken by unit and not by package is
-  visible in the header area, above the catalog
+- **THEN** a notice telling them to check whether they are ordering by unit or by
+  pack is visible in the header area, above the catalog
 
 #### Scenario: The notice is absent from the outcome states
 - **WHEN** the page renders the order-received or the invalid-link state
-- **THEN** the by-unit notice is not shown
+- **THEN** the notice is not shown
+
+### Requirement: The summary states the measure of every line
+The order summary SHALL say, for each line, which measure it was chosen in. A
+list of names and bare numbers cannot be checked once two of its rows can mean
+different things, and checking it is the whole reason the summary is put in front
+of the customer before they confirm.
+
+A line chosen in packs SHALL also show what it comes to in units. The customer is
+being asked to confirm what the bakery will bake, and what the bakery will bake is
+the unit figure.
+
+#### Scenario: A line in units says so
+- **WHEN** the summary lists a product ordered by unit
+- **THEN** the line states the quantity in units
+
+#### Scenario: A line in packs says so and gives the units
+- **WHEN** the summary lists 4 packs of a product whose pack is 5 units
+- **THEN** the line states that it is 4 packs
+- **AND** that it comes to 20 units
 

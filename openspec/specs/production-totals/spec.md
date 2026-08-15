@@ -307,9 +307,15 @@ visible before the content scrolls. Products SHALL be distributed alternately
 between the two tables — the first to the left, the second to the right, the
 third to the left, and so on — so the list reads across before it reads down.
 
-Each row SHALL show exactly two things: the product's name and the quantity to
-produce. The demand, the recorded existencia and the recorded real production
-SHALL NOT be displayed on these views.
+Each row SHALL show the product's name, the quantity to produce, and — for a
+product that has a receta — how many recetas that quantity comes to. The demand,
+the recorded existencia and the recorded real production SHALL NOT be displayed
+on these views.
+
+The quantity in units stays, beside the receta figure rather than replaced by it.
+It is what the order was placed in and what the stock is counted in, so dropping
+it would leave the line unable to check its own work against anything else in the
+building.
 
 #### Scenario: Manager views one line's outstanding production
 - **WHEN** the manager opens the **Producción salados** view
@@ -360,4 +366,12 @@ SHALL NOT be displayed on these views.
 - **THEN** the products shown are for the currently open bloque and that view's
   category
 - **AND** the view offers no control to select a different bloque
+
+#### Scenario: A row states the work in recetas
+- **WHEN** a product with a receta of 100 units has 25 to produce
+- **THEN** its row shows 25 to produce and 0,25 recetas
+
+#### Scenario: A product without a receta shows no receta figure
+- **WHEN** a product has no receta
+- **THEN** its row shows the quantity to produce and no receta figure
 
