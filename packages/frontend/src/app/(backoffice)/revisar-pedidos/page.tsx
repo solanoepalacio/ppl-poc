@@ -111,10 +111,11 @@ function groupByClient(
 export default async function RevisarPedidosPage({
   searchParams,
 }: {
-  searchParams: { slotId?: string };
+  searchParams: Promise<{ slotId?: string }>;
 }) {
+  const { slotId } = await searchParams;
   const [view, products, { slots }] = await Promise.all([
-    getOrdersBySlot(searchParams.slotId),
+    getOrdersBySlot(slotId),
     getProducts(),
     getSlots(),
   ]);

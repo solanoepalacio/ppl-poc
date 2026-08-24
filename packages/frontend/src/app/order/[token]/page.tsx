@@ -10,12 +10,13 @@ import { OrderForm } from './OrderForm';
 export default async function OrderPage({
   params,
 }: {
-  params: { token: string };
+  params: Promise<{ token: string }>;
 }) {
+  const { token } = await params;
   let valid = false;
   let catalog: Awaited<ReturnType<typeof validateToken>>['catalog'] = [];
   try {
-    const res = await validateToken(params.token);
+    const res = await validateToken(token);
     valid = res.valid;
     catalog = res.catalog ?? [];
   } catch {
@@ -26,5 +27,5 @@ export default async function OrderPage({
     return <InvalidLinkNotice />;
   }
 
-  return <OrderForm token={params.token} catalog={catalog} />;
+  return <OrderForm token={token} catalog={catalog} />;
 }

@@ -7,12 +7,13 @@
  * The failed-attempt message arrives as a query flag (?error=1) rather than
  * client state, so the whole flow is a form POST and a redirect.
  */
-export default function LoginPage({
+export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: { next?: string; error?: string };
+  searchParams: Promise<{ next?: string; error?: string }>;
 }) {
-  const failed = searchParams.error != null;
+  const { next, error } = await searchParams;
+  const failed = error != null;
 
   return (
     <main className="login-shell">
@@ -21,7 +22,7 @@ export default function LoginPage({
         <p className="login-subtitle">Oficina de gestión</p>
 
         <form method="post" action="/login/submit" className="login-form">
-          <input type="hidden" name="next" value={searchParams.next ?? ''} />
+          <input type="hidden" name="next" value={next ?? ''} />
 
           <label className="login-field">
             <span>Usuario</span>

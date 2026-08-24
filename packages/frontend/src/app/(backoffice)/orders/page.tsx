@@ -25,10 +25,11 @@ import { OrdersTable } from './OrdersTable';
 export default async function OrdersPage({
   searchParams,
 }: {
-  searchParams: { slotId?: string };
+  searchParams: Promise<{ slotId?: string }>;
 }) {
+  const { slotId } = await searchParams;
   const [view, products, { slots }, clients] = await Promise.all([
-    getOrdersBySlot(searchParams.slotId),
+    getOrdersBySlot(slotId),
     getProducts(),
     getSlots(),
     getClients(),
