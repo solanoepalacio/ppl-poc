@@ -50,13 +50,21 @@ RUN yarn workspace @pannico/shared run build \
 # ── runtime ──────────────────────────────────────────────────────────────────
 FROM node:22-bookworm-slim AS runtime
 WORKDIR /app/packages/frontend
-RUN corepack enable
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=6065
 
-COPY --from=builder /app /app
+# Owned by `node`, not root: `next start` writes into .next at run time (the
+# image optimizer caches there), so the tree has to belong to the user that
+# ends up running it. Done in the COPY rather than a later `chown -R` because
+# a recursive chown on this tree rewrites every file into a second full layer.
+COPY --from=builder --chown=node:node /app /app
+
+# Everything above this line runs as root; the server does not. A hole in the
+# framework is then a hole with this user's reach, which is this tree and
+# nothing else. Node needs no privileged port here — 6065 is well above 1024.
+USER node
 
 EXPOSE 6065
 
@@ -68,4 +76,8 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
 
 # `next start` honours PORT; the package script pins :3001 for local dev, so it
 # is bypassed here on purpose.
-CMD ["yarn", "next", "start"]
+#
+# The binary directly rather than through yarn: corepack would want to resolve
+# and cache the pinned yarn release at run time, under a home directory the
+# unprivileged user may not have primed, to accomplish nothing this needs.
+CMD ["/app/node_modules/.bin/next", "start"]

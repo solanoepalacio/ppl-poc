@@ -10,7 +10,10 @@
 set -e
 
 echo "[entrypoint] applying migrations to ${DATABASE_URL}"
-yarn prisma migrate deploy
+# The Prisma binary directly rather than `yarn prisma`: this runs unprivileged,
+# and corepack would want to resolve and cache the pinned yarn release at run
+# time, under a home directory nothing has primed, to accomplish nothing here.
+/app/node_modules/.bin/prisma migrate deploy
 
 echo "[entrypoint] seeding catalog"
 node dist/prisma/seed.js

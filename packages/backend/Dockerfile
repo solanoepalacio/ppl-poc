@@ -44,15 +44,27 @@ WORKDIR /app/packages/backend
 # openssl: Prisma's query engine links against libssl at runtime.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends openssl ca-certificates \
- && rm -rf /var/lib/apt/lists/* \
- && corepack enable
+ && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production
 ENV PORT=6066
 
 # The whole built tree, dev dependencies included: the container runs
 # `prisma migrate deploy` on start, and the Prisma CLI is a dev dependency.
-COPY --from=builder /app /app
+#
+# Owned by `node` so the unprivileged user below can read it, and chowned in
+# the COPY rather than afterwards: a recursive chown over this tree would
+# rewrite every file into a second full layer.
+COPY --from=builder --chown=node:node /app /app
+
+# The API does not run as root. It matters more here than for the frontend:
+# this is the process that reaches the mounted volume, so a hole in it would
+# otherwise be a hole with root's reach over the database on the host.
+#
+# `node` is uid 1000 in the official image, which is also the owner of
+# ./data/backend on the host — the bind mount carries host ownership straight
+# through, and a mismatch here means the entrypoint cannot write the database.
+USER node
 
 EXPOSE 6066
 
