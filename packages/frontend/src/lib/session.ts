@@ -1,15 +1,18 @@
 /**
- * Signed back-office session cookie, shared by the Edge middleware that checks
- * it and the route handlers that issue and clear it.
+ * Signed back-office session cookie, shared by the proxy that checks it and the
+ * route handlers that issue and clear it.
  *
- * The cookie has to be self-verifying: the middleware runs on the Edge Runtime
- * with no database to look a session up in, so the signature *is* the
- * mechanism. A plain `logged_in=true` cookie would be forgeable from the
- * browser console in one line.
+ * The cookie has to be self-verifying: the check runs on every request with no
+ * database to look a session up in, so the signature *is* the mechanism. A
+ * plain `logged_in=true` cookie would be forgeable from the browser console in
+ * one line.
  *
- * Signing uses Web Crypto HMAC-SHA256, not `node:crypto` — the latter does not
- * build under Edge Runtime middleware at all (it fails with
- * `UnhandledSchemeError`), which was verified before settling on this.
+ * Signing uses Web Crypto HMAC-SHA256 rather than `node:crypto`. That started
+ * as a hard constraint — under Next 14 this ran as Edge middleware, where
+ * `node:crypto` does not build at all (`UnhandledSchemeError`). Next 16 renamed
+ * the convention to `proxy` and put it on Node, so the constraint is gone, but
+ * Web Crypto is kept: it is available in both runtimes and in the route
+ * handlers, which leaves this module free of any runtime assumption.
  */
 
 export const SESSION_COOKIE = 'pannico_session';
@@ -30,7 +33,7 @@ export const SESSION_MAX_AGE_SECONDS = 400 * 24 * 60 * 60;
  * served over plain HTTP on a real hostname: browsers discard a `Secure`
  * cookie that arrives over a non-secure origin, so login would appear to
  * succeed and then bounce straight back to /login forever — the cookie is
- * dropped, the middleware sees no session, and redirects again.
+ * dropped, the proxy sees no session, and redirects again.
  *
  * This is keyed off its own variable rather than `NODE_ENV` because the two
  * questions are unrelated: `next start` always runs in production mode, but

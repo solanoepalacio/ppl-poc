@@ -13,8 +13,12 @@ import { SESSION_COOKIE, authConfig, verifySession } from '@/lib/session';
  * unprotected by accident. Only the customer order-token flow, the login page
  * itself, and Next's internals are excluded — leaving `/login` gated would
  * redirect it to itself and lock everyone out permanently.
+ *
+ * Called `proxy` rather than `middleware` since Next 16, which renamed the
+ * convention and dropped the Edge runtime for it: this runs on Node, and that
+ * is not configurable.
  */
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const config = authConfig();
   const cookie = req.cookies.get(SESSION_COOKIE)?.value;
   const authorized =

@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 #
-# Frontend image (Next.js 14 App Router).
+# Frontend image (Next.js 16 App Router).
 #
 # The build context is the REPO ROOT, not this directory — a Yarn workspace
 # install needs the root manifest, the lockfile and every workspace's
@@ -60,7 +60,7 @@ COPY --from=builder /app /app
 
 EXPOSE 6065
 
-# `/login` is public (the middleware has to let it through, or logging in would
+# `/login` is public (the proxy has to let it through, or logging in would
 # redirect to itself), which makes it the one route that proves the server
 # renders without needing a session.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \

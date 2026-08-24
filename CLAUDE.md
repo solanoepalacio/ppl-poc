@@ -14,7 +14,7 @@ is the *how*: stack, layout, commands, conventions.
   of truth for the API contract. Must be built (`tsc`) before the others typecheck.
 - `packages/backend` — NestJS + Prisma over **SQLite**. REST API on `:3000`. Modules:
   `orders/`, `links/`, `slots/`, `clients/`, `prisma/`, `config/`, `common/`.
-- `packages/frontend` — Next.js 14 **App Router**. Back office under
+- `packages/frontend` — Next.js 16 **App Router**. Back office under
   `src/app/(backoffice)/`, customer form under the order-token routes. Serves on `:3001`.
 
 ## Commands
